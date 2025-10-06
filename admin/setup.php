@@ -138,8 +138,10 @@ print '<table class="noborder" width="100%">';
 
 // Réglage 
 		setup_print_title($langs->trans("LMDB_UpdateOptions"));
-		setup_print_on_off('LMDB_COST_PRICE_ONLY');
-		setup_print_on_off('LMDB_SUPPLIER_BUYPRICE_ALTERED');
+                setup_print_on_off('LMDB_COST_PRICE_ONLY');
+                setup_print_on_off('LMDB_SUPPLIER_BUYPRICE_ALTERED');
+                setup_print_on_off('LMDB_COST_PRICE_FIXED_FEES_MODE');
+                setup_print_input_form_part('LMDB_COST_PRICE_FIXED_FEES_COEF', '', '', array('type' => 'number', 'step' => '0.01', 'min' => '0'));
 		
 
 

@@ -19,6 +19,9 @@ LMDB_UpdateOptions=Options de mise à jour des prix de vente
 
 LMDB_COST_PRICE_ONLY = Ne mettre à jour les prix de vente que sur la base des prix de revient.
 LMDB_SUPPLIER_BUYPRICE_ALTERED = Actualisation de prix de vente à la création/mise à jour/suppression d'un prix d'achat ou l'actualisation du prix de revient si le calcul sur le prix de revient est activé.
+LMDB_COST_PRICE_FIXED_FEES_MODE = Calculer le prix de revient à partir de la moyenne des prix d'achat multipliée par un coefficient de frais fixes.
+LMDB_COST_PRICE_FIXED_FEES_COEF = Coefficient de frais fixes pour le calcul du prix de revient
+LMDB_COST_PRICE_FIXED_FEES_COEF_HELP = Indiquez le coefficient (ex : 1,15 pour ajouter 15 % de frais fixes) appliqué à la moyenne des prix d'achat.
 
 
 
@@ -56,4 +59,9 @@ Entity = Entité
 LMDB_CommentAutoUpdateSellPrice = Les prix de vente sont mis à jour en fonction des coefficients de prix donnés dans le dictionnaire, et de la moyenne des prix unitaires d'achats fournisseurs.
 LMDB_LabelAutoUpdateSellPrice = Mise à jour automatique des prix de vente
 LMDB_coefprice = Taux de marges sur les prix de vente
+LMDB_ElementTypeTooltipHelp = Choisissez 0 pour appliquer le coefficient aux produits et 1 pour les services.
+LMDB_ServiceNature = Nature du service
+LMDB_ServiceNatureDictionary = Natures de services
+LMDB_ServiceNatureLabelTooltipHelp = Libellé de la nature de service.
+LMDB_ServiceNaturePositionTooltipHelp = Ordre d'affichage de la nature de service.
 DynamicsPrices = Prix de vente dynamiques

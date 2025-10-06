@@ -18,6 +18,9 @@ DynamicsPricesSetupPage = Página de configuración del módulo de precios de ve
 LMDB_UpdateOptions = Opciones de actualización de precios de venta<br>
 LMDB_COST_PRICE_ONLY = Actualizar los precios de venta según los precios de coste Solo.
 LMDB_SUPPLIER_BUYPRICE_ALTERED = Actualizar los precios de venta al crear, actualizar o eliminar un precio de compra, o al actualizar el precio de costo si el cálculo basado en costos está habilitado. <br>
+LMDB_COST_PRICE_FIXED_FEES_MODE = Calcular el precio de coste a partir del promedio de precios de compra multiplicado por un coeficiente de gastos fijos.<br>
+LMDB_COST_PRICE_FIXED_FEES_COEF = Coeficiente de gastos fijos para el cálculo del precio de coste<br>
+LMDB_COST_PRICE_FIXED_FEES_COEF_HELP = Indique el coeficiente (por ejemplo 1,15 añade un 15 % de gastos) aplicado al promedio de precios de compra.<br>
 #<br>
 # Acerca de <br>
 #<br>
@@ -51,4 +54,9 @@ Minrate = Tasa de margen mínima (en %)<br>
 LMDB_CommentAutoUpdateSellPrice = Los precios de venta se actualizan según los coeficientes de precio del diccionario y el promedio de los precios unitarios de compra del proveedor.<br>
 LMDB_LabelAutoUpdateSellPrice = Actualización automática de precios de venta<br>
 LMDB_coefprice = Tasas de margen sobre los precios de venta<br>
+LMDB_ElementTypeTooltipHelp = Seleccione 0 para aplicar el coeficiente a los productos y 1 a los servicios.<br>
+LMDB_ServiceNature = Naturaleza del servicio<br>
+LMDB_ServiceNatureDictionary = Naturalezas de servicios<br>
+LMDB_ServiceNatureLabelTooltipHelp = Etiqueta de la naturaleza del servicio.<br>
+LMDB_ServiceNaturePositionTooltipHelp = Orden de visualización de la naturaleza del servicio.<br>
 DynamicsPrices = Precios de venta dinámicos

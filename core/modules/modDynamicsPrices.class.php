@@ -254,38 +254,53 @@ class modDynamicsPrices extends DolibarrModules
 		 );
 		 */
 		/* BEGIN MODULEBUILDER DICTIONARIES */
-		$this->dictionaries = array(
-			'langs'=>'dynamicsprices@dynamicsprices',
-            'tabname'=>array(MAIN_DB_PREFIX."c_coefprice"),
-            'tablib'=>array("LMDB_coefprice"),
+                $this->dictionaries = array(
+                        'langs'=>'dynamicsprices@dynamicsprices',
+            'tabname'=>array(
+                MAIN_DB_PREFIX."c_coefprice",
+                MAIN_DB_PREFIX."c_service_nature"
+            ),
+            'tablib'=>array(
+                "LMDB_coefprice",
+                "LMDB_ServiceNatureDictionary"
+            ),
             'tabsql'=>array(
-            	'SELECT t.rowid as rowid, t.entity, t.code, t.fk_nature, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
-        	),
+                'SELECT t.rowid as rowid, t.entity, t.code, t.fk_nature, t.pricelevel, t.minrate, t.targetrate, t.element_type, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
+                'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.position, t.active FROM '.MAIN_DB_PREFIX.'c_service_nature AS t WHERE t.entity = '.((int) $conf->entity)
+                ),
             'tabsqlsort'=>array(
-            	"code ASC",
+                "code ASC",
+                "position ASC"
             ),
             'tabfield'=>array(
-            	"code,fk_nature,pricelevel,targetrate,minrate",
+                "code,fk_nature,pricelevel,targetrate,minrate,element_type",
+                "code,label,position"
             ),
             'tabfieldvalue'=>array(
-            	"code,entity,fk_nature,pricelevel,targetrate,minrate",
+                "code,entity,fk_nature,pricelevel,targetrate,minrate,element_type",
+                "code,entity,label,position"
             ),
             'tabfieldinsert'=>array(
-            	"code,entity,fk_nature,pricelevel,targetrate,minrate",
+                "code,entity,fk_nature,pricelevel,targetrate,minrate,element_type",
+                "code,entity,label,position"
             ),
-            'tabrowid'=>array('rowid'),
+            'tabrowid'=>array('rowid','rowid'),
             'tabcond'=>array(
-            	isModEnabled('dynamicsprices'),
+                isModEnabled('dynamicsprices'),
+                isModEnabled('dynamicsprices')
             ),
             'tabhelp' => array(
-            		'code' => $langs->trans('LMDB_CodeTooltipHelp'),
-            		'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
-            		'fk_nature' => $langs->trans('LMDB_FkNatureTooltipHelp'),
-            		'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
-            		'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
-            		'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'), 
+                        'code' => $langs->trans('LMDB_CodeTooltipHelp'),
+                        'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
+                        'fk_nature' => $langs->trans('LMDB_FkNatureTooltipHelp'),
+                        'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
+                        'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
+                        'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
+                        'element_type' => $langs->trans('LMDB_ElementTypeTooltipHelp'),
+                        'label' => $langs->trans('LMDB_ServiceNatureLabelTooltipHelp'),
+                        'position' => $langs->trans('LMDB_ServiceNaturePositionTooltipHelp'),
             ),
-		);
+                );
 		/* END MODULEBUILDER DICTIONARIES */
 
 		// Boxes/Widgets
@@ -531,14 +546,37 @@ class modDynamicsPrices extends DolibarrModules
 		}
 
 		// Create extrafields during init
-		//include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
-		//$extrafields = new ExtraFields($this->db);
-		//$result0=$extrafields->addExtraField('dynamicsprices_separator1', "Separator 1", 'separator', 1,  0, 'thirdparty',   0, 0, '', array('options'=>array(1=>1)), 1, '', 1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result1=$extrafields->addExtraField('dynamicsprices_myattr1', "New Attr 1 label", 'boolean', 1,  3, 'thirdparty',   0, 0, '', '', 1, '', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result2=$extrafields->addExtraField('dynamicsprices_myattr2', "New Attr 2 label", 'varchar', 1, 10, 'project',      0, 0, '', '', 1, '', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result3=$extrafields->addExtraField('dynamicsprices_myattr3', "New Attr 3 label", 'varchar', 1, 10, 'bank_account', 0, 0, '', '', 1, '', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result4=$extrafields->addExtraField('dynamicsprices_myattr4', "New Attr 4 label", 'select',  1,  3, 'thirdparty',   0, 1, '', array('options'=>array('code1'=>'Val1','code2'=>'Val2','code3'=>'Val3')), 1,'', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result5=$extrafields->addExtraField('dynamicsprices_myattr5', "New Attr 5 label", 'text',    1, 10, 'user',         0, 0, '', '', 1, '', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
+		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+		$extrafields = new ExtraFields($this->db);
+		$elementType = 'product';
+		$attrName = 'lmdb_service_nature';
+		$extrafields->fetch_name_optionals_label($elementType);
+		if (empty($extrafields->attributes[$elementType]['label'][$attrName])) {
+			$params = array('options' => array('c_service_nature:rowid:label' => null));
+			$resultExtraField = $extrafields->addExtraField(
+				$attrName,
+				'LMDB_ServiceNature',
+				'sellist',
+				1,
+				0,
+				$elementType,
+				0,
+				0,
+				'',
+				$params,
+				1,
+				'',
+				-1,
+				0,
+				'',
+				'',
+				'dynamicsprices@dynamicsprices',
+				'isModEnabled("dynamicsprices")'
+			);
+			if ($resultExtraField < 0) {
+				dol_syslog(__METHOD__.' error creating extrafield '.$attrName.' : '.$extrafields->error, LOG_ERR);
+			}
+		}
 
 		// Permissions
 		$this->remove($options);
