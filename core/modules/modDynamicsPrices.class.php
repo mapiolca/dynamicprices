@@ -262,12 +262,17 @@ class modDynamicsPrices extends DolibarrModules
                         't.rowid as rowid',
                         't.entity',
                         't.code',
-                        't.fk_nature',
+                        // EN: Resolve the code, falling back to the legacy rowid when necessary.
+                        // FR: Résoudre le code, en revenant au rowid hérité si nécessaire.
+                        'COALESCE(sn_code.code, pn_code.code, sn_rowid.code, pn_rowid.code, t.fk_nature) AS fk_nature',
+                        // EN: Surface the dictionary label to ease identification in the list.
+                        // FR: Afficher le libellé du dictionnaire pour faciliter l’identification dans la liste.
+                        'COALESCE(sn_code.label, pn_code.label, sn_rowid.label, pn_rowid.label, \'\') AS nature_label',
                         't.pricelevel',
                         't.minrate',
                         't.targetrate'
                 );
-                $coefDisplayedFields = array('code', 'fk_nature', 'pricelevel', 'targetrate', 'minrate');
+                $coefDisplayedFields = array('code', 'fk_nature', 'nature_label', 'pricelevel', 'targetrate', 'minrate');
                 $coefValueFields = array('code', 'entity', 'fk_nature', 'pricelevel', 'targetrate', 'minrate');
 
                 if ($supportsElementType) {
@@ -282,10 +287,20 @@ class modDynamicsPrices extends DolibarrModules
 
                 $coefSelectFields[] = 't.active';
 
+                // EN: Prepare joins once to keep the SQL definition readable.
+                // FR: Préparer les jointures une seule fois pour conserver une définition SQL lisible.
+                $coefJoins = array(
+                        ' LEFT JOIN '.MAIN_DB_PREFIX."c_service_nature AS sn_code ON sn_code.code = t.fk_nature AND sn_code.entity = t.entity",
+                        ' LEFT JOIN '.MAIN_DB_PREFIX."c_product_nature AS pn_code ON pn_code.code = t.fk_nature",
+                        ' LEFT JOIN '.MAIN_DB_PREFIX."c_service_nature AS sn_rowid ON t.fk_nature REGEXP \'^[0-9]+$\' AND sn_rowid.rowid = CAST(t.fk_nature AS UNSIGNED) AND sn_rowid.entity = t.entity",
+                        ' LEFT JOIN '.MAIN_DB_PREFIX."c_product_nature AS pn_rowid ON t.fk_nature REGEXP \'^[0-9]+$\' AND pn_rowid.rowid = CAST(t.fk_nature AS UNSIGNED)"
+                );
+
                 $coefHelp = array(
                         'code' => $langs->trans('LMDB_CodeTooltipHelp'),
                         'entity' => $langs->trans('LMDB_EntityTooltipHelp'),
                         'fk_nature' => $langs->trans('LMDB_FkNatureTooltipHelp'),
+                        'nature_label' => $langs->trans('LMDB_NatureLabelTooltipHelp'),
                         'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
                         'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
                         'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
@@ -313,7 +328,7 @@ class modDynamicsPrices extends DolibarrModules
                                 'LMDB_ServiceNatureDictionary'
                         ),
                         'tabsql' => array(
-                                'SELECT '.implode(', ', $coefSelectFields).' FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
+                                'SELECT '.implode(', ', $coefSelectFields).' FROM '.MAIN_DB_PREFIX.'c_coefprice AS t'.implode('', $coefJoins).' WHERE t.entity = '.((int) $conf->entity),
                                 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.position, t.active FROM '.MAIN_DB_PREFIX.'c_service_nature AS t WHERE t.entity = '.((int) $conf->entity)
                         ),
                         'tabsqlsort' => array(

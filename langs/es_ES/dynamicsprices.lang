@@ -58,6 +58,7 @@ LMDB_ElementTypeTooltipHelp = Seleccione 0 para aplicar el coeficiente a los pro
 LMDB_CodeTooltipHelp = Código único que identifica el coeficiente.<br>
 LMDB_EntityTooltipHelp = Entidad Dolibarr vinculada al coeficiente.<br>
 LMDB_FkNatureTooltipHelp = Naturaleza del servicio o producto que usa el coeficiente.<br>
+LMDB_NatureLabelTooltipHelp = Etiqueta asociada a la naturaleza de producto o servicio seleccionada.
 LMDB_PriceLevelTooltipHelp = Nivel de precio de cliente impactado por el coeficiente.<br>
 LMDB_TargetRateTooltipHelp = Porcentaje de margen objetivo aplicado al precio base.<br>
 LMDB_MinRateTooltipHelp = Porcentaje de margen mínimo garantizado para el precio base.<br>

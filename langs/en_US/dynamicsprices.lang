@@ -59,6 +59,7 @@ LMDB_ElementTypeTooltipHelp = Choose 0 to apply the coefficient to products and 
 LMDB_CodeTooltipHelp = Unique code identifying the coefficient.<br>
 LMDB_EntityTooltipHelp = Dolibarr entity linked to the coefficient.<br>
 LMDB_FkNatureTooltipHelp = Service or product nature using the coefficient.<br>
+LMDB_NatureLabelTooltipHelp = Resolved label for the selected product or service nature.<br>
 LMDB_PriceLevelTooltipHelp = Customer price level impacted by the coefficient.<br>
 LMDB_TargetRateTooltipHelp = Target margin percentage applied to the base price.<br>
 LMDB_MinRateTooltipHelp = Minimum margin percentage guaranteed for the base price.<br>
