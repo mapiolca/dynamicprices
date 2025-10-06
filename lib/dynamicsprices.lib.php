@@ -86,6 +86,57 @@ function dynamicspricesAdminPrepareHead()
 }
 
 
+
+/**
+ * EN: Provide a database-compatible integer cast expression for the given field.
+ * FR: Fournir une expression de conversion entière compatible avec la base de données pour le champ donné.
+ *
+ * @param DoliDB $db    Database handler
+ * @param string $field Field expression to cast
+ *
+ * @return string
+ */
+function dynamicsprices_sql_integer_cast($db, $field)
+{
+    $trimmedField = trim((string) $field);
+    if ($trimmedField === '') {
+        // EN: Defensive fallback returning zero when no field is provided.
+        // FR: Retour préventif renvoyant zéro lorsqu'aucun champ n'est fourni.
+        return '0';
+    }
+
+    return 'CAST('.$trimmedField.' AS INTEGER)';
+}
+
+
+/**
+ * EN: Build a guard expression ensuring the supplied field holds only digits before casting.
+ * FR: Construire une expression de garde garantissant que le champ fourni ne contient que des chiffres avant conversion.
+ *
+ * @param DoliDB $db    Database handler
+ * @param string $field Field expression to validate
+ *
+ * @return string Empty string when no guard is required
+ */
+function dynamicsprices_sql_numeric_guard($db, $field)
+{
+    $trimmedField = trim((string) $field);
+    if ($trimmedField === '') {
+        return '';
+    }
+
+    if ($db->type === 'pgsql') {
+        // EN: PostgreSQL requires an explicit regular expression guard before casting text to integer.
+        // FR: PostgreSQL nécessite une garde par expression régulière avant de convertir un texte en entier.
+        return $trimmedField." ~ '^[0-9]+$'";
+    }
+
+    // EN: Other database drivers tolerate direct casts, so no guard is needed.
+    // FR: Les autres pilotes de base de données acceptent la conversion directe, aucune garde n'est nécessaire.
+    return '';
+}
+
+
 function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $productid = 0)
 {
     dol_include_once('/product/class/product.class.php');

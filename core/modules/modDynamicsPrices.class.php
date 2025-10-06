@@ -289,14 +289,26 @@ class modDynamicsPrices extends DolibarrModules
 
                 // EN: Prepare joins once to keep the SQL definition readable.
                 // FR: Préparer les jointures une seule fois pour conserver une définition SQL lisible.
+                $numericGuard = dynamicsprices_sql_numeric_guard($this->db, 't.fk_nature');
+                $numericCast = dynamicsprices_sql_integer_cast($this->db, 't.fk_nature');
+
                 $coefJoins = array(
                         ' LEFT JOIN '.MAIN_DB_PREFIX."c_service_nature AS sn_code ON sn_code.code = t.fk_nature AND sn_code.entity = t.entity",
                         ' LEFT JOIN '.MAIN_DB_PREFIX."c_product_nature AS pn_code ON pn_code.code = t.fk_nature",
-                        // EN: Fall back to rowid lookups when the stored value is numeric.
-                        // FR: Revenir aux recherches par rowid lorsque la valeur stockée est numérique.
-                        ' LEFT JOIN '.MAIN_DB_PREFIX."c_service_nature AS sn_rowid ON t.fk_nature REGEXP '^[0-9]+$' AND sn_rowid.rowid = CAST(t.fk_nature AS UNSIGNED) AND sn_rowid.entity = t.entity",
-                        ' LEFT JOIN '.MAIN_DB_PREFIX."c_product_nature AS pn_rowid ON t.fk_nature REGEXP '^[0-9]+$' AND pn_rowid.rowid = CAST(t.fk_nature AS UNSIGNED)"
                 );
+
+                // EN: Reuse legacy rowid lookups for numeric storage while avoiding database-specific syntax errors.
+                // FR: Réutiliser les recherches par rowid héritées pour les valeurs numériques tout en évitant les erreurs de syntaxe propres aux bases.
+                $serviceJoinConditions = array('sn_rowid.rowid = '.$numericCast, 'sn_rowid.entity = t.entity');
+                $productJoinConditions = array('pn_rowid.rowid = '.$numericCast);
+
+                if ($numericGuard !== '') {
+                        array_unshift($serviceJoinConditions, '('.$numericGuard.')');
+                        array_unshift($productJoinConditions, '('.$numericGuard.')');
+                }
+
+                $coefJoins[] = ' LEFT JOIN '.MAIN_DB_PREFIX.'c_service_nature AS sn_rowid ON '.implode(' AND ', $serviceJoinConditions);
+                $coefJoins[] = ' LEFT JOIN '.MAIN_DB_PREFIX.'c_product_nature AS pn_rowid ON '.implode(' AND ', $productJoinConditions);
 
                 $coefHelp = array(
                         'code' => $langs->trans('LMDB_CodeTooltipHelp'),
