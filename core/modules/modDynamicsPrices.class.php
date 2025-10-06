@@ -271,9 +271,13 @@ class modDynamicsPrices extends DolibarrModules
                 $coefValueFields = array('code', 'entity', 'fk_nature', 'pricelevel', 'targetrate', 'minrate');
 
                 if ($supportsElementType) {
+                        $productLabel = $langs->transnoentitiesnoreplace('Product');
+                        $serviceLabel = $langs->transnoentitiesnoreplace('Service');
+
                         $coefSelectFields[] = 't.element_type';
-                        $coefDisplayedFields[] = 'element_type';
-                        $coefValueFields[] = 'element_type';
+                        $coefSelectFields[] = "CASE WHEN t.element_type = 1 THEN '".$this->db->escape($serviceLabel)."' ELSE '".$this->db->escape($productLabel)."' END AS element_type_label";
+                        $coefDisplayedFields[] = 'element_type_label';
+                        $coefValueFields[] = 'element_type:select:0='.$productLabel.':1='.$serviceLabel;
                 }
 
                 $coefSelectFields[] = 't.active';
@@ -288,7 +292,7 @@ class modDynamicsPrices extends DolibarrModules
                 );
 
                 if ($supportsElementType) {
-                        $coefHelp['element_type'] = $langs->trans('LMDB_ElementTypeTooltipHelp');
+                        $coefHelp['element_type_label'] = $langs->trans('LMDB_ElementTypeTooltipHelp');
                 }
 
                 $serviceNatureHelp = array(
