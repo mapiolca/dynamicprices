@@ -87,7 +87,14 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
                 require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
                 //var_dump(getDolGlobalString('LMDB_COST_PRICE_ONLY'));
                 if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED')) {
-                    $results = update_customer_prices_from_cost_price($db, $user, $langs, $conf, $object->fk_product);
+                    $productId = property_exists($object, 'id') ? (int) $object->id : 0;
+                    if ($productId <= 0 && property_exists($object, 'rowid')) {
+                        $productId = (int) $object->rowid;
+                    }
+
+                    if ($productId > 0) {
+                        $results = update_customer_prices_from_cost_price($db, $user, $langs, $conf, $productId);
+                    }
                 }
             }
         }

@@ -363,7 +363,7 @@ function dynamicsprices_get_coefficients($db, $natureId, $elementType)
     $sql = "SELECT pricelevel, minrate, targetrate";
     $sql .= " FROM ".MAIN_DB_PREFIX."c_coefprice";
     $sql .= " WHERE fk_nature = ".((int) $natureId);
-    $sql .= " AND entity IN (".getEntity('entity').")";
+    $sql .= " AND entity IN (".getEntity('c_coefprice').")";
     if ($supportsElementType) {
         $sql .= " AND element_type = ".$effectiveElementType;
     }
