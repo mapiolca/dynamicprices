@@ -1,0 +1,54 @@
+# Archivo de traducción<br>
+<br>
+#<br>
+# Genérico<br>
+#<br>
+<br>
+# Etiqueta del módulo 'ModuleDynamicsPricesName'<br>
+ModuleDynamicsPricesName = Precios de venta dinámicos<br>
+# Descripción del módulo 'ModuleDynamicsPricesDesc'<br>
+ModuleDynamicsPricesDesc = Este módulo permite actualizar los precios de venta según el precio unitario promedio de compra de los proveedores y los coeficientes de precio definidos en un diccionario específico.<br>
+<br>
+#<br>
+# Página de administración<br>
+#<br>
+DynamicsPricesSetup = Configuración de precios de venta dinámicos<br>
+Settings = Configuración<br>
+DynamicsPricesSetupPage = Página de configuración del módulo de precios de venta dinámicos<br>
+LMDB_UpdateOptions = Opciones de actualización de precios de venta<br>
+LMDB_COST_PRICE_ONLY = Actualizar los precios de venta según los precios de coste Solo.
+LMDB_SUPPLIER_BUYPRICE_ALTERED = Actualizar los precios de venta al crear, actualizar o eliminar un precio de compra, o al actualizar el precio de costo si el cálculo basado en costos está habilitado. <br>
+#<br>
+# Acerca de <br>
+#<br>
+About = Acerca de<br>
+DynamicsPricesAbout = Acerca de DynamicsPrices<br>
+DynamicsPricesAboutPage = Página Acerca de DynamicsPrices<br>
+<br>
+#<br>
+# Página de ejemplo<br>
+#<br>
+DynamicsPricesArea = Inicio DynamicsPrices<br>
+MyPageName = Nombre de mi página<br>
+<br>
+#<br>
+# Widget de ejemplo<br>
+#<br>
+MyWidget = Mi widget<br>
+MyWidgetDescription = Descripción de mi widget<br>
+<br>
+#<br>
+# Otro<br>
+#<br>
+<br>
+LMDB_ErrorUpdate = Error al actualizar:<br>
+LMDB_NbLinesUpdated = Número de precios de venta actualizados:<br>
+Fk_nature = Tipo de producto ID<br>
+Pricelevel = ID del nivel de precios<br>
+Targetrate = Tasa de margen objetivo (en %)<br>
+Minrate = Tasa de margen mínima (en %)<br>
+<br>
+LMDB_CommentAutoUpdateSellPrice = Los precios de venta se actualizan según los coeficientes de precio del diccionario y el promedio de los precios unitarios de compra del proveedor.<br>
+LMDB_LabelAutoUpdateSellPrice = Actualización automática de precios de venta<br>
+LMDB_coefprice = Tasas de margen sobre los precios de venta<br>
+DynamicsPrices = Precios de venta dinámicos

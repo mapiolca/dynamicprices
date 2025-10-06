@@ -1,0 +1,59 @@
+# Translation file
+
+#
+# Generic
+#
+
+# Module label 'ModuleDynamicsPricesName'
+ModuleDynamicsPricesName = Prix de vente dynamiques
+# Module description 'ModuleDynamicsPricesDesc'
+ModuleDynamicsPricesDesc = Ce module permet de mettre à jour les prix de vente en fonction du prix d'achat moyen unitaire chez les fournisseurs et des coefficients de prix définis dans un dictionnaire dédié.
+
+#
+# Admin page
+#
+DynamicsPricesSetup = Réglages des prix de vente dynamiques
+Settings = Réglages
+DynamicsPricesSetupPage = Page de réglage du module de Prix de vente dynamiques
+LMDB_UpdateOptions=Options de mise à jour des prix de vente
+
+LMDB_COST_PRICE_ONLY = Ne mettre à jour les prix de vente que sur la base des prix de revient.
+LMDB_SUPPLIER_BUYPRICE_ALTERED = Actualisation de prix de vente à la création/mise à jour/suppression d'un prix d'achat ou l'actualisation du prix de revient si le calcul sur le prix de revient est activé.
+
+
+
+#
+# About page
+#
+About = About
+DynamicsPricesAbout = About DynamicsPrices
+DynamicsPricesAboutPage = DynamicsPrices about page
+
+#
+# Sample page
+#
+DynamicsPricesArea = Home DynamicsPrices
+MyPageName = My page name
+
+#
+# Sample widget
+#
+MyWidget = My widget
+MyWidgetDescription = My widget description
+
+#
+# Autres
+#
+
+LMDB_ErrorUpdate = Erreur lors de la mise à jour :
+LMDB_NbLinesUpdated = Nombre de prix de vente mis à jour :
+Fk_nature = ID Nature du produit
+Pricelevel = ID du Niveau de prix 
+Targetrate = Taux de marge cible (en %)
+Minrate = Taux de marge minimum (en %)
+Entity = Entité
+	
+LMDB_CommentAutoUpdateSellPrice = Les prix de vente sont mis à jour en fonction des coefficients de prix donnés dans le dictionnaire, et de la moyenne des prix unitaires d'achats fournisseurs.
+LMDB_LabelAutoUpdateSellPrice = Mise à jour automatique des prix de vente
+LMDB_coefprice = Taux de marges sur les prix de vente
+DynamicsPrices = Prix de vente dynamiques

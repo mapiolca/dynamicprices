@@ -1,0 +1,55 @@
+# Translation file<br>
+<br>
+#<br>
+# Generic<br>
+#<br>
+<br>
+# Module label 'ModuleDynamicsPricesName'<br>
+ModuleDynamicsPricesName = Dynamic sales prices<br>
+# Module description 'ModuleDynamicsPricesDesc'<br>
+ModuleDynamicsPricesDesc = This module allows you to update sales prices based on the average unit purchase price from suppliers and the price coefficients defined in a dedicated dictionary.<br>
+<br>
+#<br>
+# Admin page<br>
+#<br>
+DynamicsPricesSetup = Dynamic sales price settings<br>
+Settings = Settings<br>
+DynamicsPricesSetupPage = Dynamic sales price module settings page<br>
+LMDB_UpdateOptions = Sales price update options<br>
+LMDB_COST_PRICE_ONLY = Update sales prices based on cost prices only.
+LMDB_SUPPLIER_BUYPRICE_ALTERED = Update sales prices when creating/updating/deleting a purchase price, or when updating the cost price if cost-based calculation is enabled.
+<br>
+#<br>
+# About page<br>
+#<br>
+About = About<br>
+DynamicsPricesAbout = About DynamicsPrices<br>
+DynamicsPricesAboutPage = DynamicsPrices about page<br>
+<br>
+#<br>
+# Sample page<br>
+#<br>
+DynamicsPricesArea = Home DynamicsPrices<br>
+MyPageName = My page name<br>
+<br>
+#<br>
+# Sample widget<br>
+#<br>
+MyWidget = My widget<br>
+MyWidgetDescription = My widget description<br>
+<br>
+#<br>
+# Other<br>
+#<br>
+<br>
+LMDB_ErrorUpdate = Error while updating:<br>
+LMDB_NbLinesUpdated = Number of sales prices updated:<br>
+Fk_nature = Product type ID<br>
+Pricelevel = Price level ID<br>
+Targetrate = Target margin rate (in %)<br>
+Minrate = Minimum margin rate (in %)<br>
+<br>
+LMDB_CommentAutoUpdateSellPrice = Sales prices are updated based on the price coefficients given in the dictionary and the average of the Supplier purchase unit prices.<br>
+LMDB_LabelAutoUpdateSellPrice = Automatic update of sales prices<br>
+LMDB_coefprice = Margin rates on sales prices<br>
+DynamicsPrices = Dynamic sales prices
