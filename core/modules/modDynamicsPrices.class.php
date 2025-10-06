@@ -292,8 +292,10 @@ class modDynamicsPrices extends DolibarrModules
                 $coefJoins = array(
                         ' LEFT JOIN '.MAIN_DB_PREFIX."c_service_nature AS sn_code ON sn_code.code = t.fk_nature AND sn_code.entity = t.entity",
                         ' LEFT JOIN '.MAIN_DB_PREFIX."c_product_nature AS pn_code ON pn_code.code = t.fk_nature",
-                        ' LEFT JOIN '.MAIN_DB_PREFIX."c_service_nature AS sn_rowid ON t.fk_nature REGEXP \'^[0-9]+$\' AND sn_rowid.rowid = CAST(t.fk_nature AS UNSIGNED) AND sn_rowid.entity = t.entity",
-                        ' LEFT JOIN '.MAIN_DB_PREFIX."c_product_nature AS pn_rowid ON t.fk_nature REGEXP \'^[0-9]+$\' AND pn_rowid.rowid = CAST(t.fk_nature AS UNSIGNED)"
+                        // EN: Fall back to rowid lookups when the stored value is numeric.
+                        // FR: Revenir aux recherches par rowid lorsque la valeur stockée est numérique.
+                        ' LEFT JOIN '.MAIN_DB_PREFIX."c_service_nature AS sn_rowid ON t.fk_nature REGEXP '^[0-9]+$' AND sn_rowid.rowid = CAST(t.fk_nature AS UNSIGNED) AND sn_rowid.entity = t.entity",
+                        ' LEFT JOIN '.MAIN_DB_PREFIX."c_product_nature AS pn_rowid ON t.fk_nature REGEXP '^[0-9]+$' AND pn_rowid.rowid = CAST(t.fk_nature AS UNSIGNED)"
                 );
 
                 $coefHelp = array(
