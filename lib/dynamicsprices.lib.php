@@ -303,13 +303,58 @@ function dynamicsprices_apply_coefficients($db, $user, $entity, $productId, $nat
 }
 
 /**
+ * Check if the coefficient dictionary supports the element_type column.
+ *
+ * @param DoliDB $db Database handler
+ *
+ * @return bool
+ */
+function dynamicsprices_has_coefprice_element_type_column($db)
+{
+    static $supportsElementType = null;
+
+    if ($supportsElementType !== null) {
+        return $supportsElementType;
+    }
+
+    $supportsElementType = true;
+
+    $sql = 'SELECT element_type FROM '.MAIN_DB_PREFIX.'c_coefprice WHERE 1 = 0';
+    $resql = $db->query($sql);
+
+    if ($resql === false) {
+        $errorMessage = $db->lasterror();
+        $errorCode = $db->lasterrno();
+
+        $unknownColumnDetected = (
+            $errorCode === 'DB_ERROR_NOSUCHFIELD' ||
+            (is_numeric($errorCode) && in_array((int) $errorCode, array(1054, 207, 1304, 42703), true)) ||
+            stripos($errorMessage, 'Unknown column') !== false ||
+            stripos($errorMessage, 'no such column') !== false ||
+            stripos($errorMessage, 'does not exist') !== false
+        );
+
+        if ($unknownColumnDetected) {
+            $supportsElementType = false;
+        }
+    } else {
+        $db->free($resql);
+    }
+
+    return $supportsElementType;
+}
+
+/**
  * Retrieve coefficients for a nature id with a simple runtime cache.
  */
 function dynamicsprices_get_coefficients($db, $natureId, $elementType)
 {
     static $cache = array();
 
-    $cacheKey = ((int) $elementType).'_'.((int) $natureId);
+    $supportsElementType = dynamicsprices_has_coefprice_element_type_column($db);
+    $effectiveElementType = $supportsElementType ? (int) $elementType : 0;
+
+    $cacheKey = $effectiveElementType.'_'.((int) $natureId);
 
     if (isset($cache[$cacheKey])) {
         return $cache[$cacheKey];
@@ -319,7 +364,9 @@ function dynamicsprices_get_coefficients($db, $natureId, $elementType)
     $sql .= " FROM ".MAIN_DB_PREFIX."c_coefprice";
     $sql .= " WHERE fk_nature = ".((int) $natureId);
     $sql .= " AND entity IN (".getEntity('entity').")";
-    $sql .= " AND element_type = ".((int) $elementType);
+    if ($supportsElementType) {
+        $sql .= " AND element_type = ".$effectiveElementType;
+    }
     $sql .= " AND active = 1";
 
     $resql = $db->query($sql);

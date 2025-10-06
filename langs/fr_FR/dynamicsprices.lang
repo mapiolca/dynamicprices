@@ -60,8 +60,17 @@ LMDB_CommentAutoUpdateSellPrice = Les prix de vente sont mis à jour en fonction
 LMDB_LabelAutoUpdateSellPrice = Mise à jour automatique des prix de vente
 LMDB_coefprice = Taux de marges sur les prix de vente
 LMDB_ElementTypeTooltipHelp = Choisissez 0 pour appliquer le coefficient aux produits et 1 pour les services.
+LMDB_CodeTooltipHelp = Code unique identifiant le coefficient.
+LMDB_EntityTooltipHelp = Entité Dolibarr liée au coefficient.
+LMDB_FkNatureTooltipHelp = Nature de produit ou service utilisant le coefficient.
+LMDB_PriceLevelTooltipHelp = Niveau de prix client impacté par le coefficient.
+LMDB_TargetRateTooltipHelp = Pourcentage de marge cible appliqué au prix de base.
+LMDB_MinRateTooltipHelp = Pourcentage de marge minimum garanti pour le prix de base.
 LMDB_ServiceNature = Nature du service
 LMDB_ServiceNatureDictionary = Natures de services
+LMDB_ServiceNatureCodeTooltipHelp = Code unique identifiant la nature de service.
+LMDB_ServiceNatureEntityTooltipHelp = Entité Dolibarr liée à la nature de service.
 LMDB_ServiceNatureLabelTooltipHelp = Libellé de la nature de service.
 LMDB_ServiceNaturePositionTooltipHelp = Ordre d'affichage de la nature de service.
 DynamicsPrices = Prix de vente dynamiques
+

@@ -253,55 +253,92 @@ class modDynamicsPrices extends DolibarrModules
 		 'tabhelp' => array(array('code' => $langs->trans('CodeTooltipHelp'), 'field2' => 'field2tooltip'), array('code' => $langs->trans('CodeTooltipHelp'), 'field2' => 'field2tooltip'), ...),
 		 );
 		 */
-		/* BEGIN MODULEBUILDER DICTIONARIES */
-                $this->dictionaries = array(
-                        'langs'=>'dynamicsprices@dynamicsprices',
-            'tabname'=>array(
-                MAIN_DB_PREFIX."c_coefprice",
-                MAIN_DB_PREFIX."c_service_nature"
-            ),
-            'tablib'=>array(
-                "LMDB_coefprice",
-                "LMDB_ServiceNatureDictionary"
-            ),
-            'tabsql'=>array(
-                'SELECT t.rowid as rowid, t.entity, t.code, t.fk_nature, t.pricelevel, t.minrate, t.targetrate, t.element_type, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
-                'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.position, t.active FROM '.MAIN_DB_PREFIX.'c_service_nature AS t WHERE t.entity = '.((int) $conf->entity)
-                ),
-            'tabsqlsort'=>array(
-                "code ASC",
-                "position ASC"
-            ),
-            'tabfield'=>array(
-                "code,fk_nature,pricelevel,targetrate,minrate,element_type",
-                "code,label,position"
-            ),
-            'tabfieldvalue'=>array(
-                "code,entity,fk_nature,pricelevel,targetrate,minrate,element_type",
-                "code,entity,label,position"
-            ),
-            'tabfieldinsert'=>array(
-                "code,entity,fk_nature,pricelevel,targetrate,minrate,element_type",
-                "code,entity,label,position"
-            ),
-            'tabrowid'=>array('rowid','rowid'),
-            'tabcond'=>array(
-                isModEnabled('dynamicsprices'),
-                isModEnabled('dynamicsprices')
-            ),
-            'tabhelp' => array(
+                /* BEGIN MODULEBUILDER DICTIONARIES */
+                dol_include_once('/dynamicsprices/lib/dynamicsprices.lib.php');
+
+                $supportsElementType = dynamicsprices_has_coefprice_element_type_column($this->db);
+
+                $coefSelectFields = array(
+                        't.rowid as rowid',
+                        't.entity',
+                        't.code',
+                        't.fk_nature',
+                        't.pricelevel',
+                        't.minrate',
+                        't.targetrate'
+                );
+                $coefDisplayedFields = array('code', 'fk_nature', 'pricelevel', 'targetrate', 'minrate');
+                $coefValueFields = array('code', 'entity', 'fk_nature', 'pricelevel', 'targetrate', 'minrate');
+
+                if ($supportsElementType) {
+                        $coefSelectFields[] = 't.element_type';
+                        $coefDisplayedFields[] = 'element_type';
+                        $coefValueFields[] = 'element_type';
+                }
+
+                $coefSelectFields[] = 't.active';
+
+                $coefHelp = array(
                         'code' => $langs->trans('LMDB_CodeTooltipHelp'),
-                        'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
+                        'entity' => $langs->trans('LMDB_EntityTooltipHelp'),
                         'fk_nature' => $langs->trans('LMDB_FkNatureTooltipHelp'),
                         'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
                         'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
                         'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
-                        'element_type' => $langs->trans('LMDB_ElementTypeTooltipHelp'),
+                );
+
+                if ($supportsElementType) {
+                        $coefHelp['element_type'] = $langs->trans('LMDB_ElementTypeTooltipHelp');
+                }
+
+                $serviceNatureHelp = array(
+                        'code' => $langs->trans('LMDB_ServiceNatureCodeTooltipHelp'),
+                        'entity' => $langs->trans('LMDB_ServiceNatureEntityTooltipHelp'),
                         'label' => $langs->trans('LMDB_ServiceNatureLabelTooltipHelp'),
                         'position' => $langs->trans('LMDB_ServiceNaturePositionTooltipHelp'),
-            ),
                 );
-		/* END MODULEBUILDER DICTIONARIES */
+
+                $this->dictionaries = array(
+                        'langs' => 'dynamicsprices@dynamicsprices',
+                        'tabname' => array(
+                                MAIN_DB_PREFIX.'c_coefprice',
+                                MAIN_DB_PREFIX.'c_service_nature'
+                        ),
+                        'tablib' => array(
+                                'LMDB_coefprice',
+                                'LMDB_ServiceNatureDictionary'
+                        ),
+                        'tabsql' => array(
+                                'SELECT '.implode(', ', $coefSelectFields).' FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
+                                'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.position, t.active FROM '.MAIN_DB_PREFIX.'c_service_nature AS t WHERE t.entity = '.((int) $conf->entity)
+                        ),
+                        'tabsqlsort' => array(
+                                'code ASC',
+                                'position ASC'
+                        ),
+                        'tabfield' => array(
+                                implode(',', $coefDisplayedFields),
+                                'code,label,position'
+                        ),
+                        'tabfieldvalue' => array(
+                                implode(',', $coefValueFields),
+                                'code,entity,label,position'
+                        ),
+                        'tabfieldinsert' => array(
+                                implode(',', $coefValueFields),
+                                'code,entity,label,position'
+                        ),
+                        'tabrowid' => array('rowid', 'rowid'),
+                        'tabcond' => array(
+                                isModEnabled('dynamicsprices'),
+                                isModEnabled('dynamicsprices')
+                        ),
+                        'tabhelp' => array(
+                                $coefHelp,
+                                $serviceNatureHelp,
+                        ),
+                );
+                /* END MODULEBUILDER DICTIONARIES */
 
 		// Boxes/Widgets
 		// Add here list of php file(s) stored in dynamicsprices/core/boxes that contains a class to show a widget.
