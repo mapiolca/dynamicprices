@@ -593,7 +593,7 @@ class modDynamicsPrices extends DolibarrModules
 		$attrName = 'lmdb_service_nature';
 		$extrafields->fetch_name_optionals_label($elementType);
 		if (empty($extrafields->attributes[$elementType]['label'][$attrName])) {
-			$params = array('options' => array('c_service_nature:rowid:label' => null));
+                        $params = array('options' => array('c_service_nature:code:label' => null));
 			$resultExtraField = $extrafields->addExtraField(
 				$attrName,
 				'LMDB_ServiceNature',

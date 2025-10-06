@@ -119,8 +119,8 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 
         $product->fetch_optionals($productId);
 
-        $natureId = dynamicsprices_resolve_nature_identifier($product);
-        if ($natureId <= 0) {
+        $natureCode = dynamicsprices_resolve_nature_identifier($db, $product);
+        if ($natureCode === '') {
             continue;
         }
 
@@ -139,7 +139,7 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
             $user,
             $entity,
             $productId,
-            $natureId,
+            $natureCode,
             (int) $product->type,
             (float) $product->tva_tx,
             $basePrice
@@ -183,8 +183,8 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 
         $product->fetch_optionals($productId);
 
-        $natureId = dynamicsprices_resolve_nature_identifier($product);
-        if ($natureId <= 0) {
+        $natureCode = dynamicsprices_resolve_nature_identifier($db, $product);
+        if ($natureCode === '') {
             continue;
         }
 
@@ -198,7 +198,7 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
             $user,
             $entity,
             $productId,
-            $natureId,
+            $natureCode,
             (int) $product->type,
             (float) $product->tva_tx,
             $costPrice
@@ -212,13 +212,18 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 /**
  * Apply configured coefficients to compute and persist product prices.
  */
-function dynamicsprices_apply_coefficients($db, $user, $entity, $productId, $natureId, $elementType, $tvaTx, $basePrice)
+function dynamicsprices_apply_coefficients($db, $user, $entity, $productId, $natureCode, $elementType, $tvaTx, $basePrice)
 {
     if ($basePrice <= 0) {
         return 0;
     }
 
-    $coefficients = dynamicsprices_get_coefficients($db, $natureId, $elementType);
+    $normalizedNature = trim((string) $natureCode);
+    if ($normalizedNature === '') {
+        return 0;
+    }
+
+    $coefficients = dynamicsprices_get_coefficients($db, $normalizedNature, $elementType);
     if (empty($coefficients)) {
         return 0;
     }
@@ -303,6 +308,26 @@ function dynamicsprices_apply_coefficients($db, $user, $entity, $productId, $nat
 }
 
 /**
+ * Determine if the last database error was caused by an unknown column.
+ *
+ * @param DoliDB $db
+ * @return bool
+ */
+function dynamicsprices_is_unknown_column_error($db)
+{
+    $errorMessage = $db->lasterror();
+    $errorCode = $db->lasterrno();
+
+    return (
+        $errorCode === 'DB_ERROR_NOSUCHFIELD' ||
+        (is_numeric($errorCode) && in_array((int) $errorCode, array(1054, 207, 1304, 42703), true)) ||
+        stripos($errorMessage, 'Unknown column') !== false ||
+        stripos($errorMessage, 'no such column') !== false ||
+        stripos($errorMessage, 'does not exist') !== false
+    );
+}
+
+/**
  * Check if the coefficient dictionary supports the element_type column.
  *
  * @param DoliDB $db Database handler
@@ -323,18 +348,7 @@ function dynamicsprices_has_coefprice_element_type_column($db)
     $resql = $db->query($sql);
 
     if ($resql === false) {
-        $errorMessage = $db->lasterror();
-        $errorCode = $db->lasterrno();
-
-        $unknownColumnDetected = (
-            $errorCode === 'DB_ERROR_NOSUCHFIELD' ||
-            (is_numeric($errorCode) && in_array((int) $errorCode, array(1054, 207, 1304, 42703), true)) ||
-            stripos($errorMessage, 'Unknown column') !== false ||
-            stripos($errorMessage, 'no such column') !== false ||
-            stripos($errorMessage, 'does not exist') !== false
-        );
-
-        if ($unknownColumnDetected) {
+        if (dynamicsprices_is_unknown_column_error($db)) {
             $supportsElementType = false;
         }
     } else {
@@ -345,24 +359,138 @@ function dynamicsprices_has_coefprice_element_type_column($db)
 }
 
 /**
- * Retrieve coefficients for a nature id with a simple runtime cache.
+ * Check if a dictionary table owns an entity column.
+ *
+ * @param DoliDB $db
+ * @param string $table Table name without MAIN_DB_PREFIX
+ * @return bool
  */
-function dynamicsprices_get_coefficients($db, $natureId, $elementType)
+function dynamicsprices_table_has_entity_column($db, $table)
 {
     static $cache = array();
+
+    if (array_key_exists($table, $cache)) {
+        return $cache[$table];
+    }
+
+    $sql = 'SELECT entity FROM '.MAIN_DB_PREFIX.$table.' WHERE 1 = 0';
+    $resql = $db->query($sql);
+
+    if ($resql === false) {
+        $cache[$table] = !dynamicsprices_is_unknown_column_error($db);
+        return $cache[$table];
+    }
+
+    $db->free($resql);
+    $cache[$table] = true;
+
+    return $cache[$table];
+}
+
+/**
+ * Retrieve dictionary metadata (rowid + code) from either code or rowid input.
+ *
+ * @param DoliDB $db
+ * @param string $table Table name without MAIN_DB_PREFIX
+ * @param int|string $value
+ * @return array{rowid:int,code:string}|null
+ */
+function dynamicsprices_fetch_dictionary_nature_metadata($db, $table, $value)
+{
+    $rawValue = is_scalar($value) ? (string) $value : '';
+    $rawValue = trim($rawValue);
+
+    if ($rawValue === '') {
+        return null;
+    }
+
+    static $cache = array();
+    $cacheKey = $table.'|'.$rawValue;
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
+
+    $conditions = array("t.code = '".$db->escape($rawValue)."'");
+    if (ctype_digit($rawValue)) {
+        $conditions[] = 't.rowid = '.((int) $rawValue);
+    }
+
+    $whereClauses = array();
+    if (dynamicsprices_table_has_entity_column($db, $table)) {
+        $whereClauses[] = 't.entity IN ('.getEntity($table).')';
+    }
+    $whereClauses[] = '('.implode(' OR ', $conditions).')';
+
+    $sql = 'SELECT t.rowid, t.code FROM '.MAIN_DB_PREFIX.$table.' AS t';
+    if (!empty($whereClauses)) {
+        $sql .= ' WHERE '.implode(' AND ', $whereClauses);
+    }
+    $sql .= ' ORDER BY t.rowid ASC';
+
+    $resql = $db->query($sql);
+    if ($resql === false) {
+        dol_print_error($db);
+        $cache[$cacheKey] = null;
+        return null;
+    }
+
+    $data = $db->fetch_object($resql);
+    $db->free($resql);
+
+    if (!$data) {
+        $cache[$cacheKey] = null;
+        return null;
+    }
+
+    $cache[$cacheKey] = array(
+        'rowid' => (int) $data->rowid,
+        'code' => (string) $data->code,
+    );
+
+    return $cache[$cacheKey];
+}
+
+/**
+ * Retrieve coefficients for a nature identifier with a simple runtime cache.
+ */
+function dynamicsprices_get_coefficients($db, $natureCode, $elementType)
+{
+    static $cache = array();
+
+    $normalizedCode = trim((string) $natureCode);
+    if ($normalizedCode === '') {
+        return array();
+    }
 
     $supportsElementType = dynamicsprices_has_coefprice_element_type_column($db);
     $effectiveElementType = $supportsElementType ? (int) $elementType : 0;
 
-    $cacheKey = $effectiveElementType.'_'.((int) $natureId);
+    $cacheKey = $effectiveElementType.'|'.$normalizedCode;
 
     if (isset($cache[$cacheKey])) {
         return $cache[$cacheKey];
     }
 
+    $identifiers = array($normalizedCode);
+
+    $serviceType = defined('Product::TYPE_SERVICE') ? Product::TYPE_SERVICE : 1;
+
+    if ((int) $elementType === $serviceType) {
+        $metadata = dynamicsprices_fetch_dictionary_nature_metadata($db, 'c_service_nature', $normalizedCode);
+    } else {
+        $metadata = dynamicsprices_fetch_dictionary_nature_metadata($db, 'c_product_nature', $normalizedCode);
+    }
+
+    if ($metadata !== null) {
+        $rowid = (string) $metadata['rowid'];
+        if ($rowid !== '' && !in_array($rowid, $identifiers, true)) {
+            $identifiers[] = $rowid;
+        }
+    }
+
     $sql = "SELECT pricelevel, minrate, targetrate";
     $sql .= " FROM ".MAIN_DB_PREFIX."c_coefprice";
-    $sql .= " WHERE fk_nature = ".((int) $natureId);
+    $sql .= " WHERE fk_nature IN ('".implode("','", array_map(array($db, 'escape'), $identifiers))."')";
     $sql .= " AND entity IN (".getEntity('c_coefprice').")";
     if ($supportsElementType) {
         $sql .= " AND element_type = ".$effectiveElementType;
@@ -444,18 +572,29 @@ function dynamicsprices_resolve_cost_price($db, Product $product)
     return $costPrice;
 }
 
-function dynamicsprices_resolve_nature_identifier(Product $product)
+function dynamicsprices_resolve_nature_identifier($db, Product $product)
 {
     if ((int) $product->type === Product::TYPE_SERVICE) {
-        $serviceNature = 0;
+        $serviceNature = '';
         if (!empty($product->array_options['options_lmdb_service_nature'])) {
-            $serviceNature = (int) $product->array_options['options_lmdb_service_nature'];
+            $serviceNature = $product->array_options['options_lmdb_service_nature'];
         }
 
-        return $serviceNature;
+        $metadata = dynamicsprices_fetch_dictionary_nature_metadata($db, 'c_service_nature', $serviceNature);
+        if ($metadata !== null && $metadata['code'] !== '') {
+            return $metadata['code'];
+        }
+
+        return is_scalar($serviceNature) ? trim((string) $serviceNature) : '';
     }
 
-    return (int) $product->finished;
+    $productNature = $product->finished;
+    $metadata = dynamicsprices_fetch_dictionary_nature_metadata($db, 'c_product_nature', $productNature);
+    if ($metadata !== null && $metadata['code'] !== '') {
+        return $metadata['code'];
+    }
+
+    return is_scalar($productNature) ? trim((string) $productNature) : '';
 }
 
 /**
