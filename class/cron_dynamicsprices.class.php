@@ -22,61 +22,52 @@
  */
 require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 
-
-
 class Cron_DynamicsPrices
 {
-        /**
-     *  Constructor
-     *
-     *  @param  DoliDB      $db         Database handler
+    /** @var DoliDB */
+    private $db;
+
+    /**
+     * Constructor.
      */
     public function __construct(DoliDB $db)
     {
-        global $conf, $langs ;
         $this->db = $db;
-        //var_dump($db);
         $this->ismultientitymanaged = 1;
         $this->isextrafieldmanaged = 1;
     }
 
+    /**
+     * Update customer prices using cron context.
+     */
     public function updatePrices()
     {
-        global $db, $conf, $user, $langs;
+        global $conf, $user, $langs;
 
-        $langs->load("dynamicsprices@dynamicsprices");
+        $langs->load('dynamicsprices@dynamicsprices');
 
-        $error = 0;
+        require_once __DIR__.'/../lib/dynamicsprices.lib.php';
 
         try {
-            $db->begin();
+            $this->db->begin();
 
-            require_once __DIR__.'/../lib/dynamicsprices.lib.php';
-            if (getDolGlobalString('LMDB_COST_PRICE_ONLY')) {
-                $results = update_customer_prices_from_cost_price($db, $user, $conf, $langs);
-            } else {
-                $results = update_customer_prices_from_suppliers($db, $user, $conf, $langs);
-            }
-            
-            //var_dump('$nb_line10 = '.$results.'<br>');
-            $db->commit();
+            $results = getDolGlobalString('LMDB_COST_PRICE_ONLY')
+                ? update_customer_prices_from_cost_price($this->db, $user, $langs, $conf)
+                : update_customer_prices_from_suppliers($this->db, $user, $langs, $conf);
+
+            $this->db->commit();
         } catch (Exception $e) {
-            $db->rollback();
-            dol_syslog("DynamicsPrices CRON ERROR: ".$e->getMessage(), LOG_ERR);
-            $error++;
-        }
-        //var_dump('$error = '.$error.'<br>');
-        //var_dump('$nb_line10 = '.$nb_line.'<br>');
+            $this->db->rollback();
+            dol_syslog('DynamicsPrices CRON ERROR: '.$e->getMessage(), LOG_ERR);
+            $this->error = $langs->trans('LMDB_ErrorUpdate').' '.$e->getMessage();
+            dol_syslog(__METHOD__.' end - '.$this->error, LOG_INFO);
 
-        if ($error) {
-            $this->error = $langs->trans('LMDB_ErrorUpdate').' '.$error;
-            dol_syslog(__METHOD__." end - ".$this->error, LOG_INFO);
             return 1;
-        }else{
-            $this->output = $langs->trans('LMDB_NbLinesUpdated')." ".$results.".";
-            dol_syslog(__METHOD__." end - ".$this->output, LOG_INFO);
-            return 0;
         }
-        
+
+        $this->output = $langs->trans('LMDB_NbLinesUpdated').' '.((int) $results).'.';
+        dol_syslog(__METHOD__.' end - '.$this->output, LOG_INFO);
+
+        return 0;
     }
 }

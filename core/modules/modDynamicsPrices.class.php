@@ -253,40 +253,125 @@ class modDynamicsPrices extends DolibarrModules
 		 'tabhelp' => array(array('code' => $langs->trans('CodeTooltipHelp'), 'field2' => 'field2tooltip'), array('code' => $langs->trans('CodeTooltipHelp'), 'field2' => 'field2tooltip'), ...),
 		 );
 		 */
-		/* BEGIN MODULEBUILDER DICTIONARIES */
-		$this->dictionaries = array(
-			'langs'=>'dynamicsprices@dynamicsprices',
-            'tabname'=>array(MAIN_DB_PREFIX."c_coefprice"),
-            'tablib'=>array("LMDB_coefprice"),
-            'tabsql'=>array(
-            	'SELECT t.rowid as rowid, t.entity, t.code, t.fk_nature, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
-        	),
-            'tabsqlsort'=>array(
-            	"code ASC",
-            ),
-            'tabfield'=>array(
-            	"code,fk_nature,pricelevel,targetrate,minrate",
-            ),
-            'tabfieldvalue'=>array(
-            	"code,entity,fk_nature,pricelevel,targetrate,minrate",
-            ),
-            'tabfieldinsert'=>array(
-            	"code,entity,fk_nature,pricelevel,targetrate,minrate",
-            ),
-            'tabrowid'=>array('rowid'),
-            'tabcond'=>array(
-            	isModEnabled('dynamicsprices'),
-            ),
-            'tabhelp' => array(
-            		'code' => $langs->trans('LMDB_CodeTooltipHelp'),
-            		'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
-            		'fk_nature' => $langs->trans('LMDB_FkNatureTooltipHelp'),
-            		'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
-            		'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
-            		'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'), 
-            ),
-		);
-		/* END MODULEBUILDER DICTIONARIES */
+                /* BEGIN MODULEBUILDER DICTIONARIES */
+                dol_include_once('/dynamicsprices/lib/dynamicsprices.lib.php');
+
+                $supportsElementType = dynamicsprices_has_coefprice_element_type_column($this->db);
+
+                $coefSelectFields = array(
+                        't.rowid as rowid',
+                        't.entity',
+                        't.code',
+                        // EN: Resolve the code, falling back to the legacy rowid when necessary.
+                        // FR: Résoudre le code, en revenant au rowid hérité si nécessaire.
+                        'COALESCE(sn_code.code, pn_code.code, sn_rowid.code, pn_rowid.code, t.fk_nature) AS fk_nature',
+                        // EN: Surface the dictionary label to ease identification in the list.
+                        // FR: Afficher le libellé du dictionnaire pour faciliter l’identification dans la liste.
+                        'COALESCE(sn_code.label, pn_code.label, sn_rowid.label, pn_rowid.label, \'\') AS nature_label',
+                        't.pricelevel',
+                        't.minrate',
+                        't.targetrate'
+                );
+                $coefDisplayedFields = array('code', 'fk_nature', 'nature_label', 'pricelevel', 'targetrate', 'minrate');
+                $coefValueFields = array('code', 'entity', 'fk_nature', 'pricelevel', 'targetrate', 'minrate');
+
+                if ($supportsElementType) {
+                        $productLabel = $langs->transnoentitiesnoreplace('Product');
+                        $serviceLabel = $langs->transnoentitiesnoreplace('Service');
+
+                        $coefSelectFields[] = 't.element_type';
+                        $coefSelectFields[] = "CASE WHEN t.element_type = 1 THEN '".$this->db->escape($serviceLabel)."' ELSE '".$this->db->escape($productLabel)."' END AS element_type_label";
+                        $coefDisplayedFields[] = 'element_type_label';
+                        $coefValueFields[] = 'element_type:select:0='.$productLabel.':1='.$serviceLabel;
+                }
+
+                $coefSelectFields[] = 't.active';
+
+                // EN: Prepare joins once to keep the SQL definition readable.
+                // FR: Préparer les jointures une seule fois pour conserver une définition SQL lisible.
+                $numericGuard = dynamicsprices_sql_numeric_guard($this->db, 't.fk_nature');
+                $numericCast = dynamicsprices_sql_integer_cast($this->db, 't.fk_nature');
+
+                $coefJoins = array(
+                        ' LEFT JOIN '.MAIN_DB_PREFIX."c_service_nature AS sn_code ON sn_code.code = t.fk_nature AND sn_code.entity = t.entity",
+                        ' LEFT JOIN '.MAIN_DB_PREFIX."c_product_nature AS pn_code ON pn_code.code = t.fk_nature",
+                );
+
+                // EN: Reuse legacy rowid lookups for numeric storage while avoiding database-specific syntax errors.
+                // FR: Réutiliser les recherches par rowid héritées pour les valeurs numériques tout en évitant les erreurs de syntaxe propres aux bases.
+                $serviceJoinConditions = array('sn_rowid.rowid = '.$numericCast, 'sn_rowid.entity = t.entity');
+                $productJoinConditions = array('pn_rowid.rowid = '.$numericCast);
+
+                if ($numericGuard !== '') {
+                        array_unshift($serviceJoinConditions, '('.$numericGuard.')');
+                        array_unshift($productJoinConditions, '('.$numericGuard.')');
+                }
+
+                $coefJoins[] = ' LEFT JOIN '.MAIN_DB_PREFIX.'c_service_nature AS sn_rowid ON '.implode(' AND ', $serviceJoinConditions);
+                $coefJoins[] = ' LEFT JOIN '.MAIN_DB_PREFIX.'c_product_nature AS pn_rowid ON '.implode(' AND ', $productJoinConditions);
+
+                $coefHelp = array(
+                        'code' => $langs->trans('LMDB_CodeTooltipHelp'),
+                        'entity' => $langs->trans('LMDB_EntityTooltipHelp'),
+                        'fk_nature' => $langs->trans('LMDB_FkNatureTooltipHelp'),
+                        'nature_label' => $langs->trans('LMDB_NatureLabelTooltipHelp'),
+                        'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
+                        'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
+                        'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
+                );
+
+                if ($supportsElementType) {
+                        $coefHelp['element_type_label'] = $langs->trans('LMDB_ElementTypeTooltipHelp');
+                }
+
+                $serviceNatureHelp = array(
+                        'code' => $langs->trans('LMDB_ServiceNatureCodeTooltipHelp'),
+                        'entity' => $langs->trans('LMDB_ServiceNatureEntityTooltipHelp'),
+                        'label' => $langs->trans('LMDB_ServiceNatureLabelTooltipHelp'),
+                        'position' => $langs->trans('LMDB_ServiceNaturePositionTooltipHelp'),
+                );
+
+                $this->dictionaries = array(
+                        'langs' => 'dynamicsprices@dynamicsprices',
+                        'tabname' => array(
+                                MAIN_DB_PREFIX.'c_coefprice',
+                                MAIN_DB_PREFIX.'c_service_nature'
+                        ),
+                        'tablib' => array(
+                                'LMDB_coefprice',
+                                'LMDB_ServiceNatureDictionary'
+                        ),
+                        'tabsql' => array(
+                                'SELECT '.implode(', ', $coefSelectFields).' FROM '.MAIN_DB_PREFIX.'c_coefprice AS t'.implode('', $coefJoins).' WHERE t.entity = '.((int) $conf->entity),
+                                'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.position, t.active FROM '.MAIN_DB_PREFIX.'c_service_nature AS t WHERE t.entity = '.((int) $conf->entity)
+                        ),
+                        'tabsqlsort' => array(
+                                'code ASC',
+                                'position ASC'
+                        ),
+                        'tabfield' => array(
+                                implode(',', $coefDisplayedFields),
+                                'code,label,position'
+                        ),
+                        'tabfieldvalue' => array(
+                                implode(',', $coefValueFields),
+                                'code,entity,label,position'
+                        ),
+                        'tabfieldinsert' => array(
+                                implode(',', $coefValueFields),
+                                'code,entity,label,position'
+                        ),
+                        'tabrowid' => array('rowid', 'rowid'),
+                        'tabcond' => array(
+                                isModEnabled('dynamicsprices'),
+                                isModEnabled('dynamicsprices')
+                        ),
+                        'tabhelp' => array(
+                                $coefHelp,
+                                $serviceNatureHelp,
+                        ),
+                );
+                /* END MODULEBUILDER DICTIONARIES */
 
 		// Boxes/Widgets
 		// Add here list of php file(s) stored in dynamicsprices/core/boxes that contains a class to show a widget.
@@ -531,14 +616,37 @@ class modDynamicsPrices extends DolibarrModules
 		}
 
 		// Create extrafields during init
-		//include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
-		//$extrafields = new ExtraFields($this->db);
-		//$result0=$extrafields->addExtraField('dynamicsprices_separator1', "Separator 1", 'separator', 1,  0, 'thirdparty',   0, 0, '', array('options'=>array(1=>1)), 1, '', 1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result1=$extrafields->addExtraField('dynamicsprices_myattr1', "New Attr 1 label", 'boolean', 1,  3, 'thirdparty',   0, 0, '', '', 1, '', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result2=$extrafields->addExtraField('dynamicsprices_myattr2', "New Attr 2 label", 'varchar', 1, 10, 'project',      0, 0, '', '', 1, '', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result3=$extrafields->addExtraField('dynamicsprices_myattr3', "New Attr 3 label", 'varchar', 1, 10, 'bank_account', 0, 0, '', '', 1, '', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result4=$extrafields->addExtraField('dynamicsprices_myattr4', "New Attr 4 label", 'select',  1,  3, 'thirdparty',   0, 1, '', array('options'=>array('code1'=>'Val1','code2'=>'Val2','code3'=>'Val3')), 1,'', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result5=$extrafields->addExtraField('dynamicsprices_myattr5', "New Attr 5 label", 'text',    1, 10, 'user',         0, 0, '', '', 1, '', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
+		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+		$extrafields = new ExtraFields($this->db);
+		$elementType = 'product';
+		$attrName = 'lmdb_service_nature';
+		$extrafields->fetch_name_optionals_label($elementType);
+		if (empty($extrafields->attributes[$elementType]['label'][$attrName])) {
+                        $params = array('options' => array('c_service_nature:code:label' => null));
+			$resultExtraField = $extrafields->addExtraField(
+				$attrName,
+				'LMDB_ServiceNature',
+				'sellist',
+				1,
+				0,
+				$elementType,
+				0,
+				0,
+				'',
+				$params,
+				1,
+				'',
+				-1,
+				0,
+				'',
+				'',
+				'dynamicsprices@dynamicsprices',
+				'isModEnabled("dynamicsprices")'
+			);
+			if ($resultExtraField < 0) {
+				dol_syslog(__METHOD__.' error creating extrafield '.$attrName.' : '.$extrafields->error, LOG_ERR);
+			}
+		}
 
 		// Permissions
 		$this->remove($options);

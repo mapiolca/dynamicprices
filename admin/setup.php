@@ -108,7 +108,23 @@ if (!$user->admin) {
 }
 
 
-$action = 'edit';
+if ($action === 'set_LMDB_COST_PRICE_FIXED_FEES_COEF') {
+        $coefInput = GETPOST('LMDB_COST_PRICE_FIXED_FEES_COEF', 'alphanohtml');
+        $coefValue = ($coefInput === '') ? '' : price2num($coefInput, 'MU');
+
+        $result = dolibarr_set_const($db, 'LMDB_COST_PRICE_FIXED_FEES_COEF', $coefValue, 'chaine', 0, '', $conf->entity);
+        if ($result <= 0) {
+                setEventMessages($db->lasterror(), null, 'errors');
+        } else {
+                setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
+        }
+
+        $action = '';
+}
+
+if (empty($action)) {
+        $action = 'edit';
+}
 
 
 /*
@@ -138,8 +154,10 @@ print '<table class="noborder" width="100%">';
 
 // Réglage 
 		setup_print_title($langs->trans("LMDB_UpdateOptions"));
-		setup_print_on_off('LMDB_COST_PRICE_ONLY');
-		setup_print_on_off('LMDB_SUPPLIER_BUYPRICE_ALTERED');
+                setup_print_on_off('LMDB_COST_PRICE_ONLY');
+                setup_print_on_off('LMDB_SUPPLIER_BUYPRICE_ALTERED');
+                setup_print_on_off('LMDB_COST_PRICE_FIXED_FEES_MODE');
+                setup_print_input_form_part('LMDB_COST_PRICE_FIXED_FEES_COEF', '', '', array('type' => 'number', 'step' => '0.01', 'min' => '0'));
 		
 
 
