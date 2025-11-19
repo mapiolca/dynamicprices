@@ -44,11 +44,12 @@ MyWidgetDescription = Descripción de mi widget<br>
 LMDB_ErrorUpdate = Error al actualizar:<br>
 LMDB_NbLinesUpdated = Número de precios de venta actualizados:<br>
 Fk_nature = Tipo de producto ID<br>
-Pricelevel = ID del nivel de precios<br>
+Pricelevel = Code del nivel de precios<br>
 Targetrate = Tasa de margen objetivo (en %)<br>
 Minrate = Tasa de margen mínima (en %)<br>
 <br>
 LMDB_CommentAutoUpdateSellPrice = Los precios de venta se actualizan según los coeficientes de precio del diccionario y el promedio de los precios unitarios de compra del proveedor.<br>
 LMDB_LabelAutoUpdateSellPrice = Actualización automática de precios de venta<br>
 LMDB_coefprice = Tasas de margen sobre los precios de venta<br>
+
 DynamicsPrices = Precios de venta dinámicos
