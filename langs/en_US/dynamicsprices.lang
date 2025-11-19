@@ -44,7 +44,7 @@ MyWidgetDescription = My widget description<br>
 <br>
 LMDB_ErrorUpdate = Error while updating:<br>
 LMDB_NbLinesUpdated = Number of sales prices updated:<br>
-Fk_nature = Product type ID<br>
+Fk_nature = Product type Code<br>
 Pricelevel = Price level ID<br>
 Targetrate = Target margin rate (in %)<br>
 Minrate = Minimum margin rate (in %)<br>
@@ -52,4 +52,5 @@ Minrate = Minimum margin rate (in %)<br>
 LMDB_CommentAutoUpdateSellPrice = Sales prices are updated based on the price coefficients given in the dictionary and the average of the Supplier purchase unit prices.<br>
 LMDB_LabelAutoUpdateSellPrice = Automatic update of sales prices<br>
 LMDB_coefprice = Margin rates on sales prices<br>
+
 DynamicsPrices = Dynamic sales prices
