@@ -47,7 +47,7 @@ MyWidgetDescription = My widget description
 
 LMDB_ErrorUpdate = Erreur lors de la mise à jour :
 LMDB_NbLinesUpdated = Nombre de prix de vente mis à jour :
-Fk_nature = ID Nature du produit
+Fk_nature = Code Nature du produit
 Pricelevel = ID du Niveau de prix 
 Targetrate = Taux de marge cible (en %)
 Minrate = Taux de marge minimum (en %)
@@ -57,3 +57,4 @@ LMDB_CommentAutoUpdateSellPrice = Les prix de vente sont mis à jour en fonction
 LMDB_LabelAutoUpdateSellPrice = Mise à jour automatique des prix de vente
 LMDB_coefprice = Taux de marges sur les prix de vente
 DynamicsPrices = Prix de vente dynamiques
+
