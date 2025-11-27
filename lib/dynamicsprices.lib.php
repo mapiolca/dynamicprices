@@ -95,27 +95,31 @@ function dynamicspricesAdminPrepareHead()
  */
 function dynamicsPricesGetKitComponents(DoliDB $db, Product $product)
 {
-	$components = array();
+$components = array();
 
 	if (empty($product->id)) {
 		return $components;
 	}
 
 	$sql = "SELECT fk_product_fils AS fk_child, qty";
-	$sql .= " FROM ".MAIN_DB_PREFIX."product_association";
-	$sql .= " WHERE fk_product_pere = ".((int) $product->id);
-	$sql .= " AND entity IN (".getEntity('product').")";
+$sql .= " FROM ".MAIN_DB_PREFIX."product_association";
+$sql .= " WHERE fk_product_pere = ".((int) $product->id);
+$sql .= " AND entity IN (".getEntity('product').")";
 
-	$resql = $db->query($sql);
-	if ($resql) {
-		while ($obj = $db->fetch_object($resql)) {
+var_dump('Fetching kit components with SQL', $sql);
+
+$resql = $db->query($sql);
+if ($resql) {
+while ($obj = $db->fetch_object($resql)) {
 			$childId = (int) $obj->fk_child;
 			$qty = (float) $obj->qty;
-			if ($childId > 0 && $qty > 0) {
-				$components[] = array('fk_child' => $childId, 'qty' => $qty);
-			}
-		}
-	}
+if ($childId > 0 && $qty > 0) {
+$components[] = array('fk_child' => $childId, 'qty' => $qty);
+}
+}
+}
+
+var_dump('Kit components found', $components);
 
 	return $components;
 }
@@ -130,20 +134,23 @@ function dynamicsPricesGetKitComponents(DoliDB $db, Product $product)
  */
 function dynamicsPricesComputeKitCost(DoliDB $db, array $components)
 {
-	if (empty($components)) {
+if (empty($components)) {
 		return null;
 	}
 
 	dol_include_once('/product/class/product.class.php');
 
-	$totalCost = 0.0;
-	foreach ($components as $component) {
-		$childProduct = new Product($db);
-		if ($childProduct->fetch((int) $component['fk_child']) > 0) {
-			$lineCost = price2num($childProduct->cost_price, 'MU') * (float) $component['qty'];
-			$totalCost += $lineCost;
-		}
-	}
+$totalCost = 0.0;
+foreach ($components as $component) {
+$childProduct = new Product($db);
+if ($childProduct->fetch((int) $component['fk_child']) > 0) {
+$lineCost = price2num($childProduct->cost_price, 'MU') * (float) $component['qty'];
+var_dump('Component cost line', array('product_id' => $childProduct->id, 'qty' => $component['qty'], 'cost_price' => $childProduct->cost_price, 'line_cost' => $lineCost));
+$totalCost += $lineCost;
+}
+}
+
+var_dump('Computed kit cost price', $totalCost);
 
 	return price2num($totalCost, 'MU');
 }
@@ -160,8 +167,10 @@ function dynamicsPricesComputeKitCost(DoliDB $db, array $components)
  */
 function dynamicsPricesUpdateCostPrice(DoliDB $db, User $user, Product $product, $newcost)
 {
-	$current = price2num($product->cost_price, 'MU');
-	$target = price2num($newcost, 'MU');
+$current = price2num($product->cost_price, 'MU');
+$target = price2num($newcost, 'MU');
+
+var_dump('Checking cost price update', array('product_id' => $product->id, 'current' => $current, 'target' => $target));
 
 	if ($current == $target) {
 		return false;
@@ -174,13 +183,15 @@ function dynamicsPricesUpdateCostPrice(DoliDB $db, User $user, Product $product,
 	$sql .= " WHERE rowid = ".((int) $product->id);
 	$sql .= " AND entity IN (".getEntity('product').")";
 
-	$resql = $db->query($sql);
-	if ($resql) {
-		$product->cost_price = $target;
-		return true;
-	}
+$resql = $db->query($sql);
+if ($resql) {
+$product->cost_price = $target;
+var_dump('Cost price updated successfully', array('product_id' => $product->id, 'new_cost' => $target));
+return true;
+}
 
-	dol_syslog(__METHOD__." Unable to update cost price for product " . $product->id, LOG_ERR);
+dol_syslog(__METHOD__." Unable to update cost price for product " . $product->id, LOG_ERR);
+var_dump('Failed to update cost price', array('product_id' => $product->id, 'sql' => $sql));
 
 	return false;
 }
@@ -189,32 +200,32 @@ function dynamicsPricesUpdateCostPrice(DoliDB $db, User $user, Product $product,
 function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $productid = 0)
 {
 	dol_include_once('/product/class/product.class.php');
-	
+
 	global $conf;
-	
-	$products = [];
+
+	$products = array();
 	$nb_line = 0;
 	$entity = $conf->entity;
 
 	if ($productid > 0) {
-	$products[] = $productid;
+		$products[] = $productid;
 	} else {
-	$sql = "SELECT rowid, finished";
-	$sql.= " FROM ".MAIN_DB_PREFIX."product";
-	$sql.= " WHERE tosell = 1 ";
-	$sql.= " AND entity IN (".getEntity('product').")";
+		$sql = "SELECT rowid, finished";
+		$sql .= " FROM ".MAIN_DB_PREFIX."product";
+		$sql .= " WHERE tosell = 1 ";
+		$sql .= " AND entity IN (".getEntity('product').")";
 
-	//var_dump($sql.'<br>');
+		var_dump('Selecting products for supplier price recalculation', $sql);
 
-	$resql = $db->query($sql);
-	if ($resql === false) {
+		$resql = $db->query($sql);
+		if ($resql === false) {
 			dol_print_error($db);
 			return;
 		}
 
-	while ($obj = $db->fetch_object($resql)) {
-	    $products[] = array('id'=>$obj->rowid, 'nature'=>$obj->finished);
-	}
+		while ($obj = $db->fetch_object($resql)) {
+			$products[] = array('id'=>$obj->rowid, 'nature'=>$obj->finished);
+		}
 	}
 
 	foreach ($products as $prod) {
@@ -223,11 +234,14 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		$product = new Product($db);
 		$product->fetch($prodid);
 
+		var_dump('Processing product for supplier price update', array('product_id' => $prodid, 'nature' => $natureid));
+
 		$kitcomponents = dynamicsPricesGetKitComponents($db, $product);
 		$kitcost = dynamicsPricesComputeKitCost($db, $kitcomponents);
 		if ($kitcost !== null) {
 			dynamicsPricesUpdateCostPrice($db, $user, $product, $kitcost);
 			$costsource = $kitcost;
+			var_dump('Kit cost used as base cost', array('product_id' => $prodid, 'kit_cost' => $kitcost));
 		} else {
 			$costsource = null;
 		}
@@ -248,13 +262,16 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 			}
 
 			if (!count($prices_fourn)) {
+				var_dump('No supplier prices found, skipping product', $prodid);
 				continue;
 			}
 
 			$costsource = array_sum($prices_fourn) / count($prices_fourn);
+			var_dump('Average supplier cost computed', array('product_id' => $prodid, 'cost' => $costsource));
 		}
 
 		$basecost = $costsource;
+		var_dump('Base cost selected', array('product_id' => $prodid, 'base_cost' => $basecost));
 
 		// Coefficients par nature
 		$sqlc = "SELECT code, pricelevel, minrate, targetrate";
@@ -273,58 +290,58 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 			$price_ttc = $price * (1 + $tva_tx / 100);
 			$price_min = $basecost * (1 + $minrate / 100);
 			$price_min_ttc = $price_min * (1 + $tva_tx / 100);
+			var_dump('Computed prices for level', array('product_id' => $prodid, 'level' => $level, 'price_ht' => $price, 'price_ttc' => $price_ttc, 'price_min_ht' => $price_min, 'price_min_ttc' => $price_min_ttc));
 
 			$now = $db->idate(dol_now());
 
-	    $sqlv = "SELECT price_level, price, price_ttc, price_min, price_min_ttc, tva_tx ";
-	    $sqlv.= " FROM ".MAIN_DB_PREFIX."product_price";
-	    $sqlv.= " WHERE fk_product = ".((int) $prodid) ;
-	    $sqlv.= " AND price_level = ".$level;
-	    $sqlv.= " AND entity IN (".getEntity('productprice').")";
-	    $sqlv.= " ORDER BY date_price DESC LIMIT 1";
-	    //var_dump('$sqlv = '.$sqlv.'<br>');
+			$sqlv = "SELECT price_level, price, price_ttc, price_min, price_min_ttc, tva_tx ";
+			$sqlv.= " FROM ".MAIN_DB_PREFIX."product_price";
+			$sqlv.= " WHERE fk_product = ".((int) $prodid) ;
+			$sqlv.= " AND price_level = ".$level;
+			$sqlv.= " AND entity IN (".getEntity('productprice').")";
+			$sqlv.= " ORDER BY date_price DESC LIMIT 1";
+			//var_dump('$sqlv = '.$sqlv.'<br>');
 
-	    $resqlv = $db->query($sqlv);
+			$resqlv = $db->query($sqlv);
 
-	    while ($objv = $db->fetch_object($resqlv)) {
-	    	$price_v = price2num($objv->price,2);
-	    	$price_ttc_v = price2num($objv->price_ttc,2);
-	    	$price_min_v = price2num($objv->price_min,2);
-	    	$price_min_ttc_v = price2num($objv->price_min_ttc,2);
-	    	//$tva_tx_v = $objv->tva_tx;
-	    	
-	    	if (price2num($price,2)!=$price_v || price2num($price_min,2)!=$price_min_v || price2num($price_ttc,2)!=$price_ttc_v || price2num($price_min_ttc,2)!=$price_min_ttc_v) {
-	    		$sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price
-		                (entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)
-		                VALUES (".((int )$entity).",
-		                        ".((int) $prodid).",
-		                        ".$level.",
-		                        ".$user->id.",
-		                        ".price2num($price,2).",
-		                        ".price2num($price_ttc,2).",
-		                        ".price2num($price_min,2).",
-		                        ".price2num($price_min_ttc,2).",
-		                        '".$now."',
-		                        ".((float) $tva_tx).")
-		                ON DUPLICATE KEY UPDATE
-		                    price = VALUES(price),
-		                    price_ttc = VALUES(price_ttc),
-		                    price_min = VALUES(price_min),
-		                    price_min_ttc = VALUES(price_min_ttc),
-		                    date_price = VALUES(date_price),
-		                    tva_tx = VALUES(tva_tx)";
-		            $db->query($sqlp);
-		    
-		            $nb_line++ ;
-		            //var_dump('$nb_line = '.$nb_line.'<br>');
-	    	}
-	    	//var_dump('$nb_line2 = '.$nb_line.'<br>');
-	    }
-	    //var_dump('$nb_line3 = '.$nb_line.'<br>');
+			while ($objv = $db->fetch_object($resqlv)) {
+				$price_v = price2num($objv->price,2);
+				$price_ttc_v = price2num($objv->price_ttc,2);
+				$price_min_v = price2num($objv->price_min,2);
+				$price_min_ttc_v = price2num($objv->price_min_ttc,2);
+				//$tva_tx_v = $objv->tva_tx;
+
+				if (price2num($price,2)!=$price_v || price2num($price_min,2)!=$price_min_v || price2num($price_ttc,2)!=$price_ttc_v || price2num($price_min_ttc,2)!=$price_min_ttc_v) {
+					$sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price
+							(entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)
+							VALUES (".((int )$entity).",
+									".((int) $prodid).",
+									".$level.",
+									".$user->id.",
+									".price2num($price,2).",
+									".price2num($price_ttc,2).",
+									".price2num($price_min,2).",
+									".price2num($price_min_ttc,2).",
+									'".$now."',
+									".((float) $tva_tx).")
+							ON DUPLICATE KEY UPDATE
+							    price = VALUES(price),
+							    price_ttc = VALUES(price_ttc),
+							    price_min = VALUES(price_min),
+							    price_min_ttc = VALUES(price_min_ttc),
+							    date_price = VALUES(date_price),
+							    tva_tx = VALUES(tva_tx)";
+					$db->query($sqlp);
+
+					$nb_line++ ;
+					var_dump('Inserted/updated price level', array('product_id' => $prodid, 'level' => $level, 'price_ht' => $price, 'price_ttc' => $price_ttc, 'price_min_ht' => $price_min, 'price_min_ttc' => $price_min_ttc, 'lines' => $nb_line));
+				}
+			}
+		}
 	}
-	}
-	//var_dump('$nb_line4 = '.$nb_line.'<br>');
-	
+
+	var_dump('Supplier price update finished', array('updated_lines' => $nb_line));
+
 	return $nb_line;
 }
 
@@ -346,6 +363,8 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		$sql.= " WHERE tosell = 1 ";
 		$sql.= " AND entity IN (".getEntity('product').")";
 
+		var_dump('Selecting products for cost price recalculation', $sql);
+
 		$resql = $db->query($sql);
 		if ($resql === false) {
 			dol_print_error($db);
@@ -364,11 +383,14 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		$product = new Product($db);
 		$product->fetch($prodid);
 
+		var_dump('Processing product for cost price update', array('product_id' => $prodid, 'nature' => $natureid, 'initial_cost' => $cost));
+
 		$kitcomponents = dynamicsPricesGetKitComponents($db, $product);
 		$kitcost = dynamicsPricesComputeKitCost($db, $kitcomponents);
 		if ($kitcost !== null) {
 			dynamicsPricesUpdateCostPrice($db, $user, $product, $kitcost);
 			$cost = $kitcost;
+			var_dump('Kit cost applied for cost-price strategy', array('product_id' => $prodid, 'kit_cost' => $kitcost));
 		}
 
 		$tva_tx = (float) $product->tva_tx;
@@ -389,6 +411,7 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 			$price_ttc = $price * (1 + $tva_tx/100);
 			$price_min = $cost * (1 + $minrate/100);
 			$price_min_ttc = $price_min * (1 + $tva_tx/100);
+			var_dump('Computed prices for cost-price strategy', array('product_id' => $prodid, 'level' => $level, 'price_ht' => $price, 'price_ttc' => $price_ttc, 'price_min_ht' => $price_min, 'price_min_ttc' => $price_min_ttc));
 
 			$now = $db->idate(dol_now());
 
@@ -431,14 +454,18 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 					$db->query($sqlp);
 
 					$nb_line++ ;
+					var_dump('Inserted/updated price level (cost-price strategy)', array('product_id' => $prodid, 'level' => $level, 'price_ht' => $price, 'price_ttc' => $price_ttc, 'price_min_ht' => $price_min, 'price_min_ttc' => $price_min_ttc, 'lines' => $nb_line));
 				}
 			}
 		}
 	}
 
+	var_dump('Cost price update finished', array('updated_lines' => $nb_line));
+
 	return $nb_line;
 }
 
+/**
 
 
 /**
