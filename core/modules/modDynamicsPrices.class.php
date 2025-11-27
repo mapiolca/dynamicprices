@@ -76,7 +76,7 @@ class modDynamicsPrices extends DolibarrModules
 		$this->editor_squarred_logo = 'logo.png@dynamicsprices';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@dynamicsprices'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.1.1';
+$this->version = '1.2.0';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -253,40 +253,48 @@ class modDynamicsPrices extends DolibarrModules
 		 'tabhelp' => array(array('code' => $langs->trans('CodeTooltipHelp'), 'field2' => 'field2tooltip'), array('code' => $langs->trans('CodeTooltipHelp'), 'field2' => 'field2tooltip'), ...),
 		 );
 		 */
-		/* BEGIN MODULEBUILDER DICTIONARIES */
-		$this->dictionaries = array(
-			'langs'=>'dynamicsprices@dynamicsprices',
-            'tabname'=>array(MAIN_DB_PREFIX."c_coefprice"),
-            'tablib'=>array("LMDB_coefprice"),
-            'tabsql'=>array(
-            	'SELECT t.rowid as rowid, t.entity, t.code, t.fk_nature, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
-        	),
-            'tabsqlsort'=>array(
-            	"code ASC",
-            ),
-            'tabfield'=>array(
-            	"code,fk_nature,pricelevel,targetrate,minrate",
-            ),
-            'tabfieldvalue'=>array(
-            	"code,entity,fk_nature,pricelevel,targetrate,minrate",
-            ),
-            'tabfieldinsert'=>array(
-            	"code,entity,fk_nature,pricelevel,targetrate,minrate",
-            ),
-            'tabrowid'=>array('rowid'),
-            'tabcond'=>array(
-            	isModEnabled('dynamicsprices'),
-            ),
-            'tabhelp' => array(
-            		'code' => $langs->trans('LMDB_CodeTooltipHelp'),
-            		'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
-            		'fk_nature' => $langs->trans('LMDB_FkNatureTooltipHelp'),
-            		'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
-            		'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
-            		'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'), 
-            ),
-		);
-		/* END MODULEBUILDER DICTIONARIES */
+/* BEGIN MODULEBUILDER DICTIONARIES */
+$this->dictionaries = array(
+'langs'=>'dynamicsprices@dynamicsprices',
+'tabname'=>array(MAIN_DB_PREFIX."c_coefprice", MAIN_DB_PREFIX."c_margin_on_cost"),
+'tablib'=>array("LMDB_coefprice", "LMDB_marginoncost"),
+'tabsql'=>array(
+'SELECT t.rowid as rowid, t.entity, t.code, t.fk_nature, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
+'SELECT t.rowid as rowid, t.entity, t.code, t.code_nature, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t WHERE t.entity = '.((int) $conf->entity),
+),
+'tabsqlsort'=>array(
+"code ASC",
+"code ASC",
+),
+'tabfield'=>array(
+"code,fk_nature,pricelevel,targetrate,minrate",
+"code,code_nature,margin_on_cost_percent",
+),
+'tabfieldvalue'=>array(
+"code,entity,fk_nature,pricelevel,targetrate,minrate",
+"code,entity,code_nature,margin_on_cost_percent",
+),
+'tabfieldinsert'=>array(
+"code,entity,fk_nature,pricelevel,targetrate,minrate",
+"code,entity,code_nature,margin_on_cost_percent",
+),
+'tabrowid'=>array('rowid', 'rowid'),
+'tabcond'=>array(
+isModEnabled('dynamicsprices'),
+isModEnabled('dynamicsprices'),
+),
+'tabhelp' => array(
+'code' => $langs->trans('LMDB_CodeTooltipHelp'),
+'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
+'fk_nature' => $langs->trans('LMDB_FkNatureTooltipHelp'),
+'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
+'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
+'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
+'code_nature' => $langs->trans('LMDB_CodeNatureTooltipHelp'),
+'margin_on_cost_percent' => $langs->trans('LMDB_MarginOnCostTooltipHelp'),
+),
+);
+/* END MODULEBUILDER DICTIONARIES */
 
 		// Boxes/Widgets
 		// Add here list of php file(s) stored in dynamicsprices/core/boxes that contains a class to show a widget.
