@@ -33,6 +33,9 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 	/**
 	 * Constructor
 	 *
+	 * EN: Initialize trigger metadata
+	 * FR: Initialiser les métadonnées du trigger
+	 *
 	 * @param DoliDB $db Database handler
 	 */
 	public function __construct($db)
@@ -48,6 +51,9 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 	 * Function called when a Dolibarr business event is done.
 	 * All functions "runTrigger" are triggered if the file is inside the directory core/triggers
 	 *
+	 * EN: Dispatch DynamicPrices reactions for supported actions
+	 * FR: Dispatcher les réactions DynamicPrices pour les actions supportées
+
 	 * @param string       $action Event action code
 	 * @param CommonObject $object Object
 	 * @param User         $user   Object user
@@ -59,32 +65,32 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 	{
 		global $db;
 
-                if (!isModEnabled('dynamicsprices')) {
-                        var_dump('DynamicPrices trigger skipped: module disabled');
-                        return 0; // If module is not enabled, we do nothing
-                }
+		if (!isModEnabled('dynamicsprices')) {
+			var_dump('DynamicPrices trigger skipped: module disabled');
+			return 0; // If module is not enabled, we do nothing
+		}
 
-                if (!getDolGlobalString('LMDB_COST_PRICE_ONLY')) {
-                        if (in_array($action, array('SUPPLIER_PRODUCT_BUYPRICE_CREATE', 'SUPPLIER_PRODUCT_BUYPRICE_MODIFY', 'SUPPLIER_PRODUCT_BUYPRICE_DELETE'), true)) {
-                                require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
-                                if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED')) {
-                                        var_dump('Trigger recalculation from supplier prices for product id', $this->getProductId($object));
-                                        update_customer_prices_from_suppliers($db, $user, $langs, $conf, $this->getProductId($object));
-                                }
-                        }
-                } else {
-                        if ($action === 'PRODUCT_MODIFY') {
-                                require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
-                                if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED')) {
-                                        var_dump('Trigger recalculation from cost price for product id', $this->getProductId($object));
-                                        update_customer_prices_from_cost_price($db, $user, $langs, $conf, $this->getProductId($object));
-                                }
-                        }
-                }
+		if (!getDolGlobalString('LMDB_COST_PRICE_ONLY')) {
+			if (in_array($action, array('SUPPLIER_PRODUCT_BUYPRICE_CREATE', 'SUPPLIER_PRODUCT_BUYPRICE_MODIFY', 'SUPPLIER_PRODUCT_BUYPRICE_DELETE'), true)) {
+				require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
+				if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED')) {
+					var_dump('Trigger recalculation from supplier prices for product id', $this->getProductId($object));
+					update_customer_prices_from_suppliers($db, $user, $langs, $conf, $this->getProductId($object));
+				}
+			}
+		} else {
+			if ($action === 'PRODUCT_MODIFY') {
+				require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
+				if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED')) {
+					var_dump('Trigger recalculation from cost price for product id', $this->getProductId($object));
+					update_customer_prices_from_cost_price($db, $user, $langs, $conf, $this->getProductId($object));
+				}
+			}
+		}
 
 		if (in_array($action, array('PRODUCT_MODIFY', 'PRODUCT_BUYPRICE_MODIFY', 'PRODUCT_BUYPRICE_DELETE', 'PRODUCT_SUBPRODUCT_ADD', 'PRODUCT_SUBPRODUCT_UPDATE', 'PRODUCT_SUBPRODUCT_DELETE'), true)) {
-		var_dump('Trigger kit price update for action', $action);
-		$this->triggerKitPriceUpdate($object, $user, $langs, $conf);
+			var_dump('Trigger kit price update for action', $action);
+			$this->triggerKitPriceUpdate($object, $user, $langs, $conf);
 		}
 
 		$methodName = lcfirst(str_replace(' ', '', ucwords(str_replace('_', ' ', strtolower($action)))));
@@ -103,6 +109,9 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 	/**
 	 * Launch kit price recalculation when a kit or its buy prices are updated.
 	 *
+	 * EN: Recalculate kit cost and selling prices after component or kit updates
+	 * FR: Recalculer le coût et les prix de vente du kit après mise à jour du kit ou des composants
+	 *
 	 * @param CommonObject $object Triggered object
 	 * @param User         $user   Current user
 	 * @param Translate    $langs  Language handler
@@ -113,34 +122,34 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 	{
 		global $db;
 
-                $productId = $this->getProductId($object);
-                if (empty($productId)) {
-                        var_dump('No product id detected for trigger, skipping kit update');
-                        return 0;
-                }
+		$productId = $this->getProductId($object);
+		if (empty($productId)) {
+			var_dump('No product id detected for trigger, skipping kit update');
+			return 0;
+		}
 
 		dol_include_once('/product/class/product.class.php');
 		require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
 
-                $product = new Product($db);
-                if ($product->fetch($productId) <= 0) {
-                        var_dump('Unable to fetch product for kit update', $productId);
-                        return 0;
-                }
+		$product = new Product($db);
+		if ($product->fetch($productId) <= 0) {
+			var_dump('Unable to fetch product for kit update', $productId);
+			return 0;
+		}
 
-                $components = dynamicsPricesGetKitComponents($db, $product);
-                if (empty($components)) {
-                        var_dump('Product is not a kit or has no components', $productId);
-                        return 0;
-                }
+		$components = dynamicsPricesGetKitComponents($db, $product);
+		if (empty($components)) {
+			var_dump('Product is not a kit or has no components', $productId);
+			return 0;
+		}
 
-                if (getDolGlobalString('LMDB_COST_PRICE_ONLY')) {
-                        var_dump('Updating kit prices from cost price strategy for product id', $productId);
-                        update_customer_prices_from_cost_price($db, $user, $langs, $conf, $productId);
-                } else {
-                        var_dump('Updating kit prices from supplier price strategy for product id', $productId);
-                        update_customer_prices_from_suppliers($db, $user, $langs, $conf, $productId);
-                }
+		if (getDolGlobalString('LMDB_COST_PRICE_ONLY')) {
+			var_dump('Updating kit prices from cost price strategy for product id', $productId);
+			update_customer_prices_from_cost_price($db, $user, $langs, $conf, $productId);
+		} else {
+			var_dump('Updating kit prices from supplier price strategy for product id', $productId);
+			update_customer_prices_from_suppliers($db, $user, $langs, $conf, $productId);
+		}
 
 		return 1;
 	}
@@ -148,27 +157,30 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 	/**
 	 * Extract product id from triggered object.
 	 *
+	 * EN: Identify the target product regardless of trigger payload structure
+	 * FR: Identifier le produit cible quelle que soit la structure de l'objet du trigger
+	 *
 	 * @param CommonObject $object Triggered object
 	 * @return int                 Product id if found, 0 otherwise
 	 */
 	private function getProductId($object)
 	{
 		if (!empty($object->fk_product_pere)) {
-		return (int) $object->fk_product_pere;
+			return (int) $object->fk_product_pere;
 		}
-		
+
 		if (!empty($object->fk_product)) {
-		return (int) $object->fk_product;
+			return (int) $object->fk_product;
 		}
-		
+
 		if (!empty($object->id)) {
-		return (int) $object->id;
+			return (int) $object->id;
 		}
-		
+
 		if (!empty($object->productid)) {
-		return (int) $object->productid;
+			return (int) $object->productid;
 		}
-		
+
 		return 0;
-		}
+	}
 }
