@@ -28,7 +28,7 @@
  */
 function dynamicspricesAdminPrepareHead()
 {
-	global $langs, $conf;
+global $langs, $conf;
 
 	// global $db;
 	// $extrafields = new ExtraFields($db);
@@ -86,306 +86,387 @@ function dynamicspricesAdminPrepareHead()
 }
 
 
+// Check if a product is a Kit using product associations
+function dynamicsprices_is_kit($db, $productId)
+{
+	$sql = "SELECT COUNT(rowid) as nb";
+	$sql .= " FROM ".MAIN_DB_PREFIX."product_association";
+	$sql .= " WHERE fk_product_parent = ".((int) $productId);
+	$sql .= " AND entity IN (".getEntity('product').")";
+	$sql .= " AND (type IS NULL OR type IN (0,1))";
+
+	$resql = $db->query($sql);
+	if ($resql === false) {
+		return false;
+	}
+
+	$obj = $db->fetch_object($resql);
+	return (!empty($obj->nb) && (int) $obj->nb > 0);
+}
+
+// Get Kit components with quantities
+function dynamicsprices_get_kit_components($db, $productId)
+{
+	$components = array();
+
+	$sql = "SELECT fk_product_child as fk_product, qty";
+	$sql .= " FROM ".MAIN_DB_PREFIX."product_association";
+	$sql .= " WHERE fk_product_parent = ".((int) $productId);
+	$sql .= " AND entity IN (".getEntity('product').")";
+	$sql .= " AND (type IS NULL OR type IN (0,1))";
+
+	$resql = $db->query($sql);
+	if ($resql === false) {
+		return $components;
+	}
+
+	while ($obj = $db->fetch_object($resql)) {
+		$components[] = array('id' => (int) $obj->fk_product, 'qty' => (float) $obj->qty);
+	}
+
+	return $components;
+}
+
+// Get parent Kits containing a component
+function dynamicsprices_get_parent_kits($db, $productId)
+{
+	$parents = array();
+
+	$sql = "SELECT fk_product_parent as fk_parent";
+	$sql .= " FROM ".MAIN_DB_PREFIX."product_association";
+	$sql .= " WHERE fk_product_child = ".((int) $productId);
+	$sql .= " AND entity IN (".getEntity('product').")";
+	$sql .= " AND (type IS NULL OR type IN (0,1))";
+
+	$resql = $db->query($sql);
+	if ($resql === false) {
+		return $parents;
+	}
+
+	while ($obj = $db->fetch_object($resql)) {
+		$parents[] = (int) $obj->fk_parent;
+	}
+
+	return $parents;
+}
+
+// Compute average supplier price
+function dynamicsprices_get_average_supplier_price($db, $productId)
+{
+	$sql = "SELECT price";
+	$sql .= " FROM ".MAIN_DB_PREFIX."product_fournisseur_price";
+	$sql .= " WHERE fk_product = ".((int) $productId);
+	$sql .= " AND entity IN (".getEntity('product_fournisseur_price').")";
+
+	$resql = $db->query($sql);
+	if ($resql === false) {
+		return null;
+	}
+
+	$prices = array();
+	while ($obj = $db->fetch_object($resql)) {
+		$prices[] = (float) $obj->price;
+	}
+
+	if (count($prices) === 0) {
+		return null;
+	}
+
+	return array_sum($prices) / count($prices);
+}
+
+// Get margin on cost percent for a nature
+function dynamicsprices_get_margin_on_cost_percent($db, $natureId)
+{
+	$sql = "SELECT margin_on_cost_percent";
+	$sql .= " FROM ".MAIN_DB_PREFIX."c_margin_on_cost";
+	$sql .= " WHERE code_nature = '".$db->escape($natureId)."'";
+	$sql .= " AND entity IN (".getEntity('entity').")";
+	$sql .= " AND active = 1";
+	$sql .= " ORDER BY rowid DESC";
+	$sql .= " LIMIT 1";
+
+	$resql = $db->query($sql);
+	if ($resql === false) {
+		return 0;
+	}
+
+	$obj = $db->fetch_object($resql);
+	return $obj ? (float) $obj->margin_on_cost_percent : 0;
+}
+
+// Fetch selling price rules from dictionary
+function dynamicsprices_get_price_rules($db, $natureId)
+{
+	$rules = array();
+
+	$sql = "SELECT pricelevel, minrate, targetrate";
+	$sql .= " FROM ".MAIN_DB_PREFIX."c_coefprice";
+	$sql .= " WHERE fk_nature = ".((int) $natureId);
+	$sql .= " AND entity IN (".getEntity('entity').")";
+	$sql .= " AND active = 1";
+
+	$resql = $db->query($sql);
+	if ($resql === false) {
+		return $rules;
+	}
+
+	while ($obj = $db->fetch_object($resql)) {
+		$rules[(int) $obj->pricelevel] = array('minrate' => (float) $obj->minrate, 'targetrate' => (float) $obj->targetrate);
+	}
+
+	return $rules;
+}
+
+// Save cost price on product table
+function dynamicsprices_save_cost_price($db, $productId, $costPrice)
+{
+	$sql = "UPDATE ".MAIN_DB_PREFIX."product";
+	$sql .= " SET cost_price = ".price2num($costPrice, 'MU');
+	$sql .= " WHERE rowid = ".((int) $productId);
+	$sql .= " AND entity IN (".getEntity('product').")";
+
+	return $db->query($sql);
+}
+
+// Calculate and persist Kit cost price based on components
+function dynamicsprices_update_kit_cost_price($db, $productId)
+{
+	$components = dynamicsprices_get_kit_components($db, $productId);
+	$totalCost = 0;
+
+	foreach ($components as $component) {
+		$avg = dynamicsprices_get_average_supplier_price($db, $component['id']);
+		$avg = ($avg === null) ? 0 : $avg;
+		$totalCost += $avg * (float) $component['qty'];
+	}
+
+	dynamicsprices_save_cost_price($db, $productId, $totalCost);
+
+	return $totalCost;
+}
+
+// Update selling prices from a base cost and rules
+function dynamicsprices_update_prices_from_base($db, $user, $product, $basePrice, $rules, $tvaTx, $entity)
+{
+	$nb_line = 0;
+	$now = $db->idate(dol_now());
+
+	foreach ($rules as $level => $rule) {
+		$price = $basePrice * (1 + ((float) $rule['targetrate'] / 100));
+		$price_ttc = $price * (1 + ((float) $tvaTx / 100));
+		$price_min = $basePrice * (1 + ((float) $rule['minrate'] / 100));
+		$price_min_ttc = $price_min * (1 + ((float) $tvaTx / 100));
+
+		$sqlv = "SELECT price, price_ttc, price_min, price_min_ttc";
+		$sqlv .= " FROM ".MAIN_DB_PREFIX."product_price";
+		$sqlv .= " WHERE fk_product = ".((int) $product->id);
+		$sqlv .= " AND price_level = ".((int) $level);
+		$sqlv .= " AND entity IN (".getEntity('productprice').")";
+		$sqlv .= " ORDER BY date_price DESC LIMIT 1";
+
+		$resqlv = $db->query($sqlv);
+		$current = $db->fetch_object($resqlv);
+
+		if (!$current || price2num($current->price, 2) != price2num($price, 2) || price2num($current->price_min, 2) != price2num($price_min, 2) || price2num($current->price_ttc, 2) != price2num($price_ttc, 2) || price2num($current->price_min_ttc, 2) != price2num($price_min_ttc, 2)) {
+			$sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price (entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)";
+			$sqlp .= " VALUES (".((int) $entity).", ".((int) $product->id).", ".((int) $level).", ".((int) $user->id).", ".price2num($price, 2).", ".price2num($price_ttc, 2).", ".price2num($price_min, 2).", ".price2num($price_min_ttc, 2).", '".$now."', ".((float) $tvaTx).")";
+			$sqlp .= " ON DUPLICATE KEY UPDATE price = VALUES(price), price_ttc = VALUES(price_ttc), price_min = VALUES(price_min), price_min_ttc = VALUES(price_min_ttc), date_price = VALUES(date_price), tva_tx = VALUES(tva_tx)";
+			$db->query($sqlp);
+			$nb_line++;
+		}
+	}
+
+	return $nb_line;
+}
+
+// Fetch latest component prices per level
+function dynamicsprices_get_component_prices_by_level($db, $productId)
+{
+	$prices = array();
+
+	$sql = "SELECT price_level, price, price_min";
+	$sql .= " FROM ".MAIN_DB_PREFIX."product_price";
+	$sql .= " WHERE fk_product = ".((int) $productId);
+	$sql .= " AND entity IN (".getEntity('productprice').")";
+	$sql .= " ORDER BY date_price DESC";
+
+	$resql = $db->query($sql);
+	if ($resql === false) {
+		return $prices;
+	}
+
+	while ($obj = $db->fetch_object($resql)) {
+	$level = (int) $obj->price_level;
+	if (!isset($prices[$level])) {
+	$prices[$level] = array('price' => (float) $obj->price, 'price_min' => (float) $obj->price_min);
+	}
+	}
+
+	return $prices;
+}
+
+// Update Kit prices by summing component prices
+function dynamicsprices_update_kit_prices_from_components($db, $user, $product, $components, $tvaTx, $entity)
+{
+	$levelTotals = array();
+	$nb_line = 0;
+	$now = $db->idate(dol_now());
+
+	foreach ($components as $component) {
+	$componentPrices = dynamicsprices_get_component_prices_by_level($db, $component['id']);
+	foreach ($componentPrices as $level => $values) {
+	if (!isset($levelTotals[$level])) {
+	$levelTotals[$level] = array('price' => 0, 'price_min' => 0);
+	}
+	$levelTotals[$level]['price'] += ((float) $values['price']) * (float) $component['qty'];
+	$levelTotals[$level]['price_min'] += ((float) $values['price_min']) * (float) $component['qty'];
+	}
+	}
+
+	foreach ($levelTotals as $level => $values) {
+	$price = (float) $values['price'];
+	$price_min = (float) $values['price_min'];
+	$price_ttc = $price * (1 + ((float) $tvaTx / 100));
+	$price_min_ttc = $price_min * (1 + ((float) $tvaTx / 100));
+
+	$sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price (entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)";
+	$sqlp .= " VALUES (".((int) $entity).", ".((int) $product->id).", ".((int) $level).", ".((int) $user->id).", ".price2num($price, 2).", ".price2num($price_ttc, 2).", ".price2num($price_min, 2).", ".price2num($price_min_ttc, 2).", '".$now."', ".((float) $tvaTx).")";
+	$sqlp .= " ON DUPLICATE KEY UPDATE price = VALUES(price), price_ttc = VALUES(price_ttc), price_min = VALUES(price_min), price_min_ttc = VALUES(price_min_ttc), date_price = VALUES(date_price), tva_tx = VALUES(tva_tx)";
+	$db->query($sqlp);
+	$nb_line++;
+	}
+
+	return $nb_line;
+}
+
 function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $productid = 0)
 {
-    dol_include_once('/product/class/product.class.php');
-    
-    global $conf;
-    
-    $products = [];
-    $nb_line = 0;
-    $entity = $conf->entity;
+	dol_include_once('/product/class/product.class.php');
 
-    if ($productid > 0) {
-        $products[] = $productid;
-    } else {
-        $sql = "SELECT rowid, finished";
-        $sql.= " FROM ".MAIN_DB_PREFIX."product";
-        $sql.= " WHERE tosell = 1 ";
-        $sql.= " AND entity IN (".getEntity('product').")";
+	global $conf;
 
-        //var_dump($sql.'<br>');
+	$products = array();
+	$nb_line = 0;
+	$entity = $conf->entity;
 
-        $resql = $db->query($sql);
-        if ($resql === false) {
-    		dol_print_error($db);
-    		return;
+	if ($productid > 0) {
+		$products[] = $productid;
+	} else {
+		$sql = "SELECT rowid, finished";
+		$sql .= " FROM ".MAIN_DB_PREFIX."product";
+		$sql .= " WHERE tosell = 1";
+		$sql .= " AND entity IN (".getEntity('product').")";
+
+		$resql = $db->query($sql);
+		if ($resql === false) {
+			dol_print_error($db);
+			return 0;
 		}
 
-        while ($obj = $db->fetch_object($resql)) {
-            $products[] = array('id'=>$obj->rowid, 'nature'=>$obj->finished);
-        }
-    }
+		while ($obj = $db->fetch_object($resql)) {
+			$products[] = array('id' => $obj->rowid, 'nature' => $obj->finished);
+		}
+	}
 
-    foreach ($products as $prod) {
-        $prodid = is_array($prod) ? $prod['id'] : $prod;
-        //var_dump('ID Produit = '.$prodid.'<br>');
-        $natureid = is_array($prod) ? $prod['nature'] : 0;
-        //var_dump('Nature  = '.$natureid.'<br>');
-        $product = new Product($db);
-        $product->fetch($prodid);
+	foreach ($products as $prod) {
+		$prodid = is_array($prod) ? $prod['id'] : $prod;
+		$natureid = is_array($prod) ? $prod['nature'] : 0;
+		$product = new Product($db);
+		$product->fetch($prodid);
+		$tva_tx = (float) $product->tva_tx;
 
-        $tva_tx = (float) $product->tva_tx;
+		if (dynamicsprices_is_kit($db, $prodid)) {
+			$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
+			$rules = dynamicsprices_get_price_rules($db, $natureid);
+			if (getDolGlobalInt('LMDB_KIT_PRICE_FROM_COMPONENTS')) {
+				$components = dynamicsprices_get_kit_components($db, $prodid);
+				$nb_line += dynamicsprices_update_kit_prices_from_components($db, $user, $product, $components, $tva_tx, $entity);
+			} else {
+				$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $costPrice, $rules, $tva_tx, $entity);
+			}
+			continue;
+		}
 
-        //var_dump('$tva_tx = '.price($tva_tx).'<br>');
+		$avgPrice = dynamicsprices_get_average_supplier_price($db, $prodid);
+		if ($avgPrice === null) {
+			continue;
+		}
 
-        // Prix fournisseurs
-        $sqlf = "SELECT price FROM ".MAIN_DB_PREFIX."product_fournisseur_price
-                 WHERE fk_product = ".((int) $prodid);
-        $sqlf.= " AND entity IN (".getEntity('product_fournisseur_price').")";
+		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $natureid);
+		$costPrice = $avgPrice * (1 + ($marginPercent / 100));
+		dynamicsprices_save_cost_price($db, $prodid, $costPrice);
 
-        //var_dump('$sqfl = '.$sqlf.'<br>');
+		$rules = dynamicsprices_get_price_rules($db, $natureid);
+		$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $avgPrice, $rules, $tva_tx, $entity);
+	}
 
-        $resqlf = $db->query($sqlf);
-
-        $prices_fourn = [];
-        while ($objf = $db->fetch_object($resqlf)) {
-            $prices_fourn[] = (float) $objf->price;
-        }
-
-        if (!count($prices_fourn)) continue;
-
-        $moyenne = array_sum($prices_fourn) / count($prices_fourn);
-
-        //var_dump('moyenne = '.$moyenne.'<br>');
-
-        // Coefficients par nature
-        $sqlc = "SELECT code, pricelevel, minrate, targetrate
-                 FROM ".MAIN_DB_PREFIX."c_coefprice
-                 WHERE fk_nature = ".((int) $natureid);
-        $sqlc.= " AND entity IN (".getEntity('entity').")";
-
-        //var_dump('$sqlc = '.$sqlc.'<br>');
-
-        $resqlc = $db->query($sqlc);
-
-        while ($objc = $db->fetch_object($resqlc)) {
-            $level = (int) $objc->pricelevel;
-            //var_dump('$level = '.$level.'<br>');
-            $minrate = (float) $objc->minrate;
-            $targetrate = (float) $objc->targetrate;
-
-            $price = $moyenne * (1 + $targetrate/100);
-
-            //var_dump('$price = '.price($price).'<br>');
-
-            $price_ttc = $price * (1 + $tva_tx/100);
-
-            //var_dump('$price_ttc = '.price($price_ttc).'<br>');
-
-            $price_min = $moyenne * (1 + $minrate/100);
-
-            //var_dump('$price_min = '.price($price_min).'<br>');
-
-            $price_min_ttc = $price_min * (1 + $tva_tx/100);
-
-            //var_dump('$price_min_ttc = '.price($price_min_ttc).'<br>');
-
-            $now = $db->idate(dol_now());
-
-            $sqlv = "SELECT price_level, price, price_ttc, price_min, price_min_ttc, tva_tx ";
-            $sqlv.= " FROM ".MAIN_DB_PREFIX."product_price";
-            $sqlv.= " WHERE fk_product = ".((int) $prodid) ;
-            $sqlv.= " AND price_level = ".$level;
-            $sqlv.= " AND entity IN (".getEntity('productprice').")";
-            $sqlv.= " ORDER BY date_price DESC LIMIT 1";
-            //var_dump('$sqlv = '.$sqlv.'<br>');
-
-            $resqlv = $db->query($sqlv);
-
-            while ($objv = $db->fetch_object($resqlv)) {
-            	$price_v = price2num($objv->price,2);
-            	$price_ttc_v = price2num($objv->price_ttc,2);
-            	$price_min_v = price2num($objv->price_min,2);
-            	$price_min_ttc_v = price2num($objv->price_min_ttc,2);
-            	//$tva_tx_v = $objv->tva_tx;
-            	
-            	if (price2num($price,2)!=$price_v || price2num($price_min,2)!=$price_min_v || price2num($price_ttc,2)!=$price_ttc_v || price2num($price_min_ttc,2)!=$price_min_ttc_v) {
-            		$sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price
-		                (entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)
-		                VALUES (".((int )$entity).",
-		                        ".((int) $prodid).",
-		                        ".$level.",
-		                        ".$user->id.",
-		                        ".price2num($price,2).",
-		                        ".price2num($price_ttc,2).",
-		                        ".price2num($price_min,2).",
-		                        ".price2num($price_min_ttc,2).",
-		                        '".$now."',
-		                        ".((float) $tva_tx).")
-		                ON DUPLICATE KEY UPDATE
-		                    price = VALUES(price),
-		                    price_ttc = VALUES(price_ttc),
-		                    price_min = VALUES(price_min),
-		                    price_min_ttc = VALUES(price_min_ttc),
-		                    date_price = VALUES(date_price),
-		                    tva_tx = VALUES(tva_tx)";
-		            $db->query($sqlp);
-                    
-		            $nb_line++ ;
-		            //var_dump('$nb_line = '.$nb_line.'<br>');
-            	}
-            	//var_dump('$nb_line2 = '.$nb_line.'<br>');
-            }
-            //var_dump('$nb_line3 = '.$nb_line.'<br>');
-        }
-    }
-    //var_dump('$nb_line4 = '.$nb_line.'<br>');
-    
-    return $nb_line;
+	return $nb_line;
 }
 
 function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $productid = 0)
 {
-    dol_include_once('/product/class/product.class.php');
-    
-    global $conf;
-    
-    $products = [];
-    $nb_line = 0;
-    $entity = $conf->entity;
+	dol_include_once('/product/class/product.class.php');
 
-    if ($productid > 0) {
-        $products[] = $productid;
-    } else {
-        $sql = "SELECT rowid, finished, cost_price";
-        $sql.= " FROM ".MAIN_DB_PREFIX."product";
-        $sql.= " WHERE tosell = 1 ";
-        $sql.= " AND entity IN (".getEntity('product').")";
+	global $conf;
 
-        //var_dump($sql.'<br>');
+	$products = array();
+	$nb_line = 0;
+	$entity = $conf->entity;
 
-        $resql = $db->query($sql);
-        if ($resql === false) {
-            dol_print_error($db);
-            return;
-        }
+	if ($productid > 0) {
+		$products[] = $productid;
+	} else {
+		$sql = "SELECT rowid, finished, cost_price";
+		$sql .= " FROM ".MAIN_DB_PREFIX."product";
+		$sql .= " WHERE tosell = 1";
+		$sql .= " AND entity IN (".getEntity('product').")";
 
-        while ($obj = $db->fetch_object($resql)) {
-            $products[] = array('id'=>$obj->rowid, 'nature'=>$obj->finished, 'cost_price'=>$obj->cost_price);
-        }
-    }
+		$resql = $db->query($sql);
+		if ($resql === false) {
+			dol_print_error($db);
+			return 0;
+		}
 
-    foreach ($products as $prod) {
-        $prodid = is_array($prod) ? $prod['id'] : $prod;
-        //var_dump('ID Produit = '.$prodid.'<br>');
-        $natureid = is_array($prod) ? $prod['nature'] : 0;
-        //var_dump('Nature  = '.$natureid.'<br>');
-        $cost = is_array($prod) ? $prod['cost_price'] : 0;
-        //var_dump('Prix de Revient = '.$cost.'<br>');
-        $product = new Product($db);
-        $product->fetch($prodid);
+		while ($obj = $db->fetch_object($resql)) {
+			$products[] = array('id' => $obj->rowid, 'nature' => $obj->finished, 'cost_price' => $obj->cost_price);
+		}
+	}
 
-        $tva_tx = (float) $product->tva_tx;
+	foreach ($products as $prod) {
+		$prodid = is_array($prod) ? $prod['id'] : $prod;
+		$natureid = is_array($prod) ? $prod['nature'] : 0;
+		$currentCost = is_array($prod) ? $prod['cost_price'] : 0;
+		$product = new Product($db);
+		$product->fetch($prodid);
+		$tva_tx = (float) $product->tva_tx;
 
-        // Coefficients par nature
-        $sqlc = "SELECT code, pricelevel, minrate, targetrate
-                 FROM ".MAIN_DB_PREFIX."c_coefprice
-                 WHERE fk_nature = ".((int) $natureid);
-        $sqlc.= " AND entity IN (".getEntity('entity').")";
+		if (dynamicsprices_is_kit($db, $prodid)) {
+			$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
+			$rules = dynamicsprices_get_price_rules($db, $natureid);
+			if (getDolGlobalInt('LMDB_KIT_PRICE_FROM_COMPONENTS')) {
+				$components = dynamicsprices_get_kit_components($db, $prodid);
+				$nb_line += dynamicsprices_update_kit_prices_from_components($db, $user, $product, $components, $tva_tx, $entity);
+			} else {
+				$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $costPrice, $rules, $tva_tx, $entity);
+			}
+			continue;
+		}
 
-        //var_dump('$sqlc = '.$sqlc.'<br>');
+		$avgPrice = dynamicsprices_get_average_supplier_price($db, $prodid);
+		if ($avgPrice !== null) {
+			$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $natureid);
+			$currentCost = $avgPrice * (1 + ($marginPercent / 100));
+			dynamicsprices_save_cost_price($db, $prodid, $currentCost);
+		}
 
-        $resqlc = $db->query($sqlc);
+		$rules = dynamicsprices_get_price_rules($db, $natureid);
+		$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $currentCost, $rules, $tva_tx, $entity);
+	}
 
-        ////var_dump($resqlc.'<br>');
-
-        while ($objc = $db->fetch_object($resqlc)) {
-            $level = (int) $objc->pricelevel;
-            //var_dump('$level = '.$level.'<br>');
-            $minrate = (float) $objc->minrate;
-            $targetrate = (float) $objc->targetrate;
-
-            $price = $cost * (1 + $targetrate/100);
-
-            //var_dump('$price = '.price($price).'<br>');
-
-            $price_ttc = $price * (1 + $tva_tx/100);
-
-            //var_dump('$price_ttc = '.price($price_ttc).'<br>');
-
-            $price_min = $cost * (1 + $minrate/100);
-
-            //var_dump('$price_min = '.price($price_min).'<br>');
-
-            $price_min_ttc = $price_min * (1 + $tva_tx/100);
-
-            //var_dump('$price_min_ttc = '.price($price_min_ttc).'<br>');
-
-            $now = $db->idate(dol_now());
-
-            $sqlv = "SELECT price_level, price, price_ttc, price_min, price_min_ttc, tva_tx ";
-            $sqlv.= " FROM ".MAIN_DB_PREFIX."product_price";
-            $sqlv.= " WHERE fk_product = ".((int) $prodid) ;
-            $sqlv.= " AND price_level = ".$level;
-            $sqlv.= " AND entity IN (".getEntity('productprice').")";
-            $sqlv.= " ORDER BY date_price DESC LIMIT 1";
-            //var_dump('$sqlv = '.$sqlv.'<br>');
-
-            $resqlv = $db->query($sqlv);
-
-            while ($objv = $db->fetch_object($resqlv)) {
-                $price_v = price2num($objv->price,2);
-                $price_ttc_v = price2num($objv->price_ttc,2);
-                $price_min_v = price2num($objv->price_min,2);
-                $price_min_ttc_v = price2num($objv->price_min_ttc,2);
-                //$tva_tx_v = $objv->tva_tx;
-                
-                if (price2num($price,2)!=$price_v || price2num($price_min,2)!=$price_min_v || price2num($price_ttc,2)!=$price_ttc_v || price2num($price_min_ttc,2)!=$price_min_ttc_v) {
-                    $sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price
-                        (entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)
-                        VALUES (".$entity.",
-                                ".((int) $prodid).",
-                                ".$level.",
-                                ".$user->id.",
-                                ".price2num($price,2).",
-                                ".price2num($price_ttc,2).",
-                                ".price2num($price_min,2).",
-                                ".price2num($price_min_ttc,2).",
-                                '".$now."',
-                                ".((float) $tva_tx).")
-                        ON DUPLICATE KEY UPDATE
-                            price = VALUES(price),
-                            price_ttc = VALUES(price_ttc),
-                            price_min = VALUES(price_min),
-                            price_min_ttc = VALUES(price_min_ttc),
-                            date_price = VALUES(date_price),
-                            tva_tx = VALUES(tva_tx)";
-                    $db->query($sqlp);
-
-                    $nb_line++ ;
-                }
-            }
-        }
-    }
-    
-    return $nb_line;
+	return $nb_line;
 }
 
-
-/**
- * Display title
- * @param string $title
- */
-function setup_print_title($title="Parameter", $width = 300)
-{
-    global $langs;
-    print '<tr class="liste_titre">';
-	print '<td td class="titlefield">'.$langs->trans($title) . '</td>';
-    print '<td td class="titlefield" align="center" width="20">&nbsp;</td>';
-    print '<td td class="titlefield" align="center">'.$langs->trans('Value').'</td>';
-    print '</tr>';
-}
-
-/**
- * yes / no select
- * @param string $confkey
- * @param string $title
- * @param string $desc
- * @param $ajaxConstantOnOffInput will be send to ajax_constantonoff() input param
- *
- * exemple _print_on_off('CONSTNAME', 'ParamLabel' , 'ParamDesc');
- */
 function setup_print_on_off($confkey, $title = false, $desc ='', $help = false, $width = 300, $forcereload = false, $ajaxConstantOnOffInput = array())
 {
     global $var, $bc, $langs, $conf, $form;
