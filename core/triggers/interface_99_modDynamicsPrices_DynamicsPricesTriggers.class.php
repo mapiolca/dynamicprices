@@ -74,6 +74,7 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
         global $db;
 
         if (!getDolGlobalString('LMDB_COST_PRICE_ONLY')) {
+			var_dump(getDolGlobalString('LMDB_COST_PRICE_ONLY'));
             if ($action === 'SUPPLIER_PRODUCT_BUYPRICE_CREATE' || $action === 'SUPPLIER_PRODUCT_BUYPRICE_MODIFY' || $action == 'SUPPLIER_PRODUCT_BUYPRICE_DELETE') {
                 require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
                 //var_dump(getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED'));
