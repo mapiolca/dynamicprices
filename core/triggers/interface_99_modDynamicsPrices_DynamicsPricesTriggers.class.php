@@ -82,10 +82,10 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
                         }
                 }
 
-                if (in_array($action, array('PRODUCT_MODIFY', 'PRODUCT_BUYPRICE_MODIFY', 'PRODUCT_BUYPRICE_DELETE'), true)) {
-                        var_dump('Trigger kit price update for action', $action);
-                        $this->triggerKitPriceUpdate($object, $user, $langs, $conf);
-                }
+		if (in_array($action, array('PRODUCT_MODIFY', 'PRODUCT_BUYPRICE_MODIFY', 'PRODUCT_BUYPRICE_DELETE', 'PRODUCT_SUBPRODUCT_ADD', 'PRODUCT_SUBPRODUCT_UPDATE', 'PRODUCT_SUBPRODUCT_DELETE'), true)) {
+		var_dump('Trigger kit price update for action', $action);
+		$this->triggerKitPriceUpdate($object, $user, $langs, $conf);
+		}
 
 		$methodName = lcfirst(str_replace(' ', '', ucwords(str_replace('_', ' ', strtolower($action)))));
 		$callback = array($this, $methodName);
@@ -153,18 +153,22 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 	 */
 	private function getProductId($object)
 	{
+		if (!empty($object->fk_product_pere)) {
+		return (int) $object->fk_product_pere;
+		}
+		
 		if (!empty($object->fk_product)) {
-			return (int) $object->fk_product;
+		return (int) $object->fk_product;
 		}
-
+		
 		if (!empty($object->id)) {
-			return (int) $object->id;
+		return (int) $object->id;
 		}
-
+		
 		if (!empty($object->productid)) {
-			return (int) $object->productid;
+		return (int) $object->productid;
 		}
-
+		
 		return 0;
-	}
+		}
 }
