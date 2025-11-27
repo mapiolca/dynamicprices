@@ -75,7 +75,7 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 
 		require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
 		$updateFunction = getDolGlobalString('LMDB_COST_PRICE_ONLY') ? 'update_customer_prices_from_cost_price' : 'update_customer_prices_from_suppliers';
-		$affectedActions = array('SUPPLIER_PRODUCT_BUYPRICE_CREATE', 'SUPPLIER_PRODUCT_BUYPRICE_MODIFY', 'SUPPLIER_PRODUCT_BUYPRICE_DELETE', 'PRODUCT_MODIFY', 'PRODUCT_PRICE_MODIFY');
+		$affectedActions = array('SUPPLIER_PRODUCT_BUYPRICE_CREATE', 'SUPPLIER_PRODUCT_BUYPRICE_MODIFY', 'SUPPLIER_PRODUCT_BUYPRICE_DELETE', 'PRODUCT_MODIFY', 'PRODUCT_PRICE_MODIFY', 'PRODUCT_BUYPRICE_MODIFY', 'PRODUCT_BUYPRICE_DELETE', 'PRODUCT_SUBPRODUCT_ADD', 'PRODUCT_SUBPRODUCT_UPDATE', 'PRODUCT_SUBPRODUCT_DELETE');
 
 		if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED') && in_array($action, $affectedActions, true)) {
 			$productId = !empty($object->fk_product) ? $object->fk_product : (isset($object->id) ? $object->id : 0);
