@@ -91,7 +91,7 @@ function dynamicsprices_is_kit($db, $productId)
 {
 	$sql = "SELECT COUNT(rowid) as nb";
 	$sql .= " FROM ".MAIN_DB_PREFIX."product_association";
-	$sql .= " WHERE fk_product_parent = ".((int) $productId);
+	$sql .= " WHERE fk_product_pere = ".((int) $productId);
 	$sql .= " AND entity IN (".getEntity('product').")";
 	$sql .= " AND (type IS NULL OR type IN (0,1))";
 
@@ -109,9 +109,9 @@ function dynamicsprices_get_kit_components($db, $productId)
 {
 	$components = array();
 
-	$sql = "SELECT fk_product_child as fk_product, qty";
+	$sql = "SELECT fk_product_fils as fk_product, qty";
 	$sql .= " FROM ".MAIN_DB_PREFIX."product_association";
-	$sql .= " WHERE fk_product_parent = ".((int) $productId);
+	$sql .= " WHERE fk_product_pere = ".((int) $productId);
 	$sql .= " AND entity IN (".getEntity('product').")";
 	$sql .= " AND (type IS NULL OR type IN (0,1))";
 
@@ -132,9 +132,9 @@ function dynamicsprices_get_parent_kits($db, $productId)
 {
 	$parents = array();
 
-	$sql = "SELECT fk_product_parent as fk_parent";
+	$sql = "SELECT fk_product_pere as fk_parent";
 	$sql .= " FROM ".MAIN_DB_PREFIX."product_association";
-	$sql .= " WHERE fk_product_child = ".((int) $productId);
+	$sql .= " WHERE fk_product_fils = ".((int) $productId);
 	$sql .= " AND entity IN (".getEntity('product').")";
 	$sql .= " AND (type IS NULL OR type IN (0,1))";
 
