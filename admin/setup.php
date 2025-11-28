@@ -1,27 +1,27 @@
 <?php
 /* Copyright (C) 2004-2017  Laurent Destailleur     <eldy@users.sourceforge.net>
- * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
- * Copyright (C) 2025		Pierre ARDOIN
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+* Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
+* Copyright (C) 2025		Pierre ARDOIN
+*
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
 
 /**
- * \file    dynamicsprices/admin/setup.php
- * \ingroup dynamicsprices
- * \brief   DynamicsPrices setup page.
- */
+* \file    dynamicsprices/admin/setup.php
+* \ingroup dynamicsprices
+* \brief   DynamicsPrices setup page.
+*/
 
 // Load Dolibarr environment
 $res = 0;
@@ -59,14 +59,15 @@ if (!$res) {
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once '../lib/dynamicsprices.lib.php';
 //require_once "../class/myclass.class.php";
+require_once __DIR__.'/../core/modules/modDynamicsPrices.class.php';
 
 /**
- * @var Conf $conf
- * @var DoliDB $db
- * @var HookManager $hookmanager
- * @var Translate $langs
- * @var User $user
- */
+* @var Conf $conf
+* @var DoliDB $db
+* @var HookManager $hookmanager
+* @var Translate $langs
+* @var User $user
+*/
 
 // Translations
 $langs->loadLangs(array("admin", "dynamicsprices@dynamicsprices"));
@@ -93,6 +94,27 @@ if (!$user->admin) {
 	accessforbidden();
 }
 
+// Actions on module constants
+include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
+
+// Load dictionary definitions
+$module = new modDynamicsPrices($db);
+$taborder = empty($module->dictionaries['taborder']) ? array() : $module->dictionaries['taborder'];
+$tabname = empty($module->dictionaries['tabname']) ? array() : $module->dictionaries['tabname'];
+$tablib = empty($module->dictionaries['tablib']) ? array() : $module->dictionaries['tablib'];
+$tabsql = empty($module->dictionaries['tabsql']) ? array() : $module->dictionaries['tabsql'];
+$tabsqlsort = empty($module->dictionaries['tabsqlsort']) ? array() : $module->dictionaries['tabsqlsort'];
+$tabfield = empty($module->dictionaries['tabfield']) ? array() : $module->dictionaries['tabfield'];
+$tabfieldvalue = empty($module->dictionaries['tabfieldvalue']) ? array() : $module->dictionaries['tabfieldvalue'];
+$tabfieldinsert = empty($module->dictionaries['tabfieldinsert']) ? array() : $module->dictionaries['tabfieldinsert'];
+$tabrowid = empty($module->dictionaries['tabrowid']) ? array() : $module->dictionaries['tabrowid'];
+$tabcond = empty($module->dictionaries['tabcond']) ? array() : $module->dictionaries['tabcond'];
+$tabhelp = empty($module->dictionaries['tabhelp']) ? array() : $module->dictionaries['tabhelp'];
+$tabsave = empty($module->dictionaries['tabsave']) ? array() : $module->dictionaries['tabsave'];
+$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
+
+include DOL_DOCUMENT_ROOT.'/core/actions_dictionnaire.inc.php';
+
 
 // Set this to 1 to use the factory to manage constants. Warning, the generated module will be compatible with version v15+ only
 $useFormSetup = 1;
@@ -112,8 +134,8 @@ $action = 'edit';
 
 
 /*
- * View
- */
+* View
+*/
 
 $form = new Form($db);
 
@@ -136,16 +158,21 @@ echo '<span class="opacitymedium">'.$langs->trans("DynamicsPricesSetupPage").'</
 
 print '<table class="noborder" width="100%">';
 
-// Réglage 
-		setup_print_title($langs->trans("LMDB_UpdateOptions"));
-		setup_print_on_off('LMDB_COST_PRICE_ONLY');
-		setup_print_on_off('LMDB_SUPPLIER_BUYPRICE_ALTERED');
-		
-
+// Settings
+setup_print_title($langs->trans("LMDB_UpdateOptions"));
+setup_print_on_off('LMDB_COST_PRICE_ONLY');
+setup_print_on_off('LMDB_SUPPLIER_BUYPRICE_ALTERED');
+setup_print_on_off('LMDB_KIT_PRICE_FROM_COMPONENTS');
 
 print '</table>';
+
+print '<br>';
+
+// Dictionary management
+include DOL_DOCUMENT_ROOT.'/core/tpl/admin/dict.tpl.php';
+
 if (empty($setupnotempty)) {
-	print '<br>'.$langs->trans("NothingToSetup");
+print '<br>'.$langs->trans("NothingToSetup");
 }
 
 // Page end

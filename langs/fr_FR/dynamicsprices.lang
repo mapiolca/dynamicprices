@@ -16,6 +16,7 @@ DynamicsPricesSetup = Réglages des prix de vente dynamiques
 Settings = Réglages
 DynamicsPricesSetupPage = Page de réglage du module de Prix de vente dynamiques
 LMDB_UpdateOptions=Options de mise à jour des prix de vente
+LMDB_KIT_PRICE_FROM_COMPONENTS = Calculer les prix des Kits à partir des composants
 
 LMDB_COST_PRICE_ONLY = Ne mettre à jour les prix de vente que sur la base des prix de revient.
 LMDB_SUPPLIER_BUYPRICE_ALTERED = Actualisation de prix de vente à la création/mise à jour/suppression d'un prix d'achat ou l'actualisation du prix de revient si le calcul sur le prix de revient est activé.
@@ -56,5 +57,8 @@ Entity = Entité
 LMDB_CommentAutoUpdateSellPrice = Les prix de vente sont mis à jour en fonction des coefficients de prix donnés dans le dictionnaire, et de la moyenne des prix unitaires d'achats fournisseurs.
 LMDB_LabelAutoUpdateSellPrice = Mise à jour automatique des prix de vente
 LMDB_coefprice = Taux de marges sur les prix de vente
+LMDB_marginoncost = Taux de marge sur les prix de revient
 DynamicsPrices = Prix de vente dynamiques
+LMDB_CodeNatureTooltipHelp = Code de la nature de produit
+LMDB_MarginOnCostTooltipHelp = Taux de marge appliqué sur le prix de revient moyen d'achat
 
