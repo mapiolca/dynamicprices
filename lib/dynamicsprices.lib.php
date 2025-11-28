@@ -153,7 +153,7 @@ function dynamicsprices_get_parent_kits($db, $productId)
 // Compute average supplier price
 function dynamicsprices_get_average_supplier_price($db, $productId)
 {
-	$sql = "SELECT price";
+	$sql = "SELECT unitprice";
 	$sql .= " FROM ".MAIN_DB_PREFIX."product_fournisseur_price";
 	$sql .= " WHERE fk_product = ".((int) $productId);
 	$sql .= " AND entity IN (".getEntity('product_fournisseur_price').")";
@@ -165,7 +165,7 @@ function dynamicsprices_get_average_supplier_price($db, $productId)
 
 	$prices = array();
 	while ($obj = $db->fetch_object($resql)) {
-		$prices[] = (float) $obj->price;
+		$prices[] = (float) $obj->unitprice;
 	}
 
 	if (count($prices) === 0) {
