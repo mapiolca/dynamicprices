@@ -69,13 +69,15 @@ class Cron_DynamicsPrices
         //var_dump('$nb_line10 = '.$nb_line.'<br>');
 
         if ($error) {
-            $this->error = $langs->trans('LMDB_ErrorUpdate').' '.$error;
-            dol_syslog(__METHOD__." end - ".$this->error, LOG_INFO);
+			$result = 1;
+            $result->error = $langs->trans('LMDB_ErrorUpdate').' '.$error;
+            dol_syslog(__METHOD__." end - ".$result->error, LOG_INFO);
             return 1;
         }else{
-            $this->output = $langs->trans('LMDB_NbLinesUpdated')." ".$results.".";
-            dol_syslog(__METHOD__." end - ".$this->output, LOG_INFO);
-            return 0;
+			$result = 0 ;
+            $result->output = $langs->trans('LMDB_NbLinesUpdated')." ".$results.".";
+            dol_syslog(__METHOD__." end - ".$result->output, LOG_INFO);
+            return $result;
         }
         
     }
