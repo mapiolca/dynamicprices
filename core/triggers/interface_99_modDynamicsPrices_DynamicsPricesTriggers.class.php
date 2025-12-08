@@ -80,7 +80,7 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		$product = $db->fetch_object($resql);
 		//var_dump($product->fk_product_type);
 
-		if (!$product->fk_product_type != 0) {
+		if ($product->fk_product_type != 0) {
 			return 0; // If module is not enabled, we do nothing
 		}
 
