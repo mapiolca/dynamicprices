@@ -78,7 +78,12 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 
 		$resql = $db->query($sql);
 		$product = $db->fetch_object($resql);
-		var_dump($product->fk_product_type);
+		//var_dump($product->fk_product_type);
+
+		if (!$product->fk_product_type != 0) {
+			return 0; // If module is not enabled, we do nothing
+		}
+
 
 		require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
 		$updateFunction = getDolGlobalString('LMDB_COST_PRICE_ONLY') ? 'update_customer_prices_from_cost_price' : 'update_customer_prices_from_suppliers';
