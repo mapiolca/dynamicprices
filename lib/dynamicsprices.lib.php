@@ -261,15 +261,14 @@ function dynamicsprices_update_prices_from_base($db, $user, $product, $basePrice
 		$sqlv = "SELECT price, price_ttc, price_min, price_min_ttc";
 		$sqlv .= " FROM ".MAIN_DB_PREFIX."product_price";
 		$sqlv .= " WHERE fk_product = ".((int) $product->id);
-		$sqlv .= " AND fk_product_type = 1" ;
 		$sqlv .= " AND price_level = ".((int) $level);
 		$sqlv .= " AND entity IN (".getEntity('productprice').")";
 		$sqlv .= " ORDER BY date_price DESC LIMIT 1";
 
 		$resqlv = $db->query($sqlv);
 		$current = $db->fetch_object($resqlv);
-
-		if (!$current || price2num($current->price, 2) != price2num($price, 2) || price2num($current->price_min, 2) != price2num($price_min, 2) || price2num($current->price_ttc, 2) != price2num($price_ttc, 2) || price2num($current->price_min_ttc, 2) != price2num($price_min_ttc, 2)) {
+		
+		if ($current->fk_product_type ==  || !$current || price2num($current->price, 2) != price2num($price, 2) || price2num($current->price_min, 2) != price2num($price_min, 2) || price2num($current->price_ttc, 2) != price2num($price_ttc, 2) || price2num($current->price_min_ttc, 2) != price2num($price_min_ttc, 2)) {
 			$sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price (entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)";
 			$sqlp .= " VALUES (".((int) $entity).", ".((int) $product->id).", ".((int) $level).", ".((int) $user->id).", ".price2num($price, 2).", ".price2num($price_ttc, 2).", ".price2num($price_min, 2).", ".price2num($price_min_ttc, 2).", '".$now."', ".((float) $tvaTx).")";
 			$sqlp .= " ON DUPLICATE KEY UPDATE price = VALUES(price), price_ttc = VALUES(price_ttc), price_min = VALUES(price_min), price_min_ttc = VALUES(price_min_ttc), date_price = VALUES(date_price), tva_tx = VALUES(tva_tx)";
@@ -298,10 +297,10 @@ function dynamicsprices_get_component_prices_by_level($db, $productId)
 	}
 
 	while ($obj = $db->fetch_object($resql)) {
-	$level = (int) $obj->price_level;
-	if (!isset($prices[$level])) {
-	$prices[$level] = array('price' => (float) $obj->price, 'price_min' => (float) $obj->price_min);
-	}
+		$level = (int) $obj->price_level;
+		if (!isset($prices[$level])) {
+			$prices[$level] = array('price' => (float) $obj->price, 'price_min' => (float) $obj->price_min);
+		}
 	}
 
 	return $prices;
@@ -315,27 +314,27 @@ function dynamicsprices_update_kit_prices_from_components($db, $user, $product, 
 	$now = $db->idate(dol_now());
 
 	foreach ($components as $component) {
-	$componentPrices = dynamicsprices_get_component_prices_by_level($db, $component['id']);
-	foreach ($componentPrices as $level => $values) {
-	if (!isset($levelTotals[$level])) {
-	$levelTotals[$level] = array('price' => 0, 'price_min' => 0);
-	}
-	$levelTotals[$level]['price'] += ((float) $values['price']) * (float) $component['qty'];
-	$levelTotals[$level]['price_min'] += ((float) $values['price_min']) * (float) $component['qty'];
-	}
+		$componentPrices = dynamicsprices_get_component_prices_by_level($db, $component['id']);
+		foreach ($componentPrices as $level => $values) {
+		if (!isset($levelTotals[$level])) {
+			$levelTotals[$level] = array('price' => 0, 'price_min' => 0);
+		}
+			$levelTotals[$level]['price'] += ((float) $values['price']) * (float) $component['qty'];
+			$levelTotals[$level]['price_min'] += ((float) $values['price_min']) * (float) $component['qty'];
+		}
 	}
 
 	foreach ($levelTotals as $level => $values) {
-	$price = (float) $values['price'];
-	$price_min = (float) $values['price_min'];
-	$price_ttc = $price * (1 + ((float) $tvaTx / 100));
-	$price_min_ttc = $price_min * (1 + ((float) $tvaTx / 100));
-
-	$sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price (entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)";
-	$sqlp .= " VALUES (".((int) $entity).", ".((int) $product->id).", ".((int) $level).", ".((int) $user->id).", ".price2num($price, 2).", ".price2num($price_ttc, 2).", ".price2num($price_min, 2).", ".price2num($price_min_ttc, 2).", '".$now."', ".((float) $tvaTx).")";
-	$sqlp .= " ON DUPLICATE KEY UPDATE price = VALUES(price), price_ttc = VALUES(price_ttc), price_min = VALUES(price_min), price_min_ttc = VALUES(price_min_ttc), date_price = VALUES(date_price), tva_tx = VALUES(tva_tx)";
-	$db->query($sqlp);
-	$nb_line++;
+		$price = (float) $values['price'];
+		$price_min = (float) $values['price_min'];
+		$price_ttc = $price * (1 + ((float) $tvaTx / 100));
+		$price_min_ttc = $price_min * (1 + ((float) $tvaTx / 100));
+	
+		$sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price (entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)";
+		$sqlp .= " VALUES (".((int) $entity).", ".((int) $product->id).", ".((int) $level).", ".((int) $user->id).", ".price2num($price, 2).", ".price2num($price_ttc, 2).", ".price2num($price_min, 2).", ".price2num($price_min_ttc, 2).", '".$now."', ".((float) $tvaTx).")";
+		$sqlp .= " ON DUPLICATE KEY UPDATE price = VALUES(price), price_ttc = VALUES(price_ttc), price_min = VALUES(price_min), price_min_ttc = VALUES(price_min_ttc), date_price = VALUES(date_price), tva_tx = VALUES(tva_tx)";
+		$db->query($sqlp);
+		$nb_line++;
 	}
 
 	return $nb_line;
@@ -421,7 +420,6 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		$sql = "SELECT rowid, finished, cost_price";
 		$sql .= " FROM ".MAIN_DB_PREFIX."product";
 		$sql .= " WHERE tosell = 1";
-		$sql .= " AND fk_product_type = 1";
 		$sql .= " AND entity IN (".getEntity('product').")";
 
 		$resql = $db->query($sql);
