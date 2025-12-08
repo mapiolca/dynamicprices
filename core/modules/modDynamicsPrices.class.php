@@ -75,8 +75,8 @@ class modDynamicsPrices extends DolibarrModules
 		$this->editor_url = 'lesmetiersdubatiment.fr';		// Must be an external online web site
 		$this->editor_squarred_logo = 'logo.png@dynamicsprices';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@dynamicsprices'
 
-		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.2.0';
+// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
+$this->version = '2.0.0';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
