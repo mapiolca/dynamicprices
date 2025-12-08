@@ -369,6 +369,10 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		$product->fetch($prodid);
 		$tva_tx = (float) $product->tva_tx;
 
+		if ($product->fk_product_type != 0) {
+			continue;
+		}
+
 		if (dynamicsprices_is_kit($db, $prodid)) {
 			$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
 			$rules = dynamicsprices_get_price_rules($db, $natureid);
@@ -433,6 +437,10 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		$product = new Product($db);
 		$product->fetch($prodid);
 		$tva_tx = (float) $product->tva_tx;
+
+		if ($product->fk_product_type != 0) {
+			continue;
+		}
 
 		if (dynamicsprices_is_kit($db, $prodid)) {
 			$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
