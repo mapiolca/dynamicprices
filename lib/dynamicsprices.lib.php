@@ -268,7 +268,7 @@ function dynamicsprices_update_prices_from_base($db, $user, $product, $basePrice
 		$resqlv = $db->query($sqlv);
 		$current = $db->fetch_object($resqlv);
 		
-		if ($current->fk_product_type == 0 || !$current || price2num($current->price, 2) != price2num($price, 2) || price2num($current->price_min, 2) != price2num($price_min, 2) || price2num($current->price_ttc, 2) != price2num($price_ttc, 2) || price2num($current->price_min_ttc, 2) != price2num($price_min_ttc, 2)) {
+		if ($current->fk_product_type != 0 || !$current || price2num($current->price, 2) != price2num($price, 2) || price2num($current->price_min, 2) != price2num($price_min, 2) || price2num($current->price_ttc, 2) != price2num($price_ttc, 2) || price2num($current->price_min_ttc, 2) != price2num($price_min_ttc, 2)) {
 			$sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price (entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)";
 			$sqlp .= " VALUES (".((int) $entity).", ".((int) $product->id).", ".((int) $level).", ".((int) $user->id).", ".price2num($price, 2).", ".price2num($price_ttc, 2).", ".price2num($price_min, 2).", ".price2num($price_min_ttc, 2).", '".$now."', ".((float) $tvaTx).")";
 			$sqlp .= " ON DUPLICATE KEY UPDATE price = VALUES(price), price_ttc = VALUES(price_ttc), price_min = VALUES(price_min), price_min_ttc = VALUES(price_min_ttc), date_price = VALUES(date_price), tva_tx = VALUES(tva_tx)";
@@ -340,7 +340,7 @@ function dynamicsprices_update_kit_prices_from_components($db, $user, $product, 
 		$resqlv = $db->query($sqlw);
 		$current = $db->fetch_object($resqlw);
 
-		if ($current->fk_product_type == 0 || !$current || price2num($current->price, 2) != price2num($price, 2) || price2num($current->price_min, 2) != price2num($price_min, 2) || price2num($current->price_ttc, 2) != price2num($price_ttc, 2) || price2num($current->price_min_ttc, 2) != price2num($price_min_ttc, 2)) {
+		if ($current->fk_product_type != 0 || !$current || price2num($current->price, 2) != price2num($price, 2) || price2num($current->price_min, 2) != price2num($price_min, 2) || price2num($current->price_ttc, 2) != price2num($price_ttc, 2) || price2num($current->price_min_ttc, 2) != price2num($price_min_ttc, 2)) {
 			$sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price (entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)";
 			$sqlp .= " VALUES (".((int) $entity).", ".((int) $product->id).", ".((int) $level).", ".((int) $user->id).", ".price2num($price, 2).", ".price2num($price_ttc, 2).", ".price2num($price_min, 2).", ".price2num($price_min_ttc, 2).", '".$now."', ".((float) $tvaTx).")";
 			$sqlp .= " ON DUPLICATE KEY UPDATE price = VALUES(price), price_ttc = VALUES(price_ttc), price_min = VALUES(price_min), price_min_ttc = VALUES(price_min_ttc), date_price = VALUES(date_price), tva_tx = VALUES(tva_tx)";
