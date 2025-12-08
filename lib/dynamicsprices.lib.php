@@ -340,7 +340,7 @@ function dynamicsprices_update_kit_prices_from_components($db, $user, $product, 
 		$sqlw .= " AND entity IN (".getEntity('productprice').")";
 		$sqlw .= " ORDER BY date_price DESC LIMIT 1";
 
-		$resqlv = $db->query($sqlw);
+		$resqlw = $db->query($sqlw);
 		$current = $db->fetch_object($resqlw);
 
 		var_dump($product->fk_product_type);
