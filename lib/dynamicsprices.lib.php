@@ -257,20 +257,8 @@ function dynamicsprices_update_prices_from_base($db, $user, $product, $basePrice
 		$price_ttc = $price * (1 + ((float) $tvaTx / 100));
 		$price_min = $basePrice * (1 + ((float) $rule['minrate'] / 100));
 		$price_min_ttc = $price_min * (1 + ((float) $tvaTx / 100));
-
-		$sqlv = "SELECT price, price_ttc, price_min, price_min_ttc";
-		$sqlv .= " FROM ".MAIN_DB_PREFIX."product_price";
-		$sqlv .= " WHERE fk_product = ".((int) $product->id);
-		$sqlv .= " AND price_level = ".((int) $level);
-		$sqlv .= " AND entity IN (".getEntity('productprice').")";
-		$sqlv .= " ORDER BY date_price DESC LIMIT 1";
-
-		$resqlv = $db->query($sqlv);
-		$current = $db->fetch_object($resqlv);
-
-		var_dump($product->fk_product_type);
 		
-		if ($product->fk_product_type != 0 || !$current || price2num($current->price, 2) != price2num($price, 2) || price2num($current->price_min, 2) != price2num($price_min, 2) || price2num($current->price_ttc, 2) != price2num($price_ttc, 2) || price2num($current->price_min_ttc, 2) != price2num($price_min_ttc, 2)) {
+		if (!$current || price2num($current->price, 2) != price2num($price, 2) || price2num($current->price_min, 2) != price2num($price_min, 2) || price2num($current->price_ttc, 2) != price2num($price_ttc, 2) || price2num($current->price_min_ttc, 2) != price2num($price_min_ttc, 2)) {
 			$sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price (entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)";
 			$sqlp .= " VALUES (".((int) $entity).", ".((int) $product->id).", ".((int) $level).", ".((int) $user->id).", ".price2num($price, 2).", ".price2num($price_ttc, 2).", ".price2num($price_min, 2).", ".price2num($price_min_ttc, 2).", '".$now."', ".((float) $tvaTx).")";
 			$sqlp .= " ON DUPLICATE KEY UPDATE price = VALUES(price), price_ttc = VALUES(price_ttc), price_min = VALUES(price_min), price_min_ttc = VALUES(price_min_ttc), date_price = VALUES(date_price), tva_tx = VALUES(tva_tx)";
@@ -333,19 +321,7 @@ function dynamicsprices_update_kit_prices_from_components($db, $user, $product, 
 		$price_ttc = $price * (1 + ((float) $tvaTx / 100));
 		$price_min_ttc = $price_min * (1 + ((float) $tvaTx / 100));
 
-		$sqlw = "SELECT price, price_ttc, price_min, price_min_ttc";
-		$sqlw .= " FROM ".MAIN_DB_PREFIX."product_price";
-		$sqlw .= " WHERE fk_product = ".((int) $product->id);
-		$sqlw .= " AND price_level = ".((int) $level);
-		$sqlw .= " AND entity IN (".getEntity('productprice').")";
-		$sqlw .= " ORDER BY date_price DESC LIMIT 1";
-
-		$resqlw = $db->query($sqlw);
-		$current = $db->fetch_object($resqlw);
-
-		var_dump($product->fk_product_type);
-
-		if ($product->fk_product_type != 0 || !$current || price2num($current->price, 2) != price2num($price, 2) || price2num($current->price_min, 2) != price2num($price_min, 2) || price2num($current->price_ttc, 2) != price2num($price_ttc, 2) || price2num($current->price_min_ttc, 2) != price2num($price_min_ttc, 2)) {
+		if (!$current || price2num($current->price, 2) != price2num($price, 2) || price2num($current->price_min, 2) != price2num($price_min, 2) || price2num($current->price_ttc, 2) != price2num($price_ttc, 2) || price2num($current->price_min_ttc, 2) != price2num($price_min_ttc, 2)) {
 			$sqlp = "INSERT INTO ".MAIN_DB_PREFIX."product_price (entity, fk_product, price_level, fk_user_author, price, price_ttc, price_min, price_min_ttc, date_price, tva_tx)";
 			$sqlp .= " VALUES (".((int) $entity).", ".((int) $product->id).", ".((int) $level).", ".((int) $user->id).", ".price2num($price, 2).", ".price2num($price_ttc, 2).", ".price2num($price_min, 2).", ".price2num($price_min_ttc, 2).", '".$now."', ".((float) $tvaTx).")";
 			$sqlp .= " ON DUPLICATE KEY UPDATE price = VALUES(price), price_ttc = VALUES(price_ttc), price_min = VALUES(price_min), price_min_ttc = VALUES(price_min_ttc), date_price = VALUES(date_price), tva_tx = VALUES(tva_tx)";
