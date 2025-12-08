@@ -77,7 +77,7 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		$sql.= " WHERE rowid = ".$object->fk_product ;
 
 		$resql = $db->query($sql);
-		$product = $db->fetch($resql);
+		$product = $db->fetch_object($resql);
 		var_dump($product->fk_product_type);
 
 		require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
