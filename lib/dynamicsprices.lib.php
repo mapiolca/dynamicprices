@@ -369,6 +369,7 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		$product->fetch($prodid);
 		$tva_tx = (float) $product->tva_tx;
 
+		var_dump($product->fk_product_type);
 		if ($product->fk_product_type != 0) {
 			continue;
 		}
