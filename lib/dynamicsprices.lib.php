@@ -261,6 +261,7 @@ function dynamicsprices_update_prices_from_base($db, $user, $product, $basePrice
 		$sqlv = "SELECT price, price_ttc, price_min, price_min_ttc";
 		$sqlv .= " FROM ".MAIN_DB_PREFIX."product_price";
 		$sqlv .= " WHERE fk_product = ".((int) $product->id);
+		$sqlv .= " AND fk_product_type = 1" ;
 		$sqlv .= " AND price_level = ".((int) $level);
 		$sqlv .= " AND entity IN (".getEntity('productprice').")";
 		$sqlv .= " ORDER BY date_price DESC LIMIT 1";
@@ -420,6 +421,7 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		$sql = "SELECT rowid, finished, cost_price";
 		$sql .= " FROM ".MAIN_DB_PREFIX."product";
 		$sql .= " WHERE tosell = 1";
+		$sql .= " AND fk_product_type = 1";
 		$sql .= " AND entity IN (".getEntity('product').")";
 
 		$resql = $db->query($sql);
