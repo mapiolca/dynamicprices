@@ -68,6 +68,8 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 			return 0; // If module is not enabled, we do nothing
 		}
 
+		var_dump($object->fk_product_type);
+
 		// Put here code you want to execute when a Dolibarr business events occurs.
 		// Data and type of action are stored into $object and $action
 
@@ -80,7 +82,7 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		//var_dump($action);
 		if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED') && in_array($action, $affectedActions, true)) {
 			$productId = !empty($object->fk_product) ? $object->fk_product : (isset($object->id) ? $object->id : 0);
-			if ($productId >> 0 && $object->fk_product_type == 0) {
+			if ($productId >> 0) {
 				call_user_func($updateFunction, $db, $user, $langs, $conf, $productId);
 				$parentKits = dynamicsprices_get_parent_kits($db, $productId);
 				foreach ($parentKits as $kitId) {
