@@ -68,12 +68,17 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 			return 0; // If module is not enabled, we do nothing
 		}
 
-		var_dump($object->fk_product_type);
-
 		// Put here code you want to execute when a Dolibarr business events occurs.
 		// Data and type of action are stored into $object and $action
 
 		global $db;
+
+		$sql = "SELECT fk_product_type FROM ".MAIN_DB_PREFIX."product";
+		$sql.= " WHERE rowid = ".$object->fk_product ;
+
+		$resql = $db->query($sql);
+		$product = $db->fetch($resql);
+		var_dump($product->fk_product_type);
 
 		require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
 		$updateFunction = getDolGlobalString('LMDB_COST_PRICE_ONLY') ? 'update_customer_prices_from_cost_price' : 'update_customer_prices_from_suppliers';
