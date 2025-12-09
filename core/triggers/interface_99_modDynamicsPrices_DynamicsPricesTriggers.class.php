@@ -1,6 +1,6 @@
 <?php
 /* Copyright (C) 2023       Laurent Destailleur         <eldy@users.sourceforge.net>
- * Copyright (C) ---Replace with your own copyright and developer email---
+ * Copyright (C) 2025       Pierre Ardoin                <developpeur@lesmetiersdubatiment.fr>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,17 +78,17 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		$affectedActions = array('SUPPLIER_PRODUCT_BUYPRICE_CREATE', 'SUPPLIER_PRODUCT_BUYPRICE_MODIFY', 'SUPPLIER_PRODUCT_BUYPRICE_DELETE', 'PRODUCT_MODIFY', 'PRODUCT_CREATE', 'PRODUCT_CLONE', 'PRODUCT_PRICE_CREATE', 'PRODUCT_PRICE_MODIFY', 'PRODUCT_PRICE_DELETE', 'PRODUCT_BUYPRICE_CREATE', 'PRODUCT_BUYPRICE_MODIFY', 'PRODUCT_BUYPRICE_DELETE', 'PRODUCT_SUBPRODUCT_ADD', 'PRODUCT_SUBPRODUCT_UPDATE', 'PRODUCT_SUBPRODUCT_DELETE');
 		//var_dump($updateFunction);
 		//var_dump($action);
-		if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED') && in_array($action, $affectedActions, true)) {
-			dol_include_once('/product/class/product.class.php');
-			$productId = !empty($object->fk_product) ? $object->fk_product : (isset($object->id) ? $object->id : 0);
-			$product = new Product($db);
-			if ($productId > 0 && $product->fetch($productId) > 0) {
-				if ((int) $product->type !== Product::TYPE_PRODUCT) {
-					return 0;
-				}
-			}
-			if ($productId > 0) {
-				call_user_func($updateFunction, $db, $user, $langs, $conf, $productId);
+                if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED') && in_array($action, $affectedActions, true)) {
+                        dol_include_once('/product/class/product.class.php');
+                        $productId = !empty($object->fk_product) ? $object->fk_product : (isset($object->id) ? $object->id : 0);
+                        $product = new Product($db);
+                        if ($productId > 0 && $product->fetch($productId) > 0) {
+                                if ((int) $product->type !== Product::TYPE_PRODUCT) {
+                                        return 0;
+                                }
+                        }
+                        if ($productId > 0) {
+                                call_user_func($updateFunction, $db, $user, $langs, $conf, $productId);
 				$parentKits = dynamicsprices_get_parent_kits($db, $productId);
 				foreach ($parentKits as $kitId) {
 					call_user_func($updateFunction, $db, $user, $langs, $conf, $kitId);

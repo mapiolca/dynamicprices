@@ -1,5 +1,5 @@
 <?php
-/* Copyright (C) 2025		Pierre ARDOIN
+/* Copyright (C) 2025		Pierre ARDOIN <developpeur@lesmetiersdubatiment.fr>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -277,21 +277,21 @@ function dynamicsprices_get_component_prices_by_level($db, $productId)
 	$prices = array();
 
 	$sql = "SELECT price_level, price, price_min";
-	$sql .= " FROM \".MAIN_DB_PREFIX.\"product_price";
-	$sql .= " WHERE fk_product = \".((int) $productId);";
+	$sql .= " FROM ".MAIN_DB_PREFIX."product_price";
+	$sql .= " WHERE fk_product = ".((int) $productId);
 	$sql .= " AND entity IN (".getEntity('productprice').")";
 	$sql .= " ORDER BY date_price DESC";
 
 	$resql = $db->query($sql);
 	if ($resql === false) {
-		return $prices;
+	return $prices;
 	}
 
 	while ($obj = $db->fetch_object($resql)) {
-		$level = (int) $obj->price_level;
-		if (!isset($prices[$level])) {
-			$prices[$level] = array('price' => (float) $obj->price, 'price_min' => (float) $obj->price_min);
-		}
+	$level = (int) $obj->price_level;
+	if (!isset($prices[$level])) {
+	$prices[$level] = array('price' => (float) $obj->price, 'price_min' => (float) $obj->price_min);
+	}
 	}
 
 	return $prices;
@@ -301,16 +301,16 @@ function dynamicsprices_get_component_prices_by_level($db, $productId)
 function dynamicsprices_get_latest_price_for_level($db, $productId, $level)
 {
 	$sql = "SELECT price, price_ttc, price_min, price_min_ttc";
-	$sql .= " FROM \".MAIN_DB_PREFIX.\"product_price";
-	$sql .= " WHERE fk_product = \".((int) $productId);";
-	$sql .= " AND price_level = \".((int) $level);";
+	$sql .= " FROM ".MAIN_DB_PREFIX."product_price";
+	$sql .= " WHERE fk_product = ".((int) $productId);
+	$sql .= " AND price_level = ".((int) $level);
 	$sql .= " AND entity IN (".getEntity('productprice').")";
 	$sql .= " ORDER BY date_price DESC, rowid DESC";
 	$sql .= " LIMIT 1";
 
 	$resql = $db->query($sql);
 	if ($resql === false) {
-		return null;
+	return null;
 	}
 
 	return $db->fetch_object($resql);
@@ -355,153 +355,199 @@ $sqlp .= " ON DUPLICATE KEY UPDATE price = VALUES(price), price_ttc = VALUES(pri
 
 function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $productid = 0)
 {
-	dol_include_once('/product/class/product.class.php');
 
-	global $conf;
 
-	$products = array();
-	$nb_line = 0;
-	$entity = $conf->entity;
 
-	if ($productid > 0) {
+
+		dol_include_once('/product/class/product.class.php');
+	
+		global $conf;
+	
+		$products = array();
+		$kits = array();
+		$nb_line = 0;
+		$entity = $conf->entity;
+	
+		if ($productid > 0) {
+		$product = new Product($db);
+		if ($product->fetch($productid) > 0 && (int) $product->type !== Product::TYPE_PRODUCT) {
+		return 0;
+		}
 		$products[] = $productid;
-	} else {
+		} else {
 		$sql = "SELECT rowid, finished";
 		$sql .= " FROM ".MAIN_DB_PREFIX."product";
 		$sql .= " WHERE tosell = 1";
 		$sql .= " AND fk_product_type = 0";
 		$sql .= " AND entity IN (".getEntity('product').")";
-
+	
 		$resql = $db->query($sql);
 		if ($resql === false) {
-			dol_print_error($db);
-			return 0;
+		dol_print_error($db);
+		return 0;
 		}
-
+	
 		while ($obj = $db->fetch_object($resql)) {
-			$products[] = array('id' => $obj->rowid, 'nature' => $obj->finished);
+		$products[] = array('id' => $obj->rowid, 'nature' => $obj->finished);
 		}
-	}
-
-	foreach ($products as $prod) {
+		}
+	
+		foreach ($products as $prod) {
 		$prodid = is_array($prod) ? $prod['id'] : $prod;
 		$natureid = is_array($prod) ? $prod['nature'] : 0;
 		$product = new Product($db);
 		$product->fetch($prodid);
-		$tva_tx = (float) $product->tva_tx;
 		if ((int) $product->type !== Product::TYPE_PRODUCT) {
-			continue;
+		continue;
 		}
-
+		$tva_tx = (float) $product->tva_tx;
+	
 		if (dynamicsprices_is_kit($db, $prodid)) {
-			$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
-			$rules = dynamicsprices_get_price_rules($db, $natureid);
-			if (getDolGlobalInt('LMDB_KIT_PRICE_FROM_COMPONENTS')) {
-				$components = dynamicsprices_get_kit_components($db, $prodid);
-				$nb_line += dynamicsprices_update_kit_prices_from_components($db, $user, $product, $components, $tva_tx, $entity);
-			} else {
-				$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $costPrice, $rules, $tva_tx, $entity);
-			}
-			continue;
+		$kits[] = array('id' => $prodid, 'nature' => $natureid, 'tva' => $tva_tx);
+		continue;
 		}
-
+	
 		$avgPrice = dynamicsprices_get_average_supplier_price($db, $prodid);
 		if ($avgPrice === null) {
-			continue;
+		continue;
 		}
-
+	
 		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $natureid);
 		$costPrice = $avgPrice * (1 + ($marginPercent / 100));
 		dynamicsprices_save_cost_price($db, $prodid, $costPrice);
-
+	
 		$rules = dynamicsprices_get_price_rules($db, $natureid);
 		$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $avgPrice, $rules, $tva_tx, $entity);
-	}
+		}
+	
+		foreach ($kits as $kit) {
+		$prodid = $kit['id'];
+		$natureid = $kit['nature'];
+		$tva_tx = $kit['tva'];
+		$product = new Product($db);
+		$product->fetch($prodid);
+	
+		$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
+		$rules = dynamicsprices_get_price_rules($db, $natureid);
+		if (getDolGlobalInt('LMDB_KIT_PRICE_FROM_COMPONENTS')) {
+		$components = dynamicsprices_get_kit_components($db, $prodid);
+		$nb_line += dynamicsprices_update_kit_prices_from_components($db, $user, $product, $components, $tva_tx, $entity);
+		} else {
+		$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $costPrice, $rules, $tva_tx, $entity);
+		}
+		}
+	
+		return $nb_line;
 
-	return $nb_line;
+
+
+
 }
 
 function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $productid = 0)
 {
-	dol_include_once('/product/class/product.class.php');
 
-	global $conf;
 
-	$products = array();
-	$nb_line = 0;
-	$entity = $conf->entity;
 
-	if ($productid > 0) {
+
+		dol_include_once('/product/class/product.class.php');
+	
+		global $conf;
+	
+		$products = array();
+		$kits = array();
+		$nb_line = 0;
+		$entity = $conf->entity;
+	
+		if ($productid > 0) {
+		$product = new Product($db);
+		if ($product->fetch($productid) > 0 && (int) $product->type !== Product::TYPE_PRODUCT) {
+		return 0;
+		}
 		$products[] = $productid;
-	} else {
+		} else {
 		$sql = "SELECT rowid, finished, cost_price";
 		$sql .= " FROM ".MAIN_DB_PREFIX."product";
 		$sql .= " WHERE tosell = 1";
 		$sql .= " AND fk_product_type = 0";
 		$sql .= " AND entity IN (".getEntity('product').")";
-
+	
 		$resql = $db->query($sql);
 		if ($resql === false) {
-			dol_print_error($db);
-			return 0;
+		dol_print_error($db);
+		return 0;
 		}
-
+	
 		while ($obj = $db->fetch_object($resql)) {
-			$products[] = array('id' => $obj->rowid, 'nature' => $obj->finished, 'cost_price' => $obj->cost_price);
+		$products[] = array('id' => $obj->rowid, 'nature' => $obj->finished, 'cost_price' => $obj->cost_price);
 		}
-	}
-
-	foreach ($products as $prod) {
+		}
+	
+		foreach ($products as $prod) {
 		$prodid = is_array($prod) ? $prod['id'] : $prod;
 		$natureid = is_array($prod) ? $prod['nature'] : 0;
 		$currentCost = is_array($prod) ? $prod['cost_price'] : 0;
 		$product = new Product($db);
 		$product->fetch($prodid);
-		$tva_tx = (float) $product->tva_tx;
 		if ((int) $product->type !== Product::TYPE_PRODUCT) {
-			continue;
+		continue;
 		}
-
+		$tva_tx = (float) $product->tva_tx;
+	
 		if (dynamicsprices_is_kit($db, $prodid)) {
-			$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
-			$rules = dynamicsprices_get_price_rules($db, $natureid);
-			if (getDolGlobalInt('LMDB_KIT_PRICE_FROM_COMPONENTS')) {
-				$components = dynamicsprices_get_kit_components($db, $prodid);
-				$nb_line += dynamicsprices_update_kit_prices_from_components($db, $user, $product, $components, $tva_tx, $entity);
-			} else {
-				$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $costPrice, $rules, $tva_tx, $entity);
-			}
-			continue;
+		$kits[] = array('id' => $prodid, 'nature' => $natureid, 'tva' => $tva_tx);
+		continue;
 		}
-
+	
 		$avgPrice = dynamicsprices_get_average_supplier_price($db, $prodid);
 		if ($avgPrice !== null) {
-			$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $natureid);
-			$currentCost = $avgPrice * (1 + ($marginPercent / 100));
-			dynamicsprices_save_cost_price($db, $prodid, $currentCost);
+		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $natureid);
+		$currentCost = $avgPrice * (1 + ($marginPercent / 100));
+		dynamicsprices_save_cost_price($db, $prodid, $currentCost);
 		}
-
+	
 		$rules = dynamicsprices_get_price_rules($db, $natureid);
 		$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $currentCost, $rules, $tva_tx, $entity);
+		}
+	
+		foreach ($kits as $kit) {
+		$prodid = $kit['id'];
+		$natureid = $kit['nature'];
+		$tva_tx = $kit['tva'];
+		$product = new Product($db);
+		$product->fetch($prodid);
+	
+		$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
+		$rules = dynamicsprices_get_price_rules($db, $natureid);
+		if (getDolGlobalInt('LMDB_KIT_PRICE_FROM_COMPONENTS')) {
+		$components = dynamicsprices_get_kit_components($db, $prodid);
+		$nb_line += dynamicsprices_update_kit_prices_from_components($db, $user, $product, $components, $tva_tx, $entity);
+		} else {
+		$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $costPrice, $rules, $tva_tx, $entity);
+		}
+		}
+	
+		return $nb_line;
+	
+	
+	
+	
 	}
-
-	return $nb_line;
-}
-
-/**
- * Print a table section title.
- *
- * @param string $title Title key to translate
- * @param int    $width Width of the column
- * @return void
- */
-function setup_print_title($title = "Parameter", $width = 300)
-{
-	global $langs;
-
-	print '<tr class="liste_titre">';
-	print '<td class="titlefield">'.$langs->trans($title).'</td>';
-	print '<td class="titlefield" align="center" width="20">&nbsp;</td>';
+	
+	/**
+	 * Print a table section title.
+	 *
+	 * @param string $title Title key to translate
+	 * @param int    $width Width of the column
+	 * @return void
+	 */
+	function setup_print_title($title = "Parameter", $width = 300)
+	{
+		global $langs;
+	
+		print '<tr class="liste_titre">';
+		print '<td class="titlefield">'.$langs->trans($title).'</td>';
+		print '<td class="titlefield" align="center" width="20">&nbsp;</td>';
 	print '<td class="titlefield" align="center">'.$langs->trans('Value').'</td>';
 	print '</tr>';
 }
