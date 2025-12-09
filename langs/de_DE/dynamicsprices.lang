@@ -13,7 +13,6 @@ ModuleDynamicsPricesDesc = Dieses Modul ermöglicht die Aktualisierung der Verka
 # Administrationsseite
 #
 DynamicsPricesSetup = Einstellungen für dynamische Verkaufspreise
-Settings = Einstellungen
 DynamicsPricesSetupPage = Einstellungsseite des Moduls Dynamische Verkaufspreise
 LMDB_UpdateOptions = Optionen zur Aktualisierung der Verkaufspreise
 LMDB_KIT_PRICE_FROM_COMPONENTS = Kit-Preise aus den Verkaufspreisen der Komponenten statt aus dem Selbstkostenpreis berechnen.
@@ -21,27 +20,9 @@ LMDB_COST_PRICE_ONLY = Verkaufspreise nur auf Basis der Selbstkosten aktualisier
 LMDB_SUPPLIER_BUYPRICE_ALTERED = Verkaufspreise beim Anlegen/Aktualisieren/Löschen eines Einkaufspreises oder beim Aktualisieren des Selbstkostenpreises aktualisieren, falls die kostenbasierte Berechnung aktiviert ist.
 
 #
-# Über-Seite
-#
-About = Über
-DynamicsPricesAbout = Über DynamicsPrices
-DynamicsPricesAboutPage = Informationsseite zu DynamicsPrices
-
-#
-# Beispielseite
-#
-DynamicsPricesArea = Startseite DynamicsPrices
-MyPageName = Name meiner Seite
-
-#
-# Beispiel-Widget
-#
-MyWidget = Mein Widget
-MyWidgetDescription = Beschreibung meines Widgets
-
-#
 # Sonstiges
 #
+DynamicsPricesArea = Startseite DynamicsPrices
 LMDB_ErrorUpdate = Fehler bei der Aktualisierung:
 LMDB_NbLinesUpdated = Anzahl der aktualisierten Verkaufspreise:
 Fk_nature = Produktart-Code

@@ -13,7 +13,6 @@ ModuleDynamicsPricesDesc = Questo modulo consente di aggiornare i prezzi di vend
 # Pagina di amministrazione
 #
 DynamicsPricesSetup = Impostazioni dei prezzi di vendita dinamici
-Settings = Impostazioni
 DynamicsPricesSetupPage = Pagina di configurazione del modulo Prezzi di vendita dinamici
 LMDB_UpdateOptions = Opzioni di aggiornamento dei prezzi di vendita
 LMDB_KIT_PRICE_FROM_COMPONENTS = Calcolare i prezzi dei kit a partire dal prezzo di vendita dei componenti anziché dal costo.
@@ -21,27 +20,9 @@ LMDB_COST_PRICE_ONLY = Aggiornare i prezzi di vendita solo in base ai prezzi di 
 LMDB_SUPPLIER_BUYPRICE_ALTERED = Aggiornare i prezzi di vendita durante la creazione/aggiornamento/eliminazione di un prezzo di acquisto o durante l'aggiornamento del costo se è abilitato il calcolo basato sul costo.
 
 #
-# Pagina delle informazioni
-#
-About = Informazioni
-DynamicsPricesAbout = Informazioni su DynamicsPrices
-DynamicsPricesAboutPage = Pagina Informazioni su DynamicsPrices
-
-#
-# Pagina di esempio
-#
-DynamicsPricesArea = Home DynamicsPrices
-MyPageName = Nome della mia pagina
-
-#
-# Widget di esempio
-#
-MyWidget = Il mio widget
-MyWidgetDescription = Descrizione del mio widget
-
-#
 # Altro
 #
+DynamicsPricesArea = Home DynamicsPrices
 LMDB_ErrorUpdate = Errore durante l'aggiornamento:
 LMDB_NbLinesUpdated = Numero di prezzi di vendita aggiornati:
 Fk_nature = Codice della natura del prodotto
