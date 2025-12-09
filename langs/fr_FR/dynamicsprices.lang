@@ -49,7 +49,7 @@ MyWidgetDescription = My widget description
 LMDB_ErrorUpdate = Erreur lors de la mise à jour :
 LMDB_NbLinesUpdated = Nombre de prix de vente mis à jour :
 Fk_nature = Code Nature du produit
-Pricelevel = ID du Niveau de prix 
+Pricelevel = ID du Niveau de prix
 Targetrate = Taux de marge cible (en %)
 Minrate = Taux de marge minimum (en %)
 Entity = Entité
@@ -61,5 +61,11 @@ LMDB_marginoncost = Taux de marge sur les prix de revient
 DynamicsPrices = Prix de vente dynamiques
 LMDB_CodeNatureTooltipHelp = Code de la nature de produit
 LMDB_MarginOnCostTooltipHelp = Taux de marge appliqué sur le prix de revient moyen d'achat
+LMDB_CodeTooltipHelp = Code de l'entrée du dictionnaire
+LMDB_ENtityTooltipHelp = Identifiant de l'entité
+LMDB_FkNatureTooltipHelp = Identifiant de la nature de produit
+LMDB_PriceLevelTooltipHelp = Identifiant du niveau de prix
+LMDB_TargetRateTooltipHelp = Taux de marge cible
+LMDB_MinRateTooltipHelp = Taux de marge minimum
 
 

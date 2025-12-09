@@ -47,9 +47,19 @@ Fk_nature = Tipo de producto ID<br>
 Pricelevel = Code del nivel de precios<br>
 Targetrate = Tasa de margen objetivo (en %)<br>
 Minrate = Tasa de margen mínima (en %)<br>
+Entity = Entidad<br>
 <br>
 LMDB_CommentAutoUpdateSellPrice = Los precios de venta se actualizan según los coeficientes de precio del diccionario y el promedio de los precios unitarios de compra del proveedor.<br>
 LMDB_LabelAutoUpdateSellPrice = Actualización automática de precios de venta<br>
 LMDB_coefprice = Tasas de margen sobre los precios de venta<br>
+LMDB_marginoncost = Tasa de margen sobre los precios de coste<br>
 
 DynamicsPrices = Precios de venta dinámicos
+LMDB_CodeNatureTooltipHelp = Código de la naturaleza del producto
+LMDB_MarginOnCostTooltipHelp = Tasa de margen aplicada al precio medio de coste de compra
+LMDB_CodeTooltipHelp = Código del registro del diccionario
+LMDB_ENtityTooltipHelp = Identificador de la entidad
+LMDB_FkNatureTooltipHelp = Identificador de la naturaleza del producto
+LMDB_PriceLevelTooltipHelp = Identificador del nivel de precios
+LMDB_TargetRateTooltipHelp = Tasa de margen objetivo
+LMDB_MinRateTooltipHelp = Tasa de margen mínima

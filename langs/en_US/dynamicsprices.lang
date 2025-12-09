@@ -49,6 +49,7 @@ Fk_nature = Product type Code<br>
 Pricelevel = Price level ID<br>
 Targetrate = Target margin rate (in %)<br>
 Minrate = Minimum margin rate (in %)<br>
+Entity = Entity<br>
 <br>
 
 LMDB_CommentAutoUpdateSellPrice = Sales prices are updated based on the price coefficients given in the dictionary and the average of the Supplier purchase unit prices.<br>
@@ -59,3 +60,9 @@ LMDB_marginoncost = Margin rate on cost prices<br>
 DynamicsPrices = Dynamic sales prices
 LMDB_CodeNatureTooltipHelp = Product nature code
 LMDB_MarginOnCostTooltipHelp = Margin rate applied on the average purchase cost price
+LMDB_CodeTooltipHelp = Dictionary entry code
+LMDB_ENtityTooltipHelp = Entity identifier
+LMDB_FkNatureTooltipHelp = Product nature identifier
+LMDB_PriceLevelTooltipHelp = Price level identifier
+LMDB_TargetRateTooltipHelp = Target margin rate
+LMDB_MinRateTooltipHelp = Minimum margin rate
