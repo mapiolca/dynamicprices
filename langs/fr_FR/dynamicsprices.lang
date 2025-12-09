@@ -29,6 +29,8 @@ DynamicsPricesArea = Home DynamicsPrices
 LMDB_ErrorUpdate = Erreur lors de la mise à jour :
 LMDB_NbLinesUpdated = Nombre de prix de vente mis à jour :
 Fk_nature = Code Nature du produit
+Margin_on_cost_percent = Taux de marge sur le prix de revient
+Code_nature = Code de la nature du produit
 Pricelevel = ID du Niveau de prix
 Targetrate = Taux de marge cible (en %)
 Minrate = Taux de marge minimum (en %)
@@ -47,5 +49,7 @@ LMDB_FkNatureTooltipHelp = Identifiant de la nature de produit
 LMDB_PriceLevelTooltipHelp = Identifiant du niveau de prix
 LMDB_TargetRateTooltipHelp = Taux de marge cible
 LMDB_MinRateTooltipHelp = Taux de marge minimum
+
+
 
 
