@@ -1,0 +1,47 @@
+# File di traduzione
+
+#
+# Generico
+#
+
+# Etichetta del modulo 'ModuleDynamicsPricesName'
+ModuleDynamicsPricesName = Prezzi di vendita dinamici
+# Descrizione del modulo 'ModuleDynamicsPricesDesc'
+ModuleDynamicsPricesDesc = Questo modulo consente di aggiornare i prezzi di vendita in base al prezzo medio unitario di acquisto dai fornitori e ai coefficienti di prezzo definiti in un dizionario dedicato.
+
+#
+# Pagina di amministrazione
+#
+DynamicsPricesSetup = Impostazioni dei prezzi di vendita dinamici
+DynamicsPricesSetupPage = Pagina di configurazione del modulo Prezzi di vendita dinamici
+LMDB_UpdateOptions = Opzioni di aggiornamento dei prezzi di vendita
+LMDB_KIT_PRICE_FROM_COMPONENTS = Calcolare i prezzi dei kit a partire dal prezzo di vendita dei componenti anziché dal costo.
+LMDB_COST_PRICE_ONLY = Aggiornare i prezzi di vendita solo in base ai prezzi di costo.
+LMDB_SUPPLIER_BUYPRICE_ALTERED = Aggiornare i prezzi di vendita durante la creazione/aggiornamento/eliminazione di un prezzo di acquisto o durante l'aggiornamento del costo se è abilitato il calcolo basato sul costo.
+
+#
+# Altro
+#
+DynamicsPricesArea = Home DynamicsPrices
+LMDB_ErrorUpdate = Errore durante l'aggiornamento:
+LMDB_NbLinesUpdated = Numero di prezzi di vendita aggiornati:
+Fk_nature = Codice della natura del prodotto
+Pricelevel = ID del livello di prezzo
+Targetrate = Tasso di margine obiettivo (in %)
+Minrate = Tasso di margine minimo (in %)
+Entity = Entità
+
+LMDB_CommentAutoUpdateSellPrice = I prezzi di vendita vengono aggiornati in base ai coefficienti di prezzo indicati nel dizionario e alla media dei prezzi unitari di acquisto del fornitore.
+LMDB_LabelAutoUpdateSellPrice = Aggiornamento automatico dei prezzi di vendita
+LMDB_coefprice = Aliquote di margine sui prezzi di vendita
+LMDB_marginoncost = Aliquota di margine sui prezzi di costo
+
+DynamicsPrices = Prezzi di vendita dinamici
+LMDB_CodeNatureTooltipHelp = Codice della natura del prodotto
+LMDB_MarginOnCostTooltipHelp = Aliquota di margine applicata al prezzo di costo medio di acquisto
+LMDB_CodeTooltipHelp = Codice della voce del dizionario
+LMDB_ENtityTooltipHelp = Identificativo dell'entità
+LMDB_FkNatureTooltipHelp = Identificativo della natura del prodotto
+LMDB_PriceLevelTooltipHelp = Identificativo del livello di prezzo
+LMDB_TargetRateTooltipHelp = Tasso di margine obiettivo
+LMDB_MinRateTooltipHelp = Tasso di margine minimo

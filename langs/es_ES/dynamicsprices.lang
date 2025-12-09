@@ -1,55 +1,47 @@
-# Archivo de traducción<br>
-<br>
-#<br>
-# Genérico<br>
-#<br>
-<br>
-# Etiqueta del módulo 'ModuleDynamicsPricesName'<br>
-ModuleDynamicsPricesName = Precios de venta dinámicos<br>
-# Descripción del módulo 'ModuleDynamicsPricesDesc'<br>
-ModuleDynamicsPricesDesc = Este módulo permite actualizar los precios de venta según el precio unitario promedio de compra de los proveedores y los coeficientes de precio definidos en un diccionario específico.<br>
-<br>
-#<br>
-# Página de administración<br>
-#<br>
-DynamicsPricesSetup = Configuración de precios de venta dinámicos<br>
-Settings = Configuración<br>
-DynamicsPricesSetupPage = Página de configuración del módulo de precios de venta dinámicos<br>
-LMDB_UpdateOptions = Opciones de actualización de precios de venta<br>
-LMDB_COST_PRICE_ONLY = Actualizar los precios de venta según los precios de coste Solo.
-LMDB_SUPPLIER_BUYPRICE_ALTERED = Actualizar los precios de venta al crear, actualizar o eliminar un precio de compra, o al actualizar el precio de costo si el cálculo basado en costos está habilitado. <br>
-#<br>
-# Acerca de <br>
-#<br>
-About = Acerca de<br>
-DynamicsPricesAbout = Acerca de DynamicsPrices<br>
-DynamicsPricesAboutPage = Página Acerca de DynamicsPrices<br>
-<br>
-#<br>
-# Página de ejemplo<br>
-#<br>
-DynamicsPricesArea = Inicio DynamicsPrices<br>
-MyPageName = Nombre de mi página<br>
-<br>
-#<br>
-# Widget de ejemplo<br>
-#<br>
-MyWidget = Mi widget<br>
-MyWidgetDescription = Descripción de mi widget<br>
-<br>
-#<br>
-# Otro<br>
-#<br>
-<br>
-LMDB_ErrorUpdate = Error al actualizar:<br>
-LMDB_NbLinesUpdated = Número de precios de venta actualizados:<br>
-Fk_nature = Tipo de producto ID<br>
-Pricelevel = Code del nivel de precios<br>
-Targetrate = Tasa de margen objetivo (en %)<br>
-Minrate = Tasa de margen mínima (en %)<br>
-<br>
-LMDB_CommentAutoUpdateSellPrice = Los precios de venta se actualizan según los coeficientes de precio del diccionario y el promedio de los precios unitarios de compra del proveedor.<br>
-LMDB_LabelAutoUpdateSellPrice = Actualización automática de precios de venta<br>
-LMDB_coefprice = Tasas de margen sobre los precios de venta<br>
+# Archivo de traducción
+
+#
+# Genérico
+#
+
+# Etiqueta del módulo 'ModuleDynamicsPricesName'
+ModuleDynamicsPricesName = Precios de venta dinámicos
+# Descripción del módulo 'ModuleDynamicsPricesDesc'
+ModuleDynamicsPricesDesc = Este módulo permite actualizar los precios de venta según el precio unitario promedio de compra de los proveedores y los coeficientes de precio definidos en un diccionario específico.
+
+#
+# Página de administración
+#
+DynamicsPricesSetup = Configuración de precios de venta dinámicos
+DynamicsPricesSetupPage = Página de configuración del módulo de precios de venta dinámicos
+LMDB_UpdateOptions = Opciones de actualización de precios de venta
+LMDB_KIT_PRICE_FROM_COMPONENTS = Calcular los precios de los kits a partir del precio de venta de los componentes en lugar del precio de coste.
+LMDB_COST_PRICE_ONLY = Actualizar los precios de venta según los precios de coste solo.
+LMDB_SUPPLIER_BUYPRICE_ALTERED = Actualizar los precios de venta al crear, actualizar o eliminar un precio de compra, o al actualizar el precio de coste si el cálculo basado en costes está habilitado.
+
+#
+# Otro
+#
+DynamicsPricesArea = Inicio DynamicsPrices
+LMDB_ErrorUpdate = Error al actualizar:
+LMDB_NbLinesUpdated = Número de precios de venta actualizados:
+Fk_nature = Tipo de producto ID
+Pricelevel = Código del nivel de precios
+Targetrate = Tasa de margen objetivo (en %)
+Minrate = Tasa de margen mínima (en %)
+Entity = Entidad
+
+LMDB_CommentAutoUpdateSellPrice = Los precios de venta se actualizan según los coeficientes de precio del diccionario y el promedio de los precios unitarios de compra del proveedor.
+LMDB_LabelAutoUpdateSellPrice = Actualización automática de precios de venta
+LMDB_coefprice = Tasas de margen sobre los precios de venta
+LMDB_marginoncost = Tasa de margen sobre los precios de coste
 
 DynamicsPrices = Precios de venta dinámicos
+LMDB_CodeNatureTooltipHelp = Código de la naturaleza del producto
+LMDB_MarginOnCostTooltipHelp = Tasa de margen aplicada al precio medio de coste de compra
+LMDB_CodeTooltipHelp = Código del registro del diccionario
+LMDB_ENtityTooltipHelp = Identificador de la entidad
+LMDB_FkNatureTooltipHelp = Identificador de la naturaleza del producto
+LMDB_PriceLevelTooltipHelp = Identificador del nivel de precios
+LMDB_TargetRateTooltipHelp = Tasa de margen objetivo
+LMDB_MinRateTooltipHelp = Tasa de margen mínima

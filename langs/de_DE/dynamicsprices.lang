@@ -1,0 +1,47 @@
+# Übersetzungsdatei
+
+#
+# Allgemein
+#
+
+# Modullabel 'ModuleDynamicsPricesName'
+ModuleDynamicsPricesName = Dynamische Verkaufspreise
+# Modulbeschreibung 'ModuleDynamicsPricesDesc'
+ModuleDynamicsPricesDesc = Dieses Modul ermöglicht die Aktualisierung der Verkaufspreise auf Basis des durchschnittlichen Lieferanten-Einkaufspreises und der in einem eigenen Wörterbuch definierten Preiskoeffizienten.
+
+#
+# Administrationsseite
+#
+DynamicsPricesSetup = Einstellungen für dynamische Verkaufspreise
+DynamicsPricesSetupPage = Einstellungsseite des Moduls Dynamische Verkaufspreise
+LMDB_UpdateOptions = Optionen zur Aktualisierung der Verkaufspreise
+LMDB_KIT_PRICE_FROM_COMPONENTS = Kit-Preise aus den Verkaufspreisen der Komponenten statt aus dem Selbstkostenpreis berechnen.
+LMDB_COST_PRICE_ONLY = Verkaufspreise nur auf Basis der Selbstkosten aktualisieren.
+LMDB_SUPPLIER_BUYPRICE_ALTERED = Verkaufspreise beim Anlegen/Aktualisieren/Löschen eines Einkaufspreises oder beim Aktualisieren des Selbstkostenpreises aktualisieren, falls die kostenbasierte Berechnung aktiviert ist.
+
+#
+# Sonstiges
+#
+DynamicsPricesArea = Startseite DynamicsPrices
+LMDB_ErrorUpdate = Fehler bei der Aktualisierung:
+LMDB_NbLinesUpdated = Anzahl der aktualisierten Verkaufspreise:
+Fk_nature = Produktart-Code
+Pricelevel = Preisstufen-ID
+Targetrate = Zielmargenprozentsatz (in %)
+Minrate = Mindestmargenprozentsatz (in %)
+Entity = Entität
+
+LMDB_CommentAutoUpdateSellPrice = Die Verkaufspreise werden anhand der im Wörterbuch angegebenen Preiskoeffizienten und des Durchschnitts der Einkaufseinheitspreise des Lieferanten aktualisiert.
+LMDB_LabelAutoUpdateSellPrice = Automatische Aktualisierung der Verkaufspreise
+LMDB_coefprice = Margensätze auf Verkaufspreise
+LMDB_marginoncost = Margensatz auf Selbstkostenpreise
+
+DynamicsPrices = Dynamische Verkaufspreise
+LMDB_CodeNatureTooltipHelp = Code der Produktart
+LMDB_MarginOnCostTooltipHelp = Margensatz, der auf den durchschnittlichen Einkaufsselbstkostenpreis angewandt wird
+LMDB_CodeTooltipHelp = Code des Wörterbucheintrags
+LMDB_ENtityTooltipHelp = Entitätskennung
+LMDB_FkNatureTooltipHelp = Kennung der Produktart
+LMDB_PriceLevelTooltipHelp = Kennung der Preisstufe
+LMDB_TargetRateTooltipHelp = Zielmargenprozentsatz
+LMDB_MinRateTooltipHelp = Mindestmargenprozentsatz
