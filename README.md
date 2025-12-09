@@ -1,96 +1,74 @@
-# DYNAMICSPRICES FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
+# DynamicsPrices
 
-## Features
+Module Dolibarr pour la mise à jour dynamique des prix de vente à partir des coûts d'achat et des coefficients configurables.
 
-Ce module permet de mettre à jour les prix de vente en fonction du prix d'achat moyen unitaire chez les fournisseurs et des coefficients de prix définis dans un dictionnaire dédié.
+## Aperçu
 
-<!--
-![Screenshot dynamicsprices](img/screenshot_dynamicsprices.png?raw=true "DynamicsPrices"){imgmd}
--->
+DynamicsPrices automatise le recalcul des prix des produits en s'appuyant sur les prix d'achat moyens, les coefficients de marge et les relations entre produits (composants, kits). Les déclencheurs du module s'occupent d'appliquer les nouveaux prix de vente au bon moment, tout en respectant les spécificités des produits et services Dolibarr.
 
-Other external modules are available on [Dolistore.com](https://www.dolistore.com).
+## Fonctionnalités clés
 
-## Translations
+- Mise à jour automatique des prix de vente en fonction du prix d'achat moyen et d'un dictionnaire de coefficients dédié.
+- Recalcul des kits après leurs composants pour éviter les doublons de prix de vente et refléter le coût cumulé des sous-produits et services.
+- Filtrage des services : seuls les produits physiques (`fk_product_type = 0`) sont recalculés pour éviter les mises à jour intempestives.
+- Plus grand nombre de triggers pour couvrir les actions courantes (création, modification, réception d'achat, etc.).
+- Calcul automatique des prix de revient à partir des nouveaux dictionnaires et de la moyenne des prix d'achat.
 
-Translations can be completed manually by editing files in the module directories under `langs`.
+## Compatibilité
 
-<!--
-This module contains also a sample configuration for Transifex, under the hidden directory [.tx](.tx), so it is possible to manage translation using this service.
-
-For more information, see the [translator's documentation](https://wiki.dolibarr.org/index.php/Translator_documentation).
-
-There is a [Transifex project](https://transifex.com/projects/p/dolibarr-module-template) for this module.
--->
-
+- Dolibarr ≥ 19.0 (minimum recommandé).
+- Module externe installable dans `htdocs/custom/dynamicsprices`.
 
 ## Installation
 
-Prerequisites: You must have Dolibarr ERP & CRM software installed. You can download it from [Dolistore.org](https://www.dolibarr.org).
-You can also get a ready-to-use instance in the cloud from https://saas.dolibarr.org
+### Depuis une archive ZIP
 
+1. Télécharger l'archive `module_dynamicsprices-x.y.z.zip`.
+2. Déployer l'archive via le menu **Accueil > Configuration > Modules > Déployer un module externe**.
+3. Activer le module **DynamicsPrices** dans **Configuration > Modules/Applications**.
 
-### From the ZIP file and GUI interface
+### Depuis un dépôt Git
 
-If the module is a ready-to-deploy zip file, so with a name `module_xxx-version.zip` (e.g., when downloading it from a marketplace like [Dolistore](https://www.dolistore.com)),
-go to menu `Home> Setup> Modules> Deploy external module` and upload the zip file.
-
-<!--
-
-Note: If this screen tells you that there is no "custom" directory, check that your setup is correct:
-
-- In your Dolibarr installation directory, edit the `htdocs/conf/conf.php` file and check that following lines are not commented:
-
-    ```php
-    //$dolibarr_main_url_root_alt ...
-    //$dolibarr_main_document_root_alt ...
-    ```
-
-- Uncomment them if necessary (delete the leading `//`) and assign the proper value according to your Dolibarr installation
-
-    For example :
-
-    - UNIX:
-        ```php
-        $dolibarr_main_url_root_alt = '/custom';
-        $dolibarr_main_document_root_alt = '/var/www/Dolibarr/htdocs/custom';
-        ```
-
-    - Windows:
-        ```php
-        $dolibarr_main_url_root_alt = '/custom';
-        $dolibarr_main_document_root_alt = 'C:/My Web Sites/Dolibarr/htdocs/custom';
-        ```
--->
-
-<!--
-
-### From a GIT repository
-
-Clone the repository in `$dolibarr_main_document_root_alt/dynamicsprices`
-
-```shell
-cd ....../custom
+```bash
+cd htdocs/custom
 git clone git@github.com:gitlogin/dynamicsprices.git dynamicsprices
 ```
 
--->
+Puis activer le module dans Dolibarr comme décrit ci-dessus.
 
-### Final steps
+## Mise à jour
 
-Using your browser:
+1. Sauvegarder la base de données et le répertoire du module.
+2. Installer la nouvelle version (ZIP ou Git) dans `htdocs/custom/dynamicsprices`.
+3. Lancer les scripts de migration proposés par Dolibarr si nécessaire.
 
-  - Log into Dolibarr as a super-administrator
-  - Go to "Setup"> "Modules"
-  - You should now be able to find and enable the module
+## Configuration
 
+- **Dictionnaire des coefficients** : définir les coefficients de marge dans **Dictionnaires > Coefficients DynamicsPrices**.
+- **Triggers** : les déclencheurs DynamicsPrices mettent à jour les prix lors des actions standards (création de produit, réception fournisseur, modification de prix, etc.).
+- **Kits** : le prix de vente d'un kit est recalculé uniquement après mise à jour des prix de ses composants pour éviter toute duplication.
 
+## Utilisation
 
-## Licenses
+- Créer ou mettre à jour un produit avec un prix d'achat renseigné.
+- Les triggers calculent automatiquement le prix de revient et le prix de vente suivant le coefficient applicable.
+- Les services et produits non physiques (`fk_product_type != 0`) sont ignorés par les mises à jour automatiques.
 
-### Main code
+## Permissions et sécurité
 
-GPLv3 or (at your option) any later version. See file COPYING for more information.
+- Les actions de mise à jour sont soumises aux permissions Dolibarr standard sur les produits et dictionnaires.
+- Les écrans du module masquent automatiquement les actions non autorisées.
 
-### Documentation
+## Traductions
 
-All texts and readme's are licensed under [GFDL](https://www.gnu.org/licenses/fdl-1.3.en.html).
+Les fichiers de langue sont disponibles dans `langs/`. Complétez ou ajustez les traductions en `en_US` et `fr_FR` pour tout nouveau libellé.
+
+## Support
+
+- Documentation et support Dolibarr : [https://wiki.dolibarr.org](https://wiki.dolibarr.org)
+- Autres modules externes : [Dolistore.com](https://www.dolistore.com)
+
+## Licence
+
+- Code : GPLv3 ou ultérieure (voir `COPYING`).
+- Documentation : GFDL (voir la licence correspondante).
