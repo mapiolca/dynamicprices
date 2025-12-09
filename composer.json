@@ -1,0 +1,23 @@
+{
+    "name": "dolibarr/dynamicprices",
+    "description": "Dynamicprices module for Dolibarr ERP & CRM.",
+    "type": "dolibarr-module",
+    "license": "GPL-3.0-or-later",
+    "keywords": [
+        "dolibarr",
+        "module",
+        "dynamicprices"
+    ],
+    "homepage": "https://www.dolibarr.org",
+    "support": {
+        "docs": "https://wiki.dolibarr.org/"
+    },
+    "require": {
+        "php": ">=7.0"
+    },
+    "extra": {
+        "dolibarr": {
+            "module-name": "dynamicprices"
+        }
+    }
+}
