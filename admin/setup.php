@@ -129,6 +129,61 @@ $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
 
 include DOL_DOCUMENT_ROOT.'/core/actions_dictionnaire.inc.php';
 
+/**
+ * Build options list for commercial category select.
+ *
+ * @param DoliDB $db Database handler
+ * @return array<int,string>
+ */
+function dynamicspricesGetCommercialCategoryOptions($db)
+{
+	$options = array();
+
+	$sql = "SELECT rowid, code, label";
+	$sql .= " FROM ".MAIN_DB_PREFIX."c_commercial_category";
+	$sql .= " WHERE active = 1";
+	$sql .= " ORDER BY label ASC, code ASC";
+
+	$resql = $db->query($sql);
+	if ($resql === false) {
+		return $options;
+	}
+
+	while ($obj = $db->fetch_object($resql)) {
+		$options[(int) $obj->rowid] = $obj->label.' ('.$obj->code.')';
+	}
+
+	return $options;
+}
+
+/**
+ * Replace text input for fk_commercial_category with a select.
+ *
+ * @param string $html Dictionary HTML output
+ * @param Form   $form Form helper
+ * @param array<int,string> $options Select options
+ * @return string
+ */
+function dynamicspricesInjectCommercialCategorySelect($html, $form, $options)
+{
+	if (empty($options)) {
+		return $html;
+	}
+
+	return preg_replace_callback(
+		'/<input[^>]*type=[\"\']text[\"\'][^>]*name=[\"\']fk_commercial_category[\"\'][^>]*>/i',
+		function ($matches) use ($form, $options) {
+			$input = $matches[0];
+			$selected = 0;
+			if (preg_match('/value=[\"\']([^\"\']*)[\"\']/i', $input, $valueMatch)) {
+				$selected = (int) $valueMatch[1];
+			}
+			return $form->selectarray('fk_commercial_category', $options, $selected, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
+		},
+		$html
+	);
+}
+
 
 // Set this to 1 to use the factory to manage constants. Warning, the generated module will be compatible with version v15+ only
 $useFormSetup = 1;
@@ -183,7 +238,11 @@ print '</table>';
 print '<br>';
 
 // Dictionary management
+$commercialCategoryOptions = dynamicspricesGetCommercialCategoryOptions($db);
+ob_start();
 include DOL_DOCUMENT_ROOT.'/core/tpl/admin/dict.tpl.php';
+$dictionaryHtml = ob_get_clean();
+echo dynamicspricesInjectCommercialCategorySelect($dictionaryHtml, $form, $commercialCategoryOptions);
 
 if (empty($setupnotempty)) {
 print '<br>'.$langs->trans("NothingToSetup");
