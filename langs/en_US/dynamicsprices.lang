@@ -47,3 +47,7 @@ LMDB_FkNatureTooltipHelp = Product nature identifier
 LMDB_PriceLevelTooltipHelp = Price level identifier
 LMDB_TargetRateTooltipHelp = Target margin rate
 LMDB_MinRateTooltipHelp = Minimum margin rate
+LMDB_commercialcategories = Commercial categories
+LMDB_CommercialCategoryExtrafield = Commercial category
+LMDB_LabelTooltipHelp = Dictionary entry label
+LMDB_ActiveTooltipHelp = Dictionary entry active status

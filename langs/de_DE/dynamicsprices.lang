@@ -47,3 +47,7 @@ LMDB_FkNatureTooltipHelp = Kennung der Produktart
 LMDB_PriceLevelTooltipHelp = Kennung der Preisstufe
 LMDB_TargetRateTooltipHelp = Zielmargenprozentsatz
 LMDB_MinRateTooltipHelp = Mindestmargenprozentsatz
+LMDB_commercialcategories = Kommerzielle Kategorien
+LMDB_CommercialCategoryExtrafield = Kommerzielle Kategorie
+LMDB_LabelTooltipHelp = Bezeichnung des Wörterbucheintrags
+LMDB_ActiveTooltipHelp = Aktivstatus des Wörterbucheintrags

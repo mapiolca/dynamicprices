@@ -49,6 +49,10 @@ LMDB_FkNatureTooltipHelp = Identifiant de la nature de produit
 LMDB_PriceLevelTooltipHelp = Identifiant du niveau de prix
 LMDB_TargetRateTooltipHelp = Taux de marge cible
 LMDB_MinRateTooltipHelp = Taux de marge minimum
+LMDB_commercialcategories = Catégories commerciales
+LMDB_CommercialCategoryExtrafield = Catégorie commerciale
+LMDB_LabelTooltipHelp = Libellé de l'entrée du dictionnaire
+LMDB_ActiveTooltipHelp = Statut actif de l'entrée du dictionnaire
 
 
 

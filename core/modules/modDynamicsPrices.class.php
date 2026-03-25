@@ -2,7 +2,7 @@
 /* Copyright (C) 2004-2018	Laurent Destailleur			<eldy@users.sourceforge.net>
  * Copyright (C) 2018-2019	Nicolas ZABOURI				<info@inovea-conseil.com>
  * Copyright (C) 2019-2024	Frédéric France				<frederic.france@free.fr>
- * Copyright (C) 2025		Pierre ARDOIN
+ * Copyright (C) 2025-2026	Pierre Ardoin				<developpeur@lesmetiersdubatiment.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -254,46 +254,54 @@ class modDynamicsPrices extends DolibarrModules
 		 );
 		 */
 /* BEGIN MODULEBUILDER DICTIONARIES */
-$this->dictionaries = array(
-'langs'=>'dynamicsprices@dynamicsprices',
-'tabname'=>array(MAIN_DB_PREFIX."c_coefprice", MAIN_DB_PREFIX."c_margin_on_cost"),
-'tablib'=>array("LMDB_coefprice", "LMDB_marginoncost"),
-'tabsql'=>array(
-'SELECT t.rowid as rowid, t.entity, t.code, t.fk_nature, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
-'SELECT t.rowid as rowid, t.entity, t.code, t.code_nature, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t WHERE t.entity = '.((int) $conf->entity),
-),
-'tabsqlsort'=>array(
-"code ASC",
-"code ASC",
-),
-'tabfield'=>array(
-"code,fk_nature,pricelevel,targetrate,minrate",
-"code,code_nature,margin_on_cost_percent",
-),
-'tabfieldvalue'=>array(
-"code,entity,fk_nature,pricelevel,targetrate,minrate",
-"code,entity,code_nature,margin_on_cost_percent",
-),
-'tabfieldinsert'=>array(
-"code,entity,fk_nature,pricelevel,targetrate,minrate",
-"code,entity,code_nature,margin_on_cost_percent",
-),
-'tabrowid'=>array('rowid', 'rowid'),
-'tabcond'=>array(
-isModEnabled('dynamicsprices'),
-isModEnabled('dynamicsprices'),
-),
-'tabhelp' => array(
-'code' => $langs->trans('LMDB_CodeTooltipHelp'),
-'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
-'fk_nature' => $langs->trans('LMDB_FkNatureTooltipHelp'),
-'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
-'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
-'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
-'code_nature' => $langs->trans('LMDB_CodeNatureTooltipHelp'),
-'margin_on_cost_percent' => $langs->trans('LMDB_MarginOnCostTooltipHelp'),
-),
-);
+		$this->dictionaries = array(
+			'langs' => 'dynamicsprices@dynamicsprices',
+			'tabname' => array(MAIN_DB_PREFIX."c_coefprice", MAIN_DB_PREFIX."c_margin_on_cost", MAIN_DB_PREFIX."c_commercial_category"),
+			'tablib' => array("LMDB_coefprice", "LMDB_marginoncost", "LMDB_commercialcategories"),
+			'tabsql' => array(
+				'SELECT t.rowid as rowid, t.entity, t.code, t.fk_nature, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
+				'SELECT t.rowid as rowid, t.entity, t.code, t.code_nature, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t WHERE t.entity = '.((int) $conf->entity),
+				'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t',
+			),
+			'tabsqlsort' => array(
+				"code ASC",
+				"code ASC",
+				"label ASC",
+			),
+			'tabfield' => array(
+				"code,fk_nature,pricelevel,targetrate,minrate",
+				"code,code_nature,margin_on_cost_percent",
+				"code,label",
+			),
+			'tabfieldvalue' => array(
+				"code,entity,fk_nature,pricelevel,targetrate,minrate",
+				"code,entity,code_nature,margin_on_cost_percent",
+				"code,label",
+			),
+			'tabfieldinsert' => array(
+				"code,entity,fk_nature,pricelevel,targetrate,minrate",
+				"code,entity,code_nature,margin_on_cost_percent",
+				"code,label",
+			),
+			'tabrowid' => array('rowid', 'rowid', 'rowid'),
+			'tabcond' => array(
+				isModEnabled('dynamicsprices'),
+				isModEnabled('dynamicsprices'),
+				isModEnabled('dynamicsprices'),
+			),
+			'tabhelp' => array(
+				'code' => $langs->trans('LMDB_CodeTooltipHelp'),
+				'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
+				'fk_nature' => $langs->trans('LMDB_FkNatureTooltipHelp'),
+				'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
+				'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
+				'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
+				'code_nature' => $langs->trans('LMDB_CodeNatureTooltipHelp'),
+				'margin_on_cost_percent' => $langs->trans('LMDB_MarginOnCostTooltipHelp'),
+				'label' => $langs->trans('LMDB_LabelTooltipHelp'),
+				'active' => $langs->trans('LMDB_ActiveTooltipHelp'),
+			),
+		);
 /* END MODULEBUILDER DICTIONARIES */
 
 		// Boxes/Widgets
@@ -538,15 +546,36 @@ isModEnabled('dynamicsprices'),
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
 		}
 
-		// Create extrafields during init
-		//include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
-		//$extrafields = new ExtraFields($this->db);
-		//$result0=$extrafields->addExtraField('dynamicsprices_separator1', "Separator 1", 'separator', 1,  0, 'thirdparty',   0, 0, '', array('options'=>array(1=>1)), 1, '', 1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result1=$extrafields->addExtraField('dynamicsprices_myattr1', "New Attr 1 label", 'boolean', 1,  3, 'thirdparty',   0, 0, '', '', 1, '', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result2=$extrafields->addExtraField('dynamicsprices_myattr2', "New Attr 2 label", 'varchar', 1, 10, 'project',      0, 0, '', '', 1, '', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result3=$extrafields->addExtraField('dynamicsprices_myattr3', "New Attr 3 label", 'varchar', 1, 10, 'bank_account', 0, 0, '', '', 1, '', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result4=$extrafields->addExtraField('dynamicsprices_myattr4', "New Attr 4 label", 'select',  1,  3, 'thirdparty',   0, 1, '', array('options'=>array('code1'=>'Val1','code2'=>'Val2','code3'=>'Val3')), 1,'', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
-		//$result5=$extrafields->addExtraField('dynamicsprices_myattr5', "New Attr 5 label", 'text',    1, 10, 'user',         0, 0, '', '', 1, '', -1, 0, '', '', 'dynamicsprices@dynamicsprices', 'isModEnabled("dynamicsprices")');
+		// Create product/service extrafield during init.
+		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+		$extrafields = new ExtraFields($this->db);
+		$extrafields->fetch_name_optionals_label('product');
+		if (empty($extrafields->attributes['product']['label']['lmdb_commercial_category'])) {
+			$result = $extrafields->addExtraField(
+				'lmdb_commercial_category',
+				'LMDB_CommercialCategoryExtrafield',
+				'sellist',
+				100,
+				255,
+				'product',
+				0,
+				0,
+				'',
+				array('options' => array('c_commercial_category:label:rowid::(active:=:1)' => null)),
+				1,
+				'',
+				-1,
+				'',
+				'',
+				'',
+				'dynamicsprices@dynamicsprices',
+				'isModEnabled("dynamicsprices")'
+			);
+			if ($result < 0) {
+				$this->error = $extrafields->error;
+				return -1;
+			}
+		}
 
 		// Permissions
 		$this->remove($options);
