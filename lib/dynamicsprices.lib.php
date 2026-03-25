@@ -175,12 +175,12 @@ function dynamicsprices_get_average_supplier_price($db, $productId)
 	return array_sum($prices) / count($prices);
 }
 
-// Get margin on cost percent for a nature
-function dynamicsprices_get_margin_on_cost_percent($db, $natureId)
+// Get margin on cost percent for a commercial category
+function dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId)
 {
 	$sql = "SELECT margin_on_cost_percent";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_margin_on_cost";
-	$sql .= " WHERE code_nature = '".$db->escape($natureId)."'";
+	$sql .= " WHERE code_nature = '".$db->escape((string) $commercialCategoryId)."'";
 	$sql .= " AND entity IN (".getEntity('entity').")";
 	$sql .= " AND active = 1";
 	$sql .= " ORDER BY rowid DESC";
@@ -196,13 +196,13 @@ function dynamicsprices_get_margin_on_cost_percent($db, $natureId)
 }
 
 // Fetch selling price rules from dictionary
-function dynamicsprices_get_price_rules($db, $natureId)
+function dynamicsprices_get_price_rules($db, $commercialCategoryId)
 {
 	$rules = array();
 
 	$sql = "SELECT pricelevel, minrate, targetrate";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_coefprice";
-	$sql .= " WHERE fk_nature = ".((int) $natureId);
+	$sql .= " WHERE fk_nature = ".((int) $commercialCategoryId);
 	$sql .= " AND entity IN (".getEntity('entity').")";
 	$sql .= " AND active = 1";
 
@@ -227,6 +227,26 @@ function dynamicsprices_save_cost_price($db, $productId, $costPrice)
 	$sql .= " AND entity IN (".getEntity('product').")";
 
 	return $db->query($sql);
+}
+
+// Get commercial category selected on product/service extrafield
+function dynamicsprices_get_product_commercial_category($db, $productId)
+{
+	$sql = "SELECT lmdb_commercial_category";
+	$sql .= " FROM ".MAIN_DB_PREFIX."product_extrafields";
+	$sql .= " WHERE fk_object = ".((int) $productId);
+
+	$resql = $db->query($sql);
+	if ($resql === false) {
+		return 0;
+	}
+
+	$obj = $db->fetch_object($resql);
+	if (!$obj || empty($obj->lmdb_commercial_category)) {
+		return 0;
+	}
+
+	return (int) $obj->lmdb_commercial_category;
 }
 
 // Calculate and persist Kit cost price based on components
@@ -375,11 +395,13 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		}
 		$products[] = $productid;
 		} else {
-		$sql = "SELECT rowid, finished";
+		$sql = "SELECT p.rowid, ef.lmdb_commercial_category";
 		$sql .= " FROM ".MAIN_DB_PREFIX."product";
-		$sql .= " WHERE tosell = 1";
-		$sql .= " AND fk_product_type = 0";
-		$sql .= " AND entity IN (".getEntity('product').")";
+		$sql .= " as p";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
+		$sql .= " WHERE p.tosell = 1";
+		$sql .= " AND p.fk_product_type = 0";
+		$sql .= " AND p.entity IN (".getEntity('product').")";
 	
 		$resql = $db->query($sql);
 		if ($resql === false) {
@@ -388,13 +410,13 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		}
 	
 		while ($obj = $db->fetch_object($resql)) {
-		$products[] = array('id' => $obj->rowid, 'nature' => $obj->finished);
+		$products[] = array('id' => $obj->rowid, 'commercial_category' => (int) $obj->lmdb_commercial_category);
 		}
 		}
 	
 		foreach ($products as $prod) {
 		$prodid = is_array($prod) ? $prod['id'] : $prod;
-		$natureid = is_array($prod) ? $prod['nature'] : 0;
+		$commercialCategoryId = is_array($prod) ? ((int) $prod['commercial_category']) : dynamicsprices_get_product_commercial_category($db, $prodid);
 		$product = new Product($db);
 		$product->fetch($prodid);
 		if ((int) $product->type !== Product::TYPE_PRODUCT) {
@@ -403,7 +425,7 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		$tva_tx = (float) $product->tva_tx;
 	
 		if (dynamicsprices_is_kit($db, $prodid)) {
-		$kits[] = array('id' => $prodid, 'nature' => $natureid, 'tva' => $tva_tx);
+		$kits[] = array('id' => $prodid, 'commercial_category' => $commercialCategoryId, 'tva' => $tva_tx);
 		continue;
 		}
 	
@@ -412,23 +434,23 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		continue;
 		}
 	
-		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $natureid);
+		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId);
 		$costPrice = $avgPrice * (1 + ($marginPercent / 100));
 		dynamicsprices_save_cost_price($db, $prodid, $costPrice);
-	
-		$rules = dynamicsprices_get_price_rules($db, $natureid);
+
+		$rules = dynamicsprices_get_price_rules($db, $commercialCategoryId);
 		$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $avgPrice, $rules, $tva_tx, $entity);
 		}
-	
+
 		foreach ($kits as $kit) {
 		$prodid = $kit['id'];
-		$natureid = $kit['nature'];
+		$commercialCategoryId = $kit['commercial_category'];
 		$tva_tx = $kit['tva'];
 		$product = new Product($db);
 		$product->fetch($prodid);
-	
+
 		$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
-		$rules = dynamicsprices_get_price_rules($db, $natureid);
+		$rules = dynamicsprices_get_price_rules($db, $commercialCategoryId);
 		if (getDolGlobalInt('LMDB_KIT_PRICE_FROM_COMPONENTS')) {
 		$components = dynamicsprices_get_kit_components($db, $prodid);
 		$nb_line += dynamicsprices_update_kit_prices_from_components($db, $user, $product, $components, $tva_tx, $entity);
@@ -466,11 +488,13 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		}
 		$products[] = $productid;
 		} else {
-		$sql = "SELECT rowid, finished, cost_price";
+		$sql = "SELECT p.rowid, p.cost_price, ef.lmdb_commercial_category";
 		$sql .= " FROM ".MAIN_DB_PREFIX."product";
-		$sql .= " WHERE tosell = 1";
-		$sql .= " AND fk_product_type = 0";
-		$sql .= " AND entity IN (".getEntity('product').")";
+		$sql .= " as p";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
+		$sql .= " WHERE p.tosell = 1";
+		$sql .= " AND p.fk_product_type = 0";
+		$sql .= " AND p.entity IN (".getEntity('product').")";
 	
 		$resql = $db->query($sql);
 		if ($resql === false) {
@@ -479,13 +503,13 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		}
 	
 		while ($obj = $db->fetch_object($resql)) {
-		$products[] = array('id' => $obj->rowid, 'nature' => $obj->finished, 'cost_price' => $obj->cost_price);
+		$products[] = array('id' => $obj->rowid, 'commercial_category' => (int) $obj->lmdb_commercial_category, 'cost_price' => $obj->cost_price);
 		}
 		}
 	
 		foreach ($products as $prod) {
 		$prodid = is_array($prod) ? $prod['id'] : $prod;
-		$natureid = is_array($prod) ? $prod['nature'] : 0;
+		$commercialCategoryId = is_array($prod) ? ((int) $prod['commercial_category']) : dynamicsprices_get_product_commercial_category($db, $prodid);
 		$currentCost = is_array($prod) ? $prod['cost_price'] : 0;
 		$product = new Product($db);
 		$product->fetch($prodid);
@@ -495,30 +519,30 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		$tva_tx = (float) $product->tva_tx;
 	
 		if (dynamicsprices_is_kit($db, $prodid)) {
-		$kits[] = array('id' => $prodid, 'nature' => $natureid, 'tva' => $tva_tx);
+		$kits[] = array('id' => $prodid, 'commercial_category' => $commercialCategoryId, 'tva' => $tva_tx);
 		continue;
 		}
 	
 		$avgPrice = dynamicsprices_get_average_supplier_price($db, $prodid);
 		if ($avgPrice !== null) {
-		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $natureid);
+		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId);
 		$currentCost = $avgPrice * (1 + ($marginPercent / 100));
 		dynamicsprices_save_cost_price($db, $prodid, $currentCost);
 		}
-	
-		$rules = dynamicsprices_get_price_rules($db, $natureid);
+
+		$rules = dynamicsprices_get_price_rules($db, $commercialCategoryId);
 		$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $currentCost, $rules, $tva_tx, $entity);
 		}
-	
+
 		foreach ($kits as $kit) {
 		$prodid = $kit['id'];
-		$natureid = $kit['nature'];
+		$commercialCategoryId = $kit['commercial_category'];
 		$tva_tx = $kit['tva'];
 		$product = new Product($db);
 		$product->fetch($prodid);
-	
+
 		$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
-		$rules = dynamicsprices_get_price_rules($db, $natureid);
+		$rules = dynamicsprices_get_price_rules($db, $commercialCategoryId);
 		if (getDolGlobalInt('LMDB_KIT_PRICE_FROM_COMPONENTS')) {
 		$components = dynamicsprices_get_kit_components($db, $prodid);
 		$nb_line += dynamicsprices_update_kit_prices_from_components($db, $user, $product, $components, $tva_tx, $entity);
