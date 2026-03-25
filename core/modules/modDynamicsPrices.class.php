@@ -269,8 +269,8 @@ class modDynamicsPrices extends DolibarrModules
 				"label ASC",
 			),
 			'tabfield' => array(
-				"code,commercial_category_label,pricelevel,targetrate,minrate",
-				"code,commercial_category_label,margin_on_cost_percent",
+				"code,fk_commercial_category,pricelevel,targetrate,minrate",
+				"code,fk_commercial_category,margin_on_cost_percent",
 				"code,label",
 			),
 			'tabfieldvalue' => array(
