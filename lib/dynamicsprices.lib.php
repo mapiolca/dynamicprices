@@ -232,21 +232,18 @@ function dynamicsprices_save_cost_price($db, $productId, $costPrice)
 // Get commercial category selected on product/service extrafield
 function dynamicsprices_get_product_commercial_category($db, $productId)
 {
-	$sql = "SELECT lmdb_commercial_category";
-	$sql .= " FROM ".MAIN_DB_PREFIX."product_extrafields";
-	$sql .= " WHERE fk_object = ".((int) $productId);
-
-	$resql = $db->query($sql);
-	if ($resql === false) {
+	dol_include_once('/product/class/product.class.php');
+	$product = new Product($db);
+	if ($product->fetch((int) $productId) <= 0) {
 		return 0;
 	}
 
-	$obj = $db->fetch_object($resql);
-	if (!$obj || empty($obj->lmdb_commercial_category)) {
+	$product->fetch_optionals();
+	if (empty($product->array_options['options_lmdb_commercial_category'])) {
 		return 0;
 	}
 
-	return (int) $obj->lmdb_commercial_category;
+	return (int) $product->array_options['options_lmdb_commercial_category'];
 }
 
 // Calculate and persist Kit cost price based on components
