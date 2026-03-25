@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS `llx_c_margin_on_cost`(
 `entity` integer NOT NULL DEFAULT '1',
 `code` varchar(50) NOT NULL,
 `code_nature` varchar(10) DEFAULT NULL,
+`fk_commercial_category` integer DEFAULT NULL,
 `datec` datetime NULL,
 `tms` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 `margin_on_cost_percent` float NOT NULL DEFAULT '0',

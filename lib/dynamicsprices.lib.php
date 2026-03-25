@@ -175,12 +175,26 @@ function dynamicsprices_get_average_supplier_price($db, $productId)
 	return array_sum($prices) / count($prices);
 }
 
+// Get table column for commercial category with backward compatibility
+function dynamicsprices_get_category_column_name($db, $tableName, $newColumn, $legacyColumn)
+{
+	$sql = "SHOW COLUMNS FROM ".MAIN_DB_PREFIX.$tableName." LIKE '".$db->escape($newColumn)."'";
+	$resql = $db->query($sql);
+	if ($resql && $db->num_rows($resql) > 0) {
+		return $newColumn;
+	}
+
+	return $legacyColumn;
+}
+
 // Get margin on cost percent for a commercial category
 function dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId)
 {
+	$categoryColumn = dynamicsprices_get_category_column_name($db, 'c_margin_on_cost', 'fk_commercial_category', 'code_nature');
+
 	$sql = "SELECT margin_on_cost_percent";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_margin_on_cost";
-	$sql .= " WHERE code_nature = '".$db->escape((string) $commercialCategoryId)."'";
+	$sql .= " WHERE ".$categoryColumn." = '".$db->escape((string) $commercialCategoryId)."'";
 	$sql .= " AND entity IN (".getEntity('entity').")";
 	$sql .= " AND active = 1";
 	$sql .= " ORDER BY rowid DESC";
@@ -199,10 +213,11 @@ function dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId)
 function dynamicsprices_get_price_rules($db, $commercialCategoryId)
 {
 	$rules = array();
+	$categoryColumn = dynamicsprices_get_category_column_name($db, 'c_coefprice', 'fk_commercial_category', 'fk_nature');
 
 	$sql = "SELECT pricelevel, minrate, targetrate";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_coefprice";
-	$sql .= " WHERE fk_nature = ".((int) $commercialCategoryId);
+	$sql .= " WHERE ".$categoryColumn." = ".((int) $commercialCategoryId);
 	$sql .= " AND entity IN (".getEntity('entity').")";
 	$sql .= " AND active = 1";
 

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS `llx_c_coefprice`(
   	`entity` integer NOT NULL DEFAULT '1',
 	`code` varchar(10) DEFAULT NULL,
 	`fk_nature` varchar(10) DEFAULT NULL,
+	`fk_commercial_category` integer DEFAULT NULL,
 	`pricelevel` integer NOT NULL,
 	`targetrate` float NOT NULL,
 	`minrate` float NOT NULL,
