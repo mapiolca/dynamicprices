@@ -1,5 +1,8 @@
 # Changelog DynamicsPrices
 
+## 2.0.1
+- Correction du déclenchement des recalculs de prix lors des événements de prix d'achat/vente quand l'identifiant produit n'est pas directement porté par l'objet trigger. / Fixed price recalculation trigger execution on buy/sell price events when the product identifier is not directly available on the trigger object.
+
 ## 2.0.0
 - Ajout du support des kits : le prix d'un kit est recalculé après ses composants pour éviter les doublons et refléter le coût cumulé. / Added kit support: a kit price is recalculated after its components to avoid duplicates and reflect the cumulative cost.
 - Correction des mises à jour intempestives des services : seuls les produits physiques sont recalculés (`fk_product_type = 0`). / Fixed unintended service updates: only physical products are recalculated (`fk_product_type = 0`).
