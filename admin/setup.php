@@ -97,6 +97,20 @@ if (!$user->admin) {
 // Actions on module constants
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
+// Ensure commercial category columns exist for dictionaries compatibility.
+// This keeps setup page functional before/after SQL migration scripts execution.
+$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_coefprice LIKE 'fk_commercial_category'");
+if ($resql && $db->num_rows($resql) == 0) {
+	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_coefprice ADD COLUMN fk_commercial_category INTEGER DEFAULT NULL");
+	$db->query("UPDATE ".MAIN_DB_PREFIX."c_coefprice SET fk_commercial_category = CAST(fk_nature AS UNSIGNED) WHERE (fk_commercial_category IS NULL OR fk_commercial_category = 0) AND fk_nature IS NOT NULL AND fk_nature <> ''");
+}
+
+$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_margin_on_cost LIKE 'fk_commercial_category'");
+if ($resql && $db->num_rows($resql) == 0) {
+	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_margin_on_cost ADD COLUMN fk_commercial_category INTEGER DEFAULT NULL");
+	$db->query("UPDATE ".MAIN_DB_PREFIX."c_margin_on_cost SET fk_commercial_category = CAST(code_nature AS UNSIGNED) WHERE (fk_commercial_category IS NULL OR fk_commercial_category = 0) AND code_nature IS NOT NULL AND code_nature <> ''");
+}
+
 // Load dictionary definitions
 $module = new modDynamicsPrices($db);
 $taborder = empty($module->dictionaries['taborder']) ? array() : $module->dictionaries['taborder'];
