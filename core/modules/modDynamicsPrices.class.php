@@ -259,8 +259,8 @@ class modDynamicsPrices extends DolibarrModules
 			'tabname' => array(MAIN_DB_PREFIX."c_coefprice", MAIN_DB_PREFIX."c_margin_on_cost", MAIN_DB_PREFIX."c_commercial_category"),
 			'tablib' => array("LMDB_coefprice", "LMDB_marginoncost", "LMDB_commercialcategories"),
 			'tabsql' => array(
-				'SELECT t.rowid as rowid, t.entity, t.code, t.fk_commercial_category, cc.label as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.rowid = t.fk_commercial_category WHERE t.entity = '.((int) $conf->entity),
-				'SELECT t.rowid as rowid, t.entity, t.code, t.fk_commercial_category, cc.label as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.rowid = t.fk_commercial_category WHERE t.entity = '.((int) $conf->entity),
+				'SELECT t.rowid as rowid, t.entity, t.code, t.fk_commercial_category as code_commercial_category, cc.label as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.rowid = t.fk_commercial_category WHERE t.entity = '.((int) $conf->entity),
+				'SELECT t.rowid as rowid, t.entity, t.code, t.fk_commercial_category as code_commercial_category, cc.label as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.rowid = t.fk_commercial_category WHERE t.entity = '.((int) $conf->entity),
 				'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t',
 			),
 			'tabsqlsort' => array(
@@ -269,8 +269,8 @@ class modDynamicsPrices extends DolibarrModules
 				"label ASC",
 			),
 			'tabfield' => array(
-				"code,fk_commercial_category,pricelevel,targetrate,minrate",
-				"code,fk_commercial_category,margin_on_cost_percent",
+				"code,code_commercial_category,pricelevel,targetrate,minrate",
+				"code,code_commercial_category,margin_on_cost_percent",
 				"code,label",
 			),
 			'tabfieldvalue' => array(
@@ -293,6 +293,7 @@ class modDynamicsPrices extends DolibarrModules
 				'code' => $langs->trans('LMDB_CodeTooltipHelp'),
 				'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
 				'fk_commercial_category' => $langs->trans('LMDB_FkCommercialCategoryTooltipHelp'),
+				'code_commercial_category' => $langs->trans('LMDB_FkCommercialCategoryTooltipHelp'),
 				'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
 				'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
 				'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),

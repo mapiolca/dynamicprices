@@ -171,16 +171,17 @@ function dynamicspricesInjectCommercialCategorySelect($html, $form, $options)
 	}
 
 	return preg_replace_callback(
-		'/<input\b[^>]*name=[\"\']fk_commercial_category[\"\'][^>]*>/i',
+		'/<input\b[^>]*name=[\"\'](fk_commercial_category|code_commercial_category)[\"\'][^>]*>/i',
 		function ($matches) use ($form, $options) {
 			$input = $matches[0];
+			$fieldName = $matches[1];
 			$selected = 0;
 			if (preg_match('/value=[\"\']([^\"\']*)[\"\']/i', $input, $valueMatch)) {
 				$selected = (int) $valueMatch[1];
 			} else {
-				$selected = (int) GETPOST('fk_commercial_category', 'int');
+				$selected = (int) GETPOST($fieldName, 'int');
 			}
-			return $form->selectarray('fk_commercial_category', $options, $selected, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
+			return $form->selectarray($fieldName, $options, $selected, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
 		},
 		$html
 	);

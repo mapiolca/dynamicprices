@@ -27,6 +27,7 @@ LMDB_ErrorUpdate = Errore durante l'aggiornamento:
 LMDB_NbLinesUpdated = Numero di prezzi di vendita aggiornati:
 Fk_nature = Categoria commerciale
 Fk_commercial_category = Categoria commerciale
+Code_commercial_category = Categoria commerciale
 Margin_on_cost_percent = Aliquota di margine sul prezzo di costo
 Code_nature = Categoria commerciale
 Pricelevel = ID del livello di prezzo
