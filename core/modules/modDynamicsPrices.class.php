@@ -547,6 +547,9 @@ class modDynamicsPrices extends DolibarrModules
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
 		}
 
+		// Ensure migration columns exist when module is activated/updated.
+		$this->ensureCommercialCategoryColumns();
+
 		// Create product/service extrafield during init.
 		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 		$extrafields = new ExtraFields($this->db);
@@ -615,6 +618,26 @@ class modDynamicsPrices extends DolibarrModules
 		}
 
 		return $this->_init($sql, $options);
+	}
+
+	/**
+	 * Ensure commercial category columns exist and are populated.
+	 *
+	 * @return void
+	 */
+	private function ensureCommercialCategoryColumns()
+	{
+		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_coefprice LIKE 'fk_commercial_category'");
+		if ($resql && $this->db->num_rows($resql) == 0) {
+			$this->db->query("ALTER TABLE ".$this->db->prefix()."c_coefprice ADD COLUMN fk_commercial_category INTEGER DEFAULT NULL");
+			$this->db->query("UPDATE ".$this->db->prefix()."c_coefprice SET fk_commercial_category = CAST(fk_nature AS UNSIGNED) WHERE (fk_commercial_category IS NULL OR fk_commercial_category = 0) AND fk_nature IS NOT NULL AND fk_nature <> ''");
+		}
+
+		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_margin_on_cost LIKE 'fk_commercial_category'");
+		if ($resql && $this->db->num_rows($resql) == 0) {
+			$this->db->query("ALTER TABLE ".$this->db->prefix()."c_margin_on_cost ADD COLUMN fk_commercial_category INTEGER DEFAULT NULL");
+			$this->db->query("UPDATE ".$this->db->prefix()."c_margin_on_cost SET fk_commercial_category = CAST(code_nature AS UNSIGNED) WHERE (fk_commercial_category IS NULL OR fk_commercial_category = 0) AND code_nature IS NOT NULL AND code_nature <> ''");
+		}
 	}
 
 	/**
