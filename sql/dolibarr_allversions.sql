@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS `llx_c_commercial_category`(
 `active`TINYINT NOT NULL DEFAULT '1'
 )ENGINE=innodb DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci ;
 
-ALTER TABLE `llx_c_coefprice` ADD COLUMN IF NOT EXISTS `fk_commercial_category` INTEGER DEFAULT NULL;
-ALTER TABLE `llx_c_margin_on_cost` ADD COLUMN IF NOT EXISTS `fk_commercial_category` INTEGER DEFAULT NULL;
+ALTER TABLE `llx_c_coefprice` ADD COLUMN `fk_commercial_category` INTEGER DEFAULT NULL;
+ALTER TABLE `llx_c_margin_on_cost` ADD COLUMN `fk_commercial_category` INTEGER DEFAULT NULL;
 
 UPDATE `llx_c_coefprice`
 SET `fk_commercial_category` = CAST(`fk_nature` AS UNSIGNED)
