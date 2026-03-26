@@ -208,7 +208,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 		);
 
-		$ignoreUrl = $url.'&action=confirm_commande&confirm=yes&dynamicsprices_skip_update=1';
+		$ignoreUrl = $url.'&action=confirm_commande&confirm=yes&dynamicsprices_skip_update=1&token='.newToken();
 		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'confirm_commande', $formquestion, 1, 1, 600, '90%', '', $langs->trans('Validate'), $langs->trans('LMDB_Ignore'));
 		$this->resprints .= '<script>';
 		$this->resprints .= 'jQuery(function($){';
