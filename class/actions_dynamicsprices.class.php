@@ -26,6 +26,9 @@ class ActionsDynamicsPrices extends CommonHookActions
 	/** @var DoliDB */
 	public $db;
 
+	/** @var string */
+	public $resPrint = '';
+
 	/**
 	 * Constructor.
 	 *
