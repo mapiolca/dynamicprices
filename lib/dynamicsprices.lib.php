@@ -190,7 +190,7 @@ function dynamicsprices_get_category_column_name($db, $tableName, $newColumn, $l
 // Get margin on cost percent for a commercial category
 function dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId)
 {
-	$categoryColumn = dynamicsprices_get_category_column_name($db, 'c_margin_on_cost', 'fk_commercial_category', 'code_nature');
+	$categoryColumn = dynamicsprices_get_category_column_name($db, 'c_margin_on_cost', 'code_commercial_category', 'code_nature');
 
 	$sql = "SELECT margin_on_cost_percent";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_margin_on_cost";
@@ -213,11 +213,11 @@ function dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId)
 function dynamicsprices_get_price_rules($db, $commercialCategoryId)
 {
 	$rules = array();
-	$categoryColumn = dynamicsprices_get_category_column_name($db, 'c_coefprice', 'fk_commercial_category', 'fk_nature');
+	$categoryColumn = dynamicsprices_get_category_column_name($db, 'c_coefprice', 'code_commercial_category', 'fk_nature');
 
 	$sql = "SELECT pricelevel, minrate, targetrate";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_coefprice";
-	$sql .= " WHERE ".$categoryColumn." = ".((int) $commercialCategoryId);
+	$sql .= " WHERE ".$categoryColumn." = '".$db->escape((string) $commercialCategoryId)."'";
 	$sql .= " AND entity IN (".getEntity('entity').")";
 	$sql .= " AND active = 1";
 
@@ -244,21 +244,26 @@ function dynamicsprices_save_cost_price($db, $productId, $costPrice)
 	return $db->query($sql);
 }
 
-// Get commercial category selected on product/service extrafield
+// Get commercial category code selected on product/service extrafield
 function dynamicsprices_get_product_commercial_category($db, $productId)
 {
 	dol_include_once('/product/class/product.class.php');
 	$product = new Product($db);
 	if ($product->fetch((int) $productId) <= 0) {
-		return 0;
+		return '';
 	}
 
 	$product->fetch_optionals();
 	if (empty($product->array_options['options_lmdb_commercial_category'])) {
-		return 0;
+		return '';
 	}
-
-	return (int) $product->array_options['options_lmdb_commercial_category'];
+	$sql = "SELECT code FROM ".MAIN_DB_PREFIX."c_commercial_category WHERE rowid = ".((int) $product->array_options['options_lmdb_commercial_category']);
+	$resql = $db->query($sql);
+	if ($resql === false) {
+		return '';
+	}
+	$obj = $db->fetch_object($resql);
+	return $obj ? $obj->code : '';
 }
 
 // Calculate and persist Kit cost price based on components
@@ -407,10 +412,11 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		}
 		$products[] = $productid;
 		} else {
-		$sql = "SELECT p.rowid, ef.lmdb_commercial_category";
+		$sql = "SELECT p.rowid, cc.code as code_commercial_category";
 		$sql .= " FROM ".MAIN_DB_PREFIX."product";
 		$sql .= " as p";
 		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON cc.rowid = ef.lmdb_commercial_category";
 		$sql .= " WHERE p.tosell = 1";
 		$sql .= " AND p.fk_product_type = 0";
 		$sql .= " AND p.entity IN (".getEntity('product').")";
@@ -422,7 +428,7 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		}
 	
 		while ($obj = $db->fetch_object($resql)) {
-		$products[] = array('id' => $obj->rowid, 'commercial_category' => (int) $obj->lmdb_commercial_category);
+		$products[] = array('id' => $obj->rowid, 'commercial_category' => $obj->code_commercial_category);
 		}
 		}
 	
@@ -500,10 +506,11 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		}
 		$products[] = $productid;
 		} else {
-		$sql = "SELECT p.rowid, p.cost_price, ef.lmdb_commercial_category";
+		$sql = "SELECT p.rowid, p.cost_price, cc.code as code_commercial_category";
 		$sql .= " FROM ".MAIN_DB_PREFIX."product";
 		$sql .= " as p";
 		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON cc.rowid = ef.lmdb_commercial_category";
 		$sql .= " WHERE p.tosell = 1";
 		$sql .= " AND p.fk_product_type = 0";
 		$sql .= " AND p.entity IN (".getEntity('product').")";
@@ -515,7 +522,7 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		}
 	
 		while ($obj = $db->fetch_object($resql)) {
-		$products[] = array('id' => $obj->rowid, 'commercial_category' => (int) $obj->lmdb_commercial_category, 'cost_price' => $obj->cost_price);
+		$products[] = array('id' => $obj->rowid, 'commercial_category' => $obj->code_commercial_category, 'cost_price' => $obj->cost_price);
 		}
 		}
 	

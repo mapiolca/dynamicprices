@@ -97,19 +97,19 @@ if (!$user->admin) {
 // Actions on module constants
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
-// Ensure commercial category columns exist for dictionaries compatibility.
+// Ensure commercial category code columns exist for dictionaries compatibility.
 // This keeps setup page functional before/after SQL migration scripts execution.
-$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_coefprice LIKE 'fk_commercial_category'");
+$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_coefprice LIKE 'code_commercial_category'");
 if ($resql && $db->num_rows($resql) == 0) {
-	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_coefprice ADD COLUMN fk_commercial_category INTEGER DEFAULT NULL");
-	$db->query("UPDATE ".MAIN_DB_PREFIX."c_coefprice SET fk_commercial_category = CAST(fk_nature AS UNSIGNED) WHERE (fk_commercial_category IS NULL OR fk_commercial_category = 0) AND fk_nature IS NOT NULL AND fk_nature <> ''");
+	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_coefprice ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
 }
+$db->query("UPDATE ".MAIN_DB_PREFIX."c_coefprice as t LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON cc.rowid = CAST(t.fk_nature AS UNSIGNED) SET t.code_commercial_category = cc.code WHERE (t.code_commercial_category IS NULL OR t.code_commercial_category = '') AND t.fk_nature IS NOT NULL AND t.fk_nature <> ''");
 
-$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_margin_on_cost LIKE 'fk_commercial_category'");
+$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_margin_on_cost LIKE 'code_commercial_category'");
 if ($resql && $db->num_rows($resql) == 0) {
-	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_margin_on_cost ADD COLUMN fk_commercial_category INTEGER DEFAULT NULL");
-	$db->query("UPDATE ".MAIN_DB_PREFIX."c_margin_on_cost SET fk_commercial_category = CAST(code_nature AS UNSIGNED) WHERE (fk_commercial_category IS NULL OR fk_commercial_category = 0) AND code_nature IS NOT NULL AND code_nature <> ''");
+	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_margin_on_cost ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
 }
+$db->query("UPDATE ".MAIN_DB_PREFIX."c_margin_on_cost as t LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON cc.rowid = CAST(t.code_nature AS UNSIGNED) SET t.code_commercial_category = cc.code WHERE (t.code_commercial_category IS NULL OR t.code_commercial_category = '') AND t.code_nature IS NOT NULL AND t.code_nature <> ''");
 
 // Load dictionary definitions
 $module = new modDynamicsPrices($db);
@@ -150,14 +150,14 @@ function dynamicspricesGetCommercialCategoryOptions($db)
 	}
 
 	while ($obj = $db->fetch_object($resql)) {
-		$options[(int) $obj->rowid] = $obj->label.' ('.$obj->code.')';
+		$options[$obj->code] = $obj->label.' ('.$obj->code.')';
 	}
 
 	return $options;
 }
 
 /**
- * Replace text input for fk_commercial_category with a select.
+ * Replace text input for code_commercial_category with a select.
  *
  * @param string $html Dictionary HTML output
  * @param Form   $form Form helper
@@ -171,17 +171,16 @@ function dynamicspricesInjectCommercialCategorySelect($html, $form, $options)
 	}
 
 	return preg_replace_callback(
-		'/<input\b[^>]*name=[\"\'](fk_commercial_category|code_commercial_category)[\"\'][^>]*>/i',
+		'/<input\b[^>]*name=[\"\']code_commercial_category[\"\'][^>]*>/i',
 		function ($matches) use ($form, $options) {
 			$input = $matches[0];
-			$fieldName = $matches[1];
 			$selected = 0;
 			if (preg_match('/value=[\"\']([^\"\']*)[\"\']/i', $input, $valueMatch)) {
-				$selected = (int) $valueMatch[1];
+				$selected = $valueMatch[1];
 			} else {
-				$selected = (int) GETPOST($fieldName, 'int');
+				$selected = GETPOST('code_commercial_category', 'aZ09');
 			}
-			return $form->selectarray($fieldName, $options, $selected, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
+			return $form->selectarray('code_commercial_category', $options, $selected, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
 		},
 		$html
 	);

@@ -47,6 +47,7 @@ LMDB_CodeTooltipHelp = Code des Wörterbucheintrags
 LMDB_ENtityTooltipHelp = Entitätskennung
 LMDB_FkNatureTooltipHelp = Kennung der kommerziellen Kategorie
 LMDB_FkCommercialCategoryTooltipHelp = Kennung der kommerziellen Kategorie
+LMDB_CodeCommercialCategoryTooltipHelp = Code der kommerziellen Kategorie
 LMDB_CommercialCategoryLabelTooltipHelp = Bezeichnung der kommerziellen Kategorie
 LMDB_PriceLevelTooltipHelp = Kennung der Preisstufe
 LMDB_TargetRateTooltipHelp = Zielmargenprozentsatz

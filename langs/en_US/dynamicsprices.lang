@@ -47,6 +47,7 @@ LMDB_CodeTooltipHelp = Dictionary entry code
 LMDB_ENtityTooltipHelp = Entity identifier
 LMDB_FkNatureTooltipHelp = Commercial category identifier
 LMDB_FkCommercialCategoryTooltipHelp = Commercial category identifier
+LMDB_CodeCommercialCategoryTooltipHelp = Commercial category code
 LMDB_CommercialCategoryLabelTooltipHelp = Commercial category label
 LMDB_PriceLevelTooltipHelp = Price level identifier
 LMDB_TargetRateTooltipHelp = Target margin rate

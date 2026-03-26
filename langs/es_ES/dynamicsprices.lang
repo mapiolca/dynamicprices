@@ -47,6 +47,7 @@ LMDB_CodeTooltipHelp = Código del registro del diccionario
 LMDB_ENtityTooltipHelp = Identificador de la entidad
 LMDB_FkNatureTooltipHelp = Identificador de la categoría comercial
 LMDB_FkCommercialCategoryTooltipHelp = Identificador de la categoría comercial
+LMDB_CodeCommercialCategoryTooltipHelp = Código de la categoría comercial
 LMDB_CommercialCategoryLabelTooltipHelp = Etiqueta de la categoría comercial
 LMDB_PriceLevelTooltipHelp = Identificador del nivel de precios
 LMDB_TargetRateTooltipHelp = Tasa de margen objetivo

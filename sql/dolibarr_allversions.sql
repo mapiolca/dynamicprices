@@ -31,13 +31,15 @@ CREATE TABLE IF NOT EXISTS `llx_c_commercial_category`(
 `active`TINYINT NOT NULL DEFAULT '1'
 )ENGINE=innodb DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci ;
 
-ALTER TABLE `llx_c_coefprice` ADD COLUMN `fk_commercial_category` INTEGER DEFAULT NULL;
-ALTER TABLE `llx_c_margin_on_cost` ADD COLUMN `fk_commercial_category` INTEGER DEFAULT NULL;
+ALTER TABLE `llx_c_coefprice` ADD COLUMN `code_commercial_category` VARCHAR(50) DEFAULT NULL;
+ALTER TABLE `llx_c_margin_on_cost` ADD COLUMN `code_commercial_category` VARCHAR(50) DEFAULT NULL;
 
-UPDATE `llx_c_coefprice`
-SET `fk_commercial_category` = CAST(`fk_nature` AS UNSIGNED)
-WHERE (`fk_commercial_category` IS NULL OR `fk_commercial_category` = 0) AND `fk_nature` IS NOT NULL AND `fk_nature` <> '';
+UPDATE `llx_c_coefprice` as t
+LEFT JOIN `llx_c_commercial_category` as cc ON cc.rowid = CAST(t.fk_nature AS UNSIGNED)
+SET t.`code_commercial_category` = cc.code
+WHERE (t.`code_commercial_category` IS NULL OR t.`code_commercial_category` = '') AND t.`fk_nature` IS NOT NULL AND t.`fk_nature` <> '';
 
-UPDATE `llx_c_margin_on_cost`
-SET `fk_commercial_category` = CAST(`code_nature` AS UNSIGNED)
-WHERE (`fk_commercial_category` IS NULL OR `fk_commercial_category` = 0) AND `code_nature` IS NOT NULL AND `code_nature` <> '';
+UPDATE `llx_c_margin_on_cost` as t
+LEFT JOIN `llx_c_commercial_category` as cc ON cc.rowid = CAST(t.code_nature AS UNSIGNED)
+SET t.`code_commercial_category` = cc.code
+WHERE (t.`code_commercial_category` IS NULL OR t.`code_commercial_category` = '') AND t.`code_nature` IS NOT NULL AND t.`code_nature` <> '';

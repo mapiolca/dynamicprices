@@ -259,8 +259,8 @@ class modDynamicsPrices extends DolibarrModules
 			'tabname' => array(MAIN_DB_PREFIX."c_coefprice", MAIN_DB_PREFIX."c_margin_on_cost", MAIN_DB_PREFIX."c_commercial_category"),
 			'tablib' => array("LMDB_coefprice", "LMDB_marginoncost", "LMDB_commercialcategories"),
 			'tabsql' => array(
-				'SELECT t.rowid as rowid, t.entity, t.code, t.fk_commercial_category as code_commercial_category, cc.label as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.rowid = t.fk_commercial_category WHERE t.entity = '.((int) $conf->entity),
-				'SELECT t.rowid as rowid, t.entity, t.code, t.fk_commercial_category as code_commercial_category, cc.label as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.rowid = t.fk_commercial_category WHERE t.entity = '.((int) $conf->entity),
+				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, cc.label as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.code = t.code_commercial_category WHERE t.entity = '.((int) $conf->entity),
+				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, cc.label as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.code = t.code_commercial_category WHERE t.entity = '.((int) $conf->entity),
 				'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t',
 			),
 			'tabsqlsort' => array(
@@ -274,13 +274,13 @@ class modDynamicsPrices extends DolibarrModules
 				"code,label",
 			),
 			'tabfieldvalue' => array(
-				"code,entity,fk_commercial_category,pricelevel,targetrate,minrate",
-				"code,entity,fk_commercial_category,margin_on_cost_percent",
+				"code,entity,code_commercial_category,pricelevel,targetrate,minrate",
+				"code,entity,code_commercial_category,margin_on_cost_percent",
 				"code,label",
 			),
 			'tabfieldinsert' => array(
-				"code,entity,fk_commercial_category,pricelevel,targetrate,minrate",
-				"code,entity,fk_commercial_category,margin_on_cost_percent",
+				"code,entity,code_commercial_category,pricelevel,targetrate,minrate",
+				"code,entity,code_commercial_category,margin_on_cost_percent",
 				"code,label",
 			),
 			'tabrowid' => array('rowid', 'rowid', 'rowid'),
@@ -292,8 +292,7 @@ class modDynamicsPrices extends DolibarrModules
 			'tabhelp' => array(
 				'code' => $langs->trans('LMDB_CodeTooltipHelp'),
 				'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
-				'fk_commercial_category' => $langs->trans('LMDB_FkCommercialCategoryTooltipHelp'),
-				'code_commercial_category' => $langs->trans('LMDB_FkCommercialCategoryTooltipHelp'),
+				'code_commercial_category' => $langs->trans('LMDB_CodeCommercialCategoryTooltipHelp'),
 				'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
 				'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
 				'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
@@ -628,17 +627,17 @@ class modDynamicsPrices extends DolibarrModules
 	 */
 	private function ensureCommercialCategoryColumns()
 	{
-		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_coefprice LIKE 'fk_commercial_category'");
+		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_coefprice LIKE 'code_commercial_category'");
 		if ($resql && $this->db->num_rows($resql) == 0) {
-			$this->db->query("ALTER TABLE ".$this->db->prefix()."c_coefprice ADD COLUMN fk_commercial_category INTEGER DEFAULT NULL");
-			$this->db->query("UPDATE ".$this->db->prefix()."c_coefprice SET fk_commercial_category = CAST(fk_nature AS UNSIGNED) WHERE (fk_commercial_category IS NULL OR fk_commercial_category = 0) AND fk_nature IS NOT NULL AND fk_nature <> ''");
+			$this->db->query("ALTER TABLE ".$this->db->prefix()."c_coefprice ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
 		}
+		$this->db->query("UPDATE ".$this->db->prefix()."c_coefprice as t LEFT JOIN ".$this->db->prefix()."c_commercial_category as cc ON cc.rowid = CAST(t.fk_nature AS UNSIGNED) SET t.code_commercial_category = cc.code WHERE (t.code_commercial_category IS NULL OR t.code_commercial_category = '') AND t.fk_nature IS NOT NULL AND t.fk_nature <> ''");
 
-		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_margin_on_cost LIKE 'fk_commercial_category'");
+		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_margin_on_cost LIKE 'code_commercial_category'");
 		if ($resql && $this->db->num_rows($resql) == 0) {
-			$this->db->query("ALTER TABLE ".$this->db->prefix()."c_margin_on_cost ADD COLUMN fk_commercial_category INTEGER DEFAULT NULL");
-			$this->db->query("UPDATE ".$this->db->prefix()."c_margin_on_cost SET fk_commercial_category = CAST(code_nature AS UNSIGNED) WHERE (fk_commercial_category IS NULL OR fk_commercial_category = 0) AND code_nature IS NOT NULL AND code_nature <> ''");
+			$this->db->query("ALTER TABLE ".$this->db->prefix()."c_margin_on_cost ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
 		}
+		$this->db->query("UPDATE ".$this->db->prefix()."c_margin_on_cost as t LEFT JOIN ".$this->db->prefix()."c_commercial_category as cc ON cc.rowid = CAST(t.code_nature AS UNSIGNED) SET t.code_commercial_category = cc.code WHERE (t.code_commercial_category IS NULL OR t.code_commercial_category = '') AND t.code_nature IS NOT NULL AND t.code_nature <> ''");
 	}
 
 	/**
