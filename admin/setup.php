@@ -97,6 +97,22 @@ if (!$user->admin) {
 // Actions on module constants
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
+// Ensure commercial category code columns exist for dictionaries compatibility.
+// This keeps setup page functional before/after SQL migration scripts execution.
+$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_coefprice LIKE 'code_commercial_category'");
+if ($resql && $db->num_rows($resql) == 0) {
+	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_coefprice ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
+}
+$db->query("INSERT INTO ".MAIN_DB_PREFIX."c_commercial_category (code, label, active) SELECT DISTINCT t.fk_nature, t.fk_nature, 1 FROM ".MAIN_DB_PREFIX."c_coefprice as t LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON cc.code = t.fk_nature WHERE t.fk_nature IS NOT NULL AND t.fk_nature <> '' AND cc.rowid IS NULL");
+$db->query("UPDATE ".MAIN_DB_PREFIX."c_coefprice SET code_commercial_category = fk_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND fk_nature IS NOT NULL AND fk_nature <> ''");
+
+$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_margin_on_cost LIKE 'code_commercial_category'");
+if ($resql && $db->num_rows($resql) == 0) {
+	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_margin_on_cost ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
+}
+$db->query("INSERT INTO ".MAIN_DB_PREFIX."c_commercial_category (code, label, active) SELECT DISTINCT t.code_nature, t.code_nature, 1 FROM ".MAIN_DB_PREFIX."c_margin_on_cost as t LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON cc.code = t.code_nature WHERE t.code_nature IS NOT NULL AND t.code_nature <> '' AND cc.rowid IS NULL");
+$db->query("UPDATE ".MAIN_DB_PREFIX."c_margin_on_cost SET code_commercial_category = code_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND code_nature IS NOT NULL AND code_nature <> ''");
+
 // Load dictionary definitions
 $module = new modDynamicsPrices($db);
 $taborder = empty($module->dictionaries['taborder']) ? array() : $module->dictionaries['taborder'];
@@ -114,6 +130,63 @@ $tabsave = empty($module->dictionaries['tabsave']) ? array() : $module->dictiona
 $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
 
 include DOL_DOCUMENT_ROOT.'/core/actions_dictionnaire.inc.php';
+
+/**
+ * Build options list for commercial category select.
+ *
+ * @param DoliDB $db Database handler
+ * @return array<int,string>
+ */
+function dynamicspricesGetCommercialCategoryOptions($db)
+{
+	$options = array();
+
+	$sql = "SELECT rowid, code, label";
+	$sql .= " FROM ".MAIN_DB_PREFIX."c_commercial_category";
+	$sql .= " WHERE active = 1";
+	$sql .= " ORDER BY label ASC, code ASC";
+
+	$resql = $db->query($sql);
+	if ($resql === false) {
+		return $options;
+	}
+
+	while ($obj = $db->fetch_object($resql)) {
+		$options[$obj->code] = $obj->label.' ('.$obj->code.')';
+	}
+
+	return $options;
+}
+
+/**
+ * Replace text input for code_commercial_category with a select.
+ *
+ * @param string $html Dictionary HTML output
+ * @param Form   $form Form helper
+ * @param array<int,string> $options Select options
+ * @return string
+ */
+function dynamicspricesInjectCommercialCategorySelect($html, $form, $options)
+{
+	if (empty($options)) {
+		return $html;
+	}
+
+	return preg_replace_callback(
+		'/<input\b[^>]*name=[\"\']code_commercial_category[\"\'][^>]*>/i',
+		function ($matches) use ($form, $options) {
+			$input = $matches[0];
+			$selected = 0;
+			if (preg_match('/value=[\"\']([^\"\']*)[\"\']/i', $input, $valueMatch)) {
+				$selected = $valueMatch[1];
+			} else {
+				$selected = GETPOST('code_commercial_category', 'aZ09');
+			}
+			return $form->selectarray('code_commercial_category', $options, $selected, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
+		},
+		$html
+	);
+}
 
 
 // Set this to 1 to use the factory to manage constants. Warning, the generated module will be compatible with version v15+ only
@@ -169,7 +242,11 @@ print '</table>';
 print '<br>';
 
 // Dictionary management
+$commercialCategoryOptions = dynamicspricesGetCommercialCategoryOptions($db);
+ob_start();
 include DOL_DOCUMENT_ROOT.'/core/tpl/admin/dict.tpl.php';
+$dictionaryHtml = ob_get_clean();
+echo dynamicspricesInjectCommercialCategorySelect($dictionaryHtml, $form, $commercialCategoryOptions);
 
 if (empty($setupnotempty)) {
 print '<br>'.$langs->trans("NothingToSetup");
