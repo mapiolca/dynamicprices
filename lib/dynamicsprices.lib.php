@@ -257,7 +257,11 @@ function dynamicsprices_get_product_commercial_category($db, $productId)
 	if (empty($product->array_options['options_lmdb_commercial_category'])) {
 		return '';
 	}
-	$sql = "SELECT code FROM ".MAIN_DB_PREFIX."c_commercial_category WHERE rowid = ".((int) $product->array_options['options_lmdb_commercial_category']);
+	$rawValue = $product->array_options['options_lmdb_commercial_category'];
+	if (!is_numeric($rawValue)) {
+		return $rawValue;
+	}
+	$sql = "SELECT code FROM ".MAIN_DB_PREFIX."c_commercial_category WHERE rowid = ".((int) $rawValue);
 	$resql = $db->query($sql);
 	if ($resql === false) {
 		return '';
@@ -416,7 +420,7 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		$sql .= " FROM ".MAIN_DB_PREFIX."product";
 		$sql .= " as p";
 		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
-		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON cc.rowid = ef.lmdb_commercial_category";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON (cc.rowid = ef.lmdb_commercial_category OR cc.code = ef.lmdb_commercial_category)";
 		$sql .= " WHERE p.tosell = 1";
 		$sql .= " AND p.fk_product_type = 0";
 		$sql .= " AND p.entity IN (".getEntity('product').")";
@@ -510,7 +514,7 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		$sql .= " FROM ".MAIN_DB_PREFIX."product";
 		$sql .= " as p";
 		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
-		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON cc.rowid = ef.lmdb_commercial_category";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON (cc.rowid = ef.lmdb_commercial_category OR cc.code = ef.lmdb_commercial_category)";
 		$sql .= " WHERE p.tosell = 1";
 		$sql .= " AND p.fk_product_type = 0";
 		$sql .= " AND p.entity IN (".getEntity('product').")";
