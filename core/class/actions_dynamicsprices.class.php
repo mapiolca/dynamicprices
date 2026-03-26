@@ -47,15 +47,20 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	public function doActions($parameters, &$object, &$action, $hookmanager)
 	{
+		dol_syslog(__METHOD__.' - Start doActions with action='.$action, LOG_DEBUG);
+
 		if (empty($parameters['context']) || strpos($parameters['context'], 'ordersuppliercard') === false) {
+			dol_syslog(__METHOD__.' - Skip: unsupported context', LOG_DEBUG);
 			return 0;
 		}
 
 		if (!getDolGlobalInt('LMDB_ADD_UPDATE_SUPPLIER_PRICE_ON_SUBMIT')) {
+			dol_syslog(__METHOD__.' - Skip: option LMDB_ADD_UPDATE_SUPPLIER_PRICE_ON_SUBMIT disabled', LOG_DEBUG);
 			return 0;
 		}
 
 		if ($action !== 'confirm_commande') {
+			dol_syslog(__METHOD__.' - Skip: action is not confirm_commande', LOG_DEBUG);
 			return 0;
 		}
 
@@ -66,17 +71,22 @@ class ActionsDynamicsPrices extends CommonHookActions
 
 		$differences = $this->getOrderSupplierPriceDifferences($object);
 		if (empty($differences)) {
+			dol_syslog(__METHOD__.' - No supplier price difference found, nothing to update', LOG_DEBUG);
 			return 0;
 		}
+		dol_syslog(__METHOD__.' - Found '.count($differences).' differing line(s)', LOG_DEBUG);
 
 		$updatedLines = 0;
 		foreach ($differences as $lineId => $diff) {
 			if (empty($selectedRows[$lineId])) {
+				dol_syslog(__METHOD__.' - Skip line '.$lineId.' (unchecked)', LOG_DEBUG);
 				continue;
 			}
 
+			dol_syslog(__METHOD__.' - Upsert supplier price for line '.$lineId.' (product '.$diff['fk_product'].')', LOG_DEBUG);
 			$res = $this->upsertSupplierPriceFromDiff($diff);
 			if ($res < 0) {
+				dol_syslog(__METHOD__.' - Error while upserting supplier price for line '.$lineId.': '.$this->error, LOG_ERR);
 				setEventMessages($this->error, $this->errors, 'errors');
 				return -1;
 			}
@@ -89,6 +99,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$langs->load('dynamicsprices@dynamicsprices');
 			setEventMessages($langs->trans('LMDB_SupplierPriceUpdatedCount', $updatedLines), null, 'mesgs');
 		}
+		dol_syslog(__METHOD__.' - End doActions with '.$updatedLines.' line(s) updated', LOG_DEBUG);
 
 		return 0;
 	}
@@ -105,23 +116,29 @@ class ActionsDynamicsPrices extends CommonHookActions
 	public function formConfirm($parameters, &$object, &$action, $hookmanager)
 	{
 		global $langs;
+		dol_syslog(__METHOD__.' - Start formConfirm with action='.$action, LOG_DEBUG);
 
 		if (empty($parameters['context']) || strpos($parameters['context'], 'ordersuppliercard') === false) {
+			dol_syslog(__METHOD__.' - Skip: unsupported context', LOG_DEBUG);
 			return 0;
 		}
 
 		if (!getDolGlobalInt('LMDB_ADD_UPDATE_SUPPLIER_PRICE_ON_SUBMIT')) {
+			dol_syslog(__METHOD__.' - Skip: option LMDB_ADD_UPDATE_SUPPLIER_PRICE_ON_SUBMIT disabled', LOG_DEBUG);
 			return 0;
 		}
 
 		if ($action !== 'commande') {
+			dol_syslog(__METHOD__.' - Skip: action is not commande', LOG_DEBUG);
 			return 0;
 		}
 
 		$differences = $this->getOrderSupplierPriceDifferences($object);
 		if (empty($differences)) {
+			dol_syslog(__METHOD__.' - No supplier price difference found, native confirmation will be used', LOG_DEBUG);
 			return 0;
 		}
+		dol_syslog(__METHOD__.' - Prepare modal for '.count($differences).' differing line(s)', LOG_DEBUG);
 
 		$langs->load('dynamicsprices@dynamicsprices');
 		$url = $_SERVER['PHP_SELF'].'?id='.(int) $object->id;
@@ -168,6 +185,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		);
 
 		$this->resPrint = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'confirm_commande', $formquestion, 1, 1, 600, '90%');
+		dol_syslog(__METHOD__.' - Custom confirmation modal rendered', LOG_DEBUG);
 		return 1;
 	}
 
@@ -181,6 +199,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	{
 		$differences = array();
 		if (empty($object->id) || empty($object->socid)) {
+			dol_syslog(__METHOD__.' - Skip comparison: missing order id or supplier id', LOG_DEBUG);
 			return $differences;
 		}
 
@@ -190,6 +209,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 
 		foreach ($object->lines as $line) {
 			if (empty($line->fk_product)) {
+				dol_syslog(__METHOD__.' - Skip line without product id', LOG_DEBUG);
 				continue;
 			}
 
@@ -229,6 +249,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 				'label' => isset($line->product_label) ? $line->product_label : (isset($line->desc) ? $line->desc : ''),
 			);
 		}
+		dol_syslog(__METHOD__.' - Comparison completed with '.count($differences).' difference(s)', LOG_DEBUG);
 
 		return $differences;
 	}
@@ -302,6 +323,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		global $conf, $user;
 
 		if (!empty($diff['current_rowid'])) {
+			dol_syslog(__METHOD__.' - Update existing supplier price rowid='.$diff['current_rowid'], LOG_DEBUG);
 			$sql = 'UPDATE '.MAIN_DB_PREFIX.'product_fournisseur_price';
 			$sql .= ' SET unitprice = '.price2num((float) $diff['unitprice'], 'MS');
 			$sql .= ', price = '.price2num((float) $diff['unitprice'], 'MS');
@@ -314,6 +336,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$sql .= ' WHERE rowid = '.((int) $diff['current_rowid']);
 			$sql .= ' AND entity = '.((int) $conf->entity);
 		} else {
+			dol_syslog(__METHOD__.' - Insert new supplier price for product='.$diff['fk_product'].' supplier='.$diff['fk_soc'], LOG_DEBUG);
 			$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'product_fournisseur_price(';
 			$sql .= 'entity, fk_product, fk_soc, quantity, unitquantity, unitprice, price, tva_tx, remise_percent, fk_availability, supplier_reputation, fk_user, datec';
 			$sql .= ') VALUES (';
@@ -337,8 +360,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 		if (!$resql) {
 			$this->error = $this->db->lasterror();
 			$this->errors[] = $this->error;
+			dol_syslog(__METHOD__.' - SQL error: '.$this->error, LOG_ERR);
 			return -1;
 		}
+		dol_syslog(__METHOD__.' - SQL upsert successful', LOG_DEBUG);
 
 		return 1;
 	}
