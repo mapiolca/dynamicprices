@@ -26,9 +26,6 @@ class ActionsDynamicsPrices extends CommonHookActions
 	/** @var DoliDB */
 	public $db;
 
-	/** @var string */
-	public $resPrint = '';
-
 	/**
 	 * Constructor.
 	 *
@@ -187,7 +184,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 		);
 
-		$this->resPrint = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'confirm_commande', $formquestion, 1, 1, 600, '90%');
+		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'confirm_commande', $formquestion, 1, 1, 600, '90%');
 		dol_syslog(__METHOD__.' - Custom confirmation modal rendered', LOG_DEBUG);
 		return 1;
 	}
