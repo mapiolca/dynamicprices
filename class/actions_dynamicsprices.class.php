@@ -59,8 +59,24 @@ class ActionsDynamicsPrices extends CommonHookActions
 			return 0;
 		}
 
+		if ($action === 'commande' && GETPOST('confirm', 'alpha') === 'no') {
+			dol_syslog(__METHOD__.' - Convert cancel flow to confirm_commande with skip update', LOG_DEBUG);
+			$_POST['action'] = 'confirm_commande';
+			$_REQUEST['action'] = 'confirm_commande';
+			$_POST['confirm'] = 'yes';
+			$_REQUEST['confirm'] = 'yes';
+			$_POST['dynamicsprices_skip_update'] = '1';
+			$_REQUEST['dynamicsprices_skip_update'] = '1';
+			$action = 'confirm_commande';
+		}
+
 		if ($action !== 'confirm_commande') {
 			dol_syslog(__METHOD__.' - Skip: action is not confirm_commande', LOG_DEBUG);
+			return 0;
+		}
+
+		if (GETPOST('dynamicsprices_skip_update', 'alpha') === '1') {
+			dol_syslog(__METHOD__.' - Skip update requested, continue supplier order submission', LOG_DEBUG);
 			return 0;
 		}
 
@@ -192,7 +208,16 @@ class ActionsDynamicsPrices extends CommonHookActions
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 		);
 
-		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'confirm_commande', $formquestion, 1, 1, 600, '90%');
+		$ignoreUrl = $url.'&action=confirm_commande&confirm=yes&dynamicsprices_skip_update=1';
+		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'confirm_commande', $formquestion, 1, 1, 600, '90%', '', $langs->trans('Validate'), $langs->trans('LMDB_Ignore'));
+		$this->resprints .= '<script>';
+		$this->resprints .= 'jQuery(function($){';
+		$this->resprints .= '$(document).on("click", ".ui-dialog-titlebar-close, .ui-dialog-buttonset .ui-button", function(){';
+		$this->resprints .= 'var txt=$.trim($(this).text());';
+		$this->resprints .= 'if (txt === "'.$langs->transnoentitiesnoconv('LMDB_Ignore').'" || $(this).hasClass("ui-dialog-titlebar-close")) { window.location.href = "'.$ignoreUrl.'"; }';
+		$this->resprints .= '});';
+		$this->resprints .= '});';
+		$this->resprints .= '</script>';
 		dol_syslog(__METHOD__.' - Custom confirmation modal rendered', LOG_DEBUG);
 		return 1;
 	}

@@ -66,3 +66,4 @@ LMDB_QuantityPackaging = Conditionnement des quantités
 LMDB_MinQtyPriceHT = Prix quantité min. (HT)
 LMDB_SupplierReputation = Réputation
 LMDB_SupplierPriceUpdatedCount = %s prix d'achat fournisseur ajoutés/mis à jour.
+LMDB_Ignore = Ignorer
