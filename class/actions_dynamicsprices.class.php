@@ -68,6 +68,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 		if (!is_array($selectedRows)) {
 			$selectedRows = array();
 		}
+		$postedRowsData = GETPOST('dynamicsprices_data', 'array');
+		if (!is_array($postedRowsData)) {
+			$postedRowsData = array();
+		}
 
 		$differences = $this->getOrderSupplierPriceDifferences($object);
 		if (empty($differences)) {
@@ -83,8 +87,9 @@ class ActionsDynamicsPrices extends CommonHookActions
 				continue;
 			}
 
-			dol_syslog(__METHOD__.' - Upsert supplier price for line '.$lineId.' (product '.$diff['fk_product'].')', LOG_DEBUG);
-			$res = $this->upsertSupplierPriceFromDiff($diff);
+			$preparedDiff = $this->applyPostedValuesToDiff($lineId, $diff, $postedRowsData);
+			dol_syslog(__METHOD__.' - Upsert supplier price for line '.$lineId.' (product '.$preparedDiff['fk_product'].')', LOG_DEBUG);
+			$res = $this->upsertSupplierPriceFromDiff($preparedDiff);
 			if ($res < 0) {
 				dol_syslog(__METHOD__.' - Error while upserting supplier price for line '.$lineId.': '.$this->error, LOG_ERR);
 				setEventMessages($this->error, $this->errors, 'errors');
@@ -164,15 +169,18 @@ class ActionsDynamicsPrices extends CommonHookActions
 		foreach ($differences as $lineId => $diff) {
 			$html .= '<tr class="oddeven">';
 			$html .= '<td><input type="checkbox" name="dynamicsprices_apply_line['.$lineId.']" value="1" checked></td>';
-			$html .= '<td>'.dol_escape_htmltag($diff['ref']).'</td>';
-			$html .= '<td>'.dol_escape_htmltag($diff['label']).'</td>';
-			$html .= '<td class="right">'.price($diff['qty']).'</td>';
-			$html .= '<td class="right">'.price($diff['unitquantity']).'</td>';
-			$html .= '<td class="right">'.price($diff['vat']).'</td>';
-			$html .= '<td class="right">'.price($diff['unitprice']).'</td>';
-			$html .= '<td class="right">'.price($diff['discount']).'</td>';
-			$html .= '<td class="right">'.((int) $diff['delivery_time_days']).'</td>';
-			$html .= '<td class="right">'.price($diff['supplier_reputation']).'</td>';
+			$html .= '<td><input class="minwidth75" type="text" name="dynamicsprices_data['.$lineId.'][ref]" value="'.dol_escape_htmltag($diff['ref']).'" readonly></td>';
+			$html .= '<td><input class="minwidth200" type="text" name="dynamicsprices_data['.$lineId.'][label]" value="'.dol_escape_htmltag($diff['label']).'" readonly></td>';
+			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][qty]" value="'.dol_escape_htmltag((string) $diff['qty']).'"></td>';
+			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][unitquantity]" value="'.dol_escape_htmltag((string) $diff['unitquantity']).'"></td>';
+			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][vat]" value="'.dol_escape_htmltag((string) $diff['vat']).'"></td>';
+			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][unitprice]" value="'.dol_escape_htmltag((string) $diff['unitprice']).'"></td>';
+			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][discount]" value="'.dol_escape_htmltag((string) $diff['discount']).'"></td>';
+			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][delivery_time_days]" value="'.dol_escape_htmltag((string) $diff['delivery_time_days']).'"></td>';
+			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][supplier_reputation]" value="'.dol_escape_htmltag((string) $diff['supplier_reputation']).'"></td>';
+			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_product]" value="'.((int) $diff['fk_product']).'">';
+			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_soc]" value="'.((int) $diff['fk_soc']).'">';
+			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][current_rowid]" value="'.((int) $diff['current_rowid']).'">';
 			$html .= '</tr>';
 		}
 		$html .= '</table>';
@@ -366,5 +374,35 @@ class ActionsDynamicsPrices extends CommonHookActions
 		dol_syslog(__METHOD__.' - SQL upsert successful', LOG_DEBUG);
 
 		return 1;
+	}
+
+	/**
+	 * Merge posted form values into difference payload.
+	 *
+	 * @param int $lineId Line id
+	 * @param array<string,mixed> $diff Computed difference
+	 * @param array<string,mixed> $postedRowsData Submitted rows data
+	 * @return array<string,mixed>
+	 */
+	private function applyPostedValuesToDiff($lineId, array $diff, array $postedRowsData)
+	{
+		if (empty($postedRowsData[$lineId]) || !is_array($postedRowsData[$lineId])) {
+			return $diff;
+		}
+
+		$rowData = $postedRowsData[$lineId];
+
+		$diff['qty'] = isset($rowData['qty']) ? price2num($rowData['qty'], 'MS') : $diff['qty'];
+		$diff['unitquantity'] = isset($rowData['unitquantity']) ? price2num($rowData['unitquantity'], 'MS') : $diff['unitquantity'];
+		$diff['vat'] = isset($rowData['vat']) ? price2num($rowData['vat'], 'MS') : $diff['vat'];
+		$diff['unitprice'] = isset($rowData['unitprice']) ? price2num($rowData['unitprice'], 'MS') : $diff['unitprice'];
+		$diff['discount'] = isset($rowData['discount']) ? price2num($rowData['discount'], 'MS') : $diff['discount'];
+		$diff['delivery_time_days'] = isset($rowData['delivery_time_days']) ? (int) $rowData['delivery_time_days'] : $diff['delivery_time_days'];
+		$diff['supplier_reputation'] = isset($rowData['supplier_reputation']) ? price2num($rowData['supplier_reputation'], 'MS') : $diff['supplier_reputation'];
+		$diff['fk_product'] = isset($rowData['fk_product']) ? (int) $rowData['fk_product'] : $diff['fk_product'];
+		$diff['fk_soc'] = isset($rowData['fk_soc']) ? (int) $rowData['fk_soc'] : $diff['fk_soc'];
+		$diff['current_rowid'] = isset($rowData['current_rowid']) ? (int) $rowData['current_rowid'] : $diff['current_rowid'];
+
+		return $diff;
 	}
 }
