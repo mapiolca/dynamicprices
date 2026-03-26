@@ -184,7 +184,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$html .= '<table class="noborder centpercent">';
 		$html .= '<tr class="liste_titre">';
 		$html .= '<td>'.$langs->trans('LMDB_AddOrUpdate').'</td>';
-		$html .= '<td>'.$langs->trans('Ref').'</td>';
+		$html .= '<td>'.$langs->trans('ProductRef').'</td>';
+		$html .= '<td>'.$langs->trans('LMDB_SupplierRef').'</td>';
 		$html .= '<td class="right">'.$langs->trans('QtyMin').'</td>';
 		$html .= '<td class="right">'.$langs->trans('LMDB_QuantityPackaging').'</td>';
 		$html .= '<td class="right">'.$langs->trans('VATRate').'</td>';
@@ -197,11 +198,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 		foreach ($differences as $lineId => $diff) {
 			$html .= '<tr class="oddeven">';
 			$html .= '<td><input type="checkbox" name="dynamicsprices_apply_line['.$lineId.']" value="1" checked></td>';
-			$displayRef = $diff['ref'];
-			if (!empty($diff['supplier_ref'])) {
-				$displayRef .= ' / '. $diff['supplier_ref'];
-			}
-			$html .= '<td><input class="minwidth150" type="text" name="dynamicsprices_data['.$lineId.'][ref]" value="'.dol_escape_htmltag($displayRef).'" readonly></td>';
+			$html .= '<td>'.$this->getProductNomUrl((int) $diff['fk_product'], $diff['ref']).'</td>';
+			$html .= '<td><input class="minwidth150" type="text" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'"></td>';
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][qty]" value="'.dol_escape_htmltag((string) $diff['qty']).'"></td>';
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][unitquantity]" value="'.dol_escape_htmltag((string) $diff['unitquantity']).'"></td>';
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][vat]" value="'.dol_escape_htmltag((string) $diff['vat']).'"></td>';
@@ -380,20 +378,22 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$sql .= ', tva_tx = '.price2num((float) $diff['vat'], 'MS');
 			$sql .= ', remise_percent = '.price2num((float) $diff['discount'], 'MS');
 			$sql .= ', fk_availability = '.((int) $diff['delivery_time_days']);
-			$sql .= ', supplier_reputation = '.price2num((float) $diff['supplier_reputation'], 'MS');
-			$sql .= ', fk_user = '.((int) $user->id);
+				$sql .= ', supplier_reputation = '.price2num((float) $diff['supplier_reputation'], 'MS');
+				$sql .= ', ref_fourn = '.(empty($diff['supplier_ref']) ? "''" : "'".$this->db->escape($diff['supplier_ref'])."'");
+				$sql .= ', fk_user = '.((int) $user->id);
 			$sql .= ', tms = '.$this->db->idate(dol_now());
 			$sql .= ' WHERE rowid = '.((int) $diff['current_rowid']);
 			$sql .= ' AND entity = '.((int) $conf->entity);
 		} else {
 			dol_syslog(__METHOD__.' - Insert new supplier price for product='.$diff['fk_product'].' supplier='.$diff['fk_soc'], LOG_DEBUG);
 			$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'product_fournisseur_price(';
-			$sql .= 'entity, fk_product, fk_soc, quantity, unitquantity, unitprice, price, tva_tx, remise_percent, fk_availability, supplier_reputation, fk_user, datec';
+				$sql .= 'entity, fk_product, fk_soc, ref_fourn, quantity, unitquantity, unitprice, price, tva_tx, remise_percent, fk_availability, supplier_reputation, fk_user, datec';
 			$sql .= ') VALUES (';
-			$sql .= ((int) $conf->entity).', ';
-			$sql .= ((int) $diff['fk_product']).', ';
-			$sql .= ((int) $diff['fk_soc']).', ';
-			$sql .= price2num((float) $diff['qty'], 'MS').', ';
+				$sql .= ((int) $conf->entity).', ';
+				$sql .= ((int) $diff['fk_product']).', ';
+				$sql .= ((int) $diff['fk_soc']).', ';
+				$sql .= (empty($diff['supplier_ref']) ? "''" : "'".$this->db->escape($diff['supplier_ref'])."'").', ';
+				$sql .= price2num((float) $diff['qty'], 'MS').', ';
 			$sql .= price2num((float) $diff['unitquantity'], 'MS').', ';
 			$sql .= price2num((float) $diff['unitprice'], 'MS').', ';
 			$sql .= price2num((float) $diff['unitprice'], 'MS').', ';
@@ -485,5 +485,34 @@ class ActionsDynamicsPrices extends CommonHookActions
 		}
 
 		return '';
+	}
+
+	/**
+	 * Build product ref output with getNomUrl for modal display.
+	 *
+	 * @param int $fkProduct Product id
+	 * @param string $fallbackRef Fallback ref
+	 * @return string
+	 */
+	private function getProductNomUrl($fkProduct, $fallbackRef = '')
+	{
+		static $cache = array();
+		if (isset($cache[$fkProduct])) {
+			return $cache[$fkProduct];
+		}
+
+		if ($fkProduct <= 0) {
+			return dol_escape_htmltag($fallbackRef);
+		}
+
+		dol_include_once('/product/class/product.class.php');
+		$product = new Product($this->db);
+		if ($product->fetch($fkProduct) > 0) {
+			$cache[$fkProduct] = $product->getNomUrl(1);
+			return $cache[$fkProduct];
+		}
+
+		$cache[$fkProduct] = dol_escape_htmltag($fallbackRef);
+		return $cache[$fkProduct];
 	}
 }

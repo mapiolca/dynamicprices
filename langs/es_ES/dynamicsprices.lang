@@ -65,3 +65,4 @@ LMDB_MinQtyPriceHT = Precio cantidad mínima (sin IVA)
 LMDB_SupplierReputation = Reputación
 LMDB_SupplierPriceUpdatedCount = %s precios de compra de proveedor añadidos/actualizados.
 LMDB_Ignore = Ignorar
+LMDB_SupplierRef = Ref. proveedor

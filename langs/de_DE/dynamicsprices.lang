@@ -65,3 +65,4 @@ LMDB_MinQtyPriceHT = Mindestmengenpreis (o. MwSt.)
 LMDB_SupplierReputation = Reputation
 LMDB_SupplierPriceUpdatedCount = %s Lieferanten-Einkaufspreise hinzugefügt/aktualisiert.
 LMDB_Ignore = Ignorieren
+LMDB_SupplierRef = Lieferanten-Ref.

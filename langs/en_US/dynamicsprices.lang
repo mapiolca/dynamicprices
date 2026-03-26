@@ -65,3 +65,4 @@ LMDB_MinQtyPriceHT = Min quantity price (excl. tax)
 LMDB_SupplierReputation = Reputation
 LMDB_SupplierPriceUpdatedCount = %s supplier purchase prices added/updated.
 LMDB_Ignore = Ignore
+LMDB_SupplierRef = Supplier ref
