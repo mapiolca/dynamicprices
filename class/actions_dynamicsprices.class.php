@@ -71,6 +71,13 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$_REQUEST['dynamicsprices_skip_update'] = '1';
 			$action = 'confirm_commande';
 		}
+		if ($action === 'commande' && GETPOST('confirm', 'alpha') === 'yes') {
+			dol_syslog(__METHOD__.' - Convert validate flow to confirm_commande', LOG_DEBUG);
+			dol_syslog(__METHOD__.' - WARNING trace: convert validate flow to trigger supplier price upsert', LOG_WARNING);
+			$_POST['action'] = 'confirm_commande';
+			$_REQUEST['action'] = 'confirm_commande';
+			$action = 'confirm_commande';
+		}
 
 		if ($action !== 'confirm_commande') {
 			dol_syslog(__METHOD__.' - Skip: action is not confirm_commande', LOG_DEBUG);
