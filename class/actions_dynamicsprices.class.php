@@ -48,6 +48,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	public function doActions($parameters, &$object, &$action, $hookmanager)
 	{
 		dol_syslog(__METHOD__.' - Start doActions with action='.$action, LOG_DEBUG);
+		dol_syslog(__METHOD__.' - WARNING trace: entering doActions', LOG_WARNING);
 
 		if (empty($parameters['context']) || strpos($parameters['context'], 'ordersuppliercard') === false) {
 			dol_syslog(__METHOD__.' - Skip: unsupported context', LOG_DEBUG);
@@ -61,6 +62,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 
 		if ($action === 'commande' && GETPOST('confirm', 'alpha') === 'no') {
 			dol_syslog(__METHOD__.' - Convert cancel flow to confirm_commande with skip update', LOG_DEBUG);
+			dol_syslog(__METHOD__.' - WARNING trace: convert cancel flow to continue order submission', LOG_WARNING);
 			$_POST['action'] = 'confirm_commande';
 			$_REQUEST['action'] = 'confirm_commande';
 			$_POST['confirm'] = 'yes';
@@ -77,6 +79,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 
 		if (GETPOST('dynamicsprices_skip_update', 'alpha') === '1') {
 			dol_syslog(__METHOD__.' - Skip update requested, continue supplier order submission', LOG_DEBUG);
+			dol_syslog(__METHOD__.' - WARNING trace: skip update requested', LOG_WARNING);
 			return 0;
 		}
 
@@ -95,6 +98,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		}
 
 		$differences = $this->getOrderSupplierPriceDifferences($object);
+		dol_syslog(__METHOD__.' - WARNING trace: differences computed count='.count($differences), LOG_WARNING);
 		if (empty($differences)) {
 			dol_syslog(__METHOD__.' - No supplier price difference found, nothing to update', LOG_DEBUG);
 			return 0;
@@ -109,6 +113,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			}
 
 			$preparedDiff = $this->applyPostedValuesToDiff($lineId, $diff, $postedRowsData);
+			dol_syslog(__METHOD__.' - WARNING trace: process line '.$lineId.' for supplier price upsert', LOG_WARNING);
 			dol_syslog(__METHOD__.' - Upsert supplier price for line '.$lineId.' (product '.$preparedDiff['fk_product'].')', LOG_DEBUG);
 			$res = $this->upsertSupplierPriceFromDiff($preparedDiff);
 			if ($res < 0) {
@@ -118,6 +123,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			}
 
 			$updatedLines++;
+			dol_syslog(__METHOD__.' - WARNING trace: supplier price upsert success for line '.$lineId, LOG_WARNING);
 		}
 
 		if ($updatedLines > 0) {
@@ -125,6 +131,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$langs->load('dynamicsprices@dynamicsprices');
 			setEventMessages($langs->trans('LMDB_SupplierPriceUpdatedCount', $updatedLines), null, 'mesgs');
 		}
+		dol_syslog(__METHOD__.' - WARNING trace: doActions completed with updatedLines='.$updatedLines, LOG_WARNING);
 		dol_syslog(__METHOD__.' - End doActions with '.$updatedLines.' line(s) updated', LOG_DEBUG);
 
 		return 0;
@@ -143,6 +150,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	{
 		global $langs;
 		dol_syslog(__METHOD__.' - Start formConfirm with action='.$action, LOG_DEBUG);
+		dol_syslog(__METHOD__.' - WARNING trace: entering formConfirm', LOG_WARNING);
 
 		if (empty($parameters['context']) || strpos($parameters['context'], 'ordersuppliercard') === false) {
 			dol_syslog(__METHOD__.' - Skip: unsupported context', LOG_DEBUG);
@@ -189,7 +197,11 @@ class ActionsDynamicsPrices extends CommonHookActions
 		foreach ($differences as $lineId => $diff) {
 			$html .= '<tr class="oddeven">';
 			$html .= '<td><input type="checkbox" name="dynamicsprices_apply_line['.$lineId.']" value="1" checked></td>';
-			$html .= '<td><input class="minwidth75" type="text" name="dynamicsprices_data['.$lineId.'][ref]" value="'.dol_escape_htmltag($diff['ref']).'" readonly></td>';
+			$displayRef = $diff['ref'];
+			if (!empty($diff['supplier_ref'])) {
+				$displayRef .= ' / '. $diff['supplier_ref'];
+			}
+			$html .= '<td><input class="minwidth150" type="text" name="dynamicsprices_data['.$lineId.'][ref]" value="'.dol_escape_htmltag($displayRef).'" readonly></td>';
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][qty]" value="'.dol_escape_htmltag((string) $diff['qty']).'"></td>';
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][unitquantity]" value="'.dol_escape_htmltag((string) $diff['unitquantity']).'"></td>';
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][vat]" value="'.dol_escape_htmltag((string) $diff['vat']).'"></td>';
@@ -200,6 +212,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_product]" value="'.((int) $diff['fk_product']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_soc]" value="'.((int) $diff['fk_soc']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][current_rowid]" value="'.((int) $diff['current_rowid']).'">';
+			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'">';
 			$html .= '</tr>';
 		}
 		$html .= '</table>';
@@ -282,6 +295,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 				'supplier_reputation' => $reputation,
 				'current_rowid' => !empty($current['rowid']) ? (int) $current['rowid'] : 0,
 				'ref' => isset($line->ref) ? $line->ref : '',
+				'supplier_ref' => $this->getSupplierReferenceFromLine($line, (int) $object->socid),
 				'label' => isset($line->product_label) ? $line->product_label : (isset($line->desc) ? $line->desc : ''),
 			);
 		}
@@ -391,6 +405,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$sql .= $this->db->idate(dol_now());
 			$sql .= ')';
 		}
+		dol_syslog(__METHOD__.' - WARNING trace SQL upsert='.$sql, LOG_WARNING);
 
 		$resql = $this->db->query($sql);
 		if (!$resql) {
@@ -430,8 +445,45 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$diff['fk_product'] = isset($rowData['fk_product']) ? (int) $rowData['fk_product'] : $diff['fk_product'];
 		$diff['fk_soc'] = isset($rowData['fk_soc']) ? (int) $rowData['fk_soc'] : $diff['fk_soc'];
 		$diff['current_rowid'] = isset($rowData['current_rowid']) ? (int) $rowData['current_rowid'] : $diff['current_rowid'];
+		$diff['supplier_ref'] = isset($rowData['supplier_ref']) ? $rowData['supplier_ref'] : $diff['supplier_ref'];
 		$diff['label'] = isset($rowData['label']) ? $rowData['label'] : $diff['label'];
 
 		return $diff;
+	}
+
+	/**
+	 * Get supplier reference to display next to product internal ref.
+	 *
+	 * @param CommonObjectLine $line Order line
+	 * @param int $socid Supplier id
+	 * @return string
+	 */
+	private function getSupplierReferenceFromLine($line, $socid)
+	{
+		if (!empty($line->ref_fourn)) {
+			return (string) $line->ref_fourn;
+		}
+		if (!empty($line->ref_supplier)) {
+			return (string) $line->ref_supplier;
+		}
+		if (empty($line->fk_product) || empty($socid)) {
+			return '';
+		}
+
+		$sql = 'SELECT ref_fourn FROM '.MAIN_DB_PREFIX.'product_fournisseur_price';
+		$sql .= ' WHERE fk_product = '.((int) $line->fk_product);
+		$sql .= ' AND fk_soc = '.((int) $socid);
+		$sql .= ' AND ref_fourn IS NOT NULL AND ref_fourn <> \'\'';
+		$sql .= ' ORDER BY rowid DESC';
+		$sql .= ' LIMIT 1';
+		$resql = $this->db->query($sql);
+		if ($resql && $this->db->num_rows($resql) > 0) {
+			$obj = $this->db->fetch_object($resql);
+			if ($obj && isset($obj->ref_fourn)) {
+				return (string) $obj->ref_fourn;
+			}
+		}
+
+		return '';
 	}
 }
