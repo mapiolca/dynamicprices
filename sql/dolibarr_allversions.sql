@@ -35,11 +35,23 @@ ALTER TABLE `llx_c_coefprice` ADD COLUMN `code_commercial_category` VARCHAR(50) 
 ALTER TABLE `llx_c_margin_on_cost` ADD COLUMN `code_commercial_category` VARCHAR(50) DEFAULT NULL;
 
 UPDATE `llx_c_coefprice` as t
-LEFT JOIN `llx_c_commercial_category` as cc ON cc.rowid = CAST(t.fk_nature AS UNSIGNED)
-SET t.`code_commercial_category` = cc.code
+LEFT JOIN `llx_c_commercial_category` as cc ON cc.code = t.fk_nature
+SET t.`code_commercial_category` = t.fk_nature
 WHERE (t.`code_commercial_category` IS NULL OR t.`code_commercial_category` = '') AND t.`fk_nature` IS NOT NULL AND t.`fk_nature` <> '';
 
 UPDATE `llx_c_margin_on_cost` as t
-LEFT JOIN `llx_c_commercial_category` as cc ON cc.rowid = CAST(t.code_nature AS UNSIGNED)
-SET t.`code_commercial_category` = cc.code
+LEFT JOIN `llx_c_commercial_category` as cc ON cc.code = t.code_nature
+SET t.`code_commercial_category` = t.code_nature
 WHERE (t.`code_commercial_category` IS NULL OR t.`code_commercial_category` = '') AND t.`code_nature` IS NOT NULL AND t.`code_nature` <> '';
+
+INSERT INTO `llx_c_commercial_category` (`code`, `label`, `active`)
+SELECT DISTINCT t.fk_nature, t.fk_nature, 1
+FROM `llx_c_coefprice` as t
+LEFT JOIN `llx_c_commercial_category` as cc ON cc.code = t.fk_nature
+WHERE t.fk_nature IS NOT NULL AND t.fk_nature <> '' AND cc.rowid IS NULL;
+
+INSERT INTO `llx_c_commercial_category` (`code`, `label`, `active`)
+SELECT DISTINCT t.code_nature, t.code_nature, 1
+FROM `llx_c_margin_on_cost` as t
+LEFT JOIN `llx_c_commercial_category` as cc ON cc.code = t.code_nature
+WHERE t.code_nature IS NOT NULL AND t.code_nature <> '' AND cc.rowid IS NULL;

@@ -190,7 +190,7 @@ function dynamicsprices_get_category_column_name($db, $tableName, $newColumn, $l
 // Get margin on cost percent for a commercial category
 function dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId)
 {
-	$categoryColumn = dynamicsprices_get_category_column_name($db, 'c_margin_on_cost', 'code_commercial_category', 'code_nature');
+	$categoryColumn = dynamicsprices_get_category_column_name($db, 'c_margin_on_cost', 'code_commercial_category', 'code_commercial_category');
 
 	$sql = "SELECT margin_on_cost_percent";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_margin_on_cost";
@@ -213,7 +213,7 @@ function dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId)
 function dynamicsprices_get_price_rules($db, $commercialCategoryId)
 {
 	$rules = array();
-	$categoryColumn = dynamicsprices_get_category_column_name($db, 'c_coefprice', 'code_commercial_category', 'fk_nature');
+	$categoryColumn = dynamicsprices_get_category_column_name($db, 'c_coefprice', 'code_commercial_category', 'code_commercial_category');
 
 	$sql = "SELECT pricelevel, minrate, targetrate";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_coefprice";

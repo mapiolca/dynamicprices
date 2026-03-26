@@ -296,7 +296,6 @@ class modDynamicsPrices extends DolibarrModules
 				'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
 				'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
 				'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
-				'code_nature' => $langs->trans('LMDB_FkCommercialCategoryTooltipHelp'),
 				'commercial_category_label' => $langs->trans('LMDB_CommercialCategoryLabelTooltipHelp'),
 				'margin_on_cost_percent' => $langs->trans('LMDB_MarginOnCostTooltipHelp'),
 				'label' => $langs->trans('LMDB_LabelTooltipHelp'),
@@ -631,13 +630,15 @@ class modDynamicsPrices extends DolibarrModules
 		if ($resql && $this->db->num_rows($resql) == 0) {
 			$this->db->query("ALTER TABLE ".$this->db->prefix()."c_coefprice ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
 		}
-		$this->db->query("UPDATE ".$this->db->prefix()."c_coefprice as t LEFT JOIN ".$this->db->prefix()."c_commercial_category as cc ON cc.rowid = CAST(t.fk_nature AS UNSIGNED) SET t.code_commercial_category = cc.code WHERE (t.code_commercial_category IS NULL OR t.code_commercial_category = '') AND t.fk_nature IS NOT NULL AND t.fk_nature <> ''");
+		$this->db->query("INSERT INTO ".$this->db->prefix()."c_commercial_category (code, label, active) SELECT DISTINCT t.fk_nature, t.fk_nature, 1 FROM ".$this->db->prefix()."c_coefprice as t LEFT JOIN ".$this->db->prefix()."c_commercial_category as cc ON cc.code = t.fk_nature WHERE t.fk_nature IS NOT NULL AND t.fk_nature <> '' AND cc.rowid IS NULL");
+		$this->db->query("UPDATE ".$this->db->prefix()."c_coefprice SET code_commercial_category = fk_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND fk_nature IS NOT NULL AND fk_nature <> ''");
 
 		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_margin_on_cost LIKE 'code_commercial_category'");
 		if ($resql && $this->db->num_rows($resql) == 0) {
 			$this->db->query("ALTER TABLE ".$this->db->prefix()."c_margin_on_cost ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
 		}
-		$this->db->query("UPDATE ".$this->db->prefix()."c_margin_on_cost as t LEFT JOIN ".$this->db->prefix()."c_commercial_category as cc ON cc.rowid = CAST(t.code_nature AS UNSIGNED) SET t.code_commercial_category = cc.code WHERE (t.code_commercial_category IS NULL OR t.code_commercial_category = '') AND t.code_nature IS NOT NULL AND t.code_nature <> ''");
+		$this->db->query("INSERT INTO ".$this->db->prefix()."c_commercial_category (code, label, active) SELECT DISTINCT t.code_nature, t.code_nature, 1 FROM ".$this->db->prefix()."c_margin_on_cost as t LEFT JOIN ".$this->db->prefix()."c_commercial_category as cc ON cc.code = t.code_nature WHERE t.code_nature IS NOT NULL AND t.code_nature <> '' AND cc.rowid IS NULL");
+		$this->db->query("UPDATE ".$this->db->prefix()."c_margin_on_cost SET code_commercial_category = code_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND code_nature IS NOT NULL AND code_nature <> ''");
 	}
 
 	/**
