@@ -88,6 +88,11 @@ class ActionsDynamicsPrices extends CommonHookActions
 		if (!is_array($postedRowsData)) {
 			$postedRowsData = array();
 		}
+		if (empty($selectedRows) && !empty($postedRowsData)) {
+			foreach ($postedRowsData as $lineId => $unused) {
+				$selectedRows[$lineId] = 1;
+			}
+		}
 
 		$differences = $this->getOrderSupplierPriceDifferences($object);
 		if (empty($differences)) {
@@ -172,7 +177,6 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$html .= '<tr class="liste_titre">';
 		$html .= '<td>'.$langs->trans('LMDB_AddOrUpdate').'</td>';
 		$html .= '<td>'.$langs->trans('Ref').'</td>';
-		$html .= '<td>'.$langs->trans('Description').'</td>';
 		$html .= '<td class="right">'.$langs->trans('QtyMin').'</td>';
 		$html .= '<td class="right">'.$langs->trans('LMDB_QuantityPackaging').'</td>';
 		$html .= '<td class="right">'.$langs->trans('VATRate').'</td>';
@@ -186,7 +190,6 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<tr class="oddeven">';
 			$html .= '<td><input type="checkbox" name="dynamicsprices_apply_line['.$lineId.']" value="1" checked></td>';
 			$html .= '<td><input class="minwidth75" type="text" name="dynamicsprices_data['.$lineId.'][ref]" value="'.dol_escape_htmltag($diff['ref']).'" readonly></td>';
-			$html .= '<td><input class="minwidth200" type="text" name="dynamicsprices_data['.$lineId.'][label]" value="'.dol_escape_htmltag($diff['label']).'" readonly></td>';
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][qty]" value="'.dol_escape_htmltag((string) $diff['qty']).'"></td>';
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][unitquantity]" value="'.dol_escape_htmltag((string) $diff['unitquantity']).'"></td>';
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][vat]" value="'.dol_escape_htmltag((string) $diff['vat']).'"></td>';
@@ -427,6 +430,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$diff['fk_product'] = isset($rowData['fk_product']) ? (int) $rowData['fk_product'] : $diff['fk_product'];
 		$diff['fk_soc'] = isset($rowData['fk_soc']) ? (int) $rowData['fk_soc'] : $diff['fk_soc'];
 		$diff['current_rowid'] = isset($rowData['current_rowid']) ? (int) $rowData['current_rowid'] : $diff['current_rowid'];
+		$diff['label'] = isset($rowData['label']) ? $rowData['label'] : $diff['label'];
 
 		return $diff;
 	}
