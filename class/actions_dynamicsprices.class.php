@@ -593,10 +593,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 
 		$productFournisseur->product_fourn_price_id = $targetSupplierPriceRowId;
 		dol_syslog(__METHOD__.' - Upsert supplier price through ProductFournisseur::update_buyprice product='.(int) $diff['fk_product'].' supplier='.(int) $diff['fk_soc'].' target_rowid='.$targetSupplierPriceRowId, LOG_DEBUG);
+		$qtyForApi = price2num((float) $diff['qty'], 'MS');
+		$unitpriceForApi = price2num((float) $diff['unitprice'], 'MS');
+		$buypriceForApi = price2num($unitpriceForApi * $qtyForApi, 'MS');
+		dol_syslog(__METHOD__.' - update_buyprice payload qty='.$qtyForApi.' unitprice='.$unitpriceForApi.' buyprice_for_api='.$buypriceForApi.' current_rowid='.$targetSupplierPriceRowId, LOG_DEBUG);
 
 		$resultUpdate = $productFournisseur->update_buyprice(
-			price2num((float) $diff['qty'], 'MS'),
-			price2num((float) $diff['unitprice'], 'MS'),
+			$qtyForApi,
+			$buypriceForApi,
 			$user,
 			'HT',
 			$supplier,
