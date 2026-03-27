@@ -187,9 +187,9 @@ class ActionsDynamicsPrices extends CommonHookActions
 
 		$langs->load('dynamicsprices@dynamicsprices');
 		$url = $_SERVER['PHP_SELF'].'?id='.(int) $object->id;
-		$url .= '&datecommande='.(int) GETPOST('datecommande', 'int');
-		$url .= '&methode='.urlencode(GETPOST('methodecommande', 'alpha'));
-		$url .= '&comment='.urlencode(GETPOST('comment', 'alphanohtml'));
+		$datecommande = GETPOST('datecommande', 'alphanohtml');
+		$methodecommande = GETPOST('methodecommande', 'alpha');
+		$comment = GETPOST('comment', 'alphanohtml');
 		$csrfToken = newToken();
 		$url .= '&token='.$csrfToken;
 
@@ -240,9 +240,15 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$formquestion = array(
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_modal', 'value' => '1'),
+			array('type' => 'hidden', 'name' => 'datecommande', 'value' => $datecommande),
+			array('type' => 'hidden', 'name' => 'methodecommande', 'value' => $methodecommande),
+			array('type' => 'hidden', 'name' => 'comment', 'value' => $comment),
 		);
 
 		$ignoreUrl = $url.'&action=dynamicsprices_confirm_commande&confirm=no&dynamicsprices_modal=1';
+		$ignoreUrl .= '&datecommande='.urlencode($datecommande);
+		$ignoreUrl .= '&methodecommande='.urlencode($methodecommande);
+		$ignoreUrl .= '&comment='.urlencode($comment);
 		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'dynamicsprices_confirm_commande', $formquestion, 1, 1, 600, '90%', '', $langs->trans('Validate'), $langs->trans('LMDB_Ignore'));
 		$this->resprints .= '<script>';
 		$this->resprints .= 'jQuery(function($){';
