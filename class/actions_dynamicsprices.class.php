@@ -99,6 +99,12 @@ class ActionsDynamicsPrices extends CommonHookActions
 		if (!is_array($postedRowsData)) {
 			$postedRowsData = array();
 		}
+		if (empty($selectedRows) && !empty($postedRowsData) && GETPOST('confirm', 'alpha') === 'yes') {
+			foreach (array_keys($postedRowsData) as $lineIdFromPost) {
+				$selectedRows[(int) $lineIdFromPost] = 1;
+			}
+		}
+		dol_syslog(__METHOD__.' - Selected supplier price lines='.implode(',', array_keys($selectedRows)), LOG_DEBUG);
 
 		$differences = $this->getOrderSupplierPriceDifferences($object);
 		if (empty($differences)) {
@@ -112,7 +118,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$updatedDown = 0;
 		$updatedSame = 0;
 		foreach ($differences as $lineId => $diff) {
-			if (empty($selectedRows[$lineId])) {
+			if (!array_key_exists((int) $lineId, $selectedRows) && !array_key_exists((string) $lineId, $selectedRows)) {
 				dol_syslog(__METHOD__.' - Skip line '.$lineId.' (unchecked)', LOG_DEBUG);
 				continue;
 			}
