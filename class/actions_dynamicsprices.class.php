@@ -206,6 +206,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$html .= '<td class="right">'.$langs->trans('LMDB_ProposedUnitPriceHT').'</td>';
 		$html .= '<td class="right">'.$langs->trans('LMDB_PriceDeltaHT').'</td>';
 		$html .= '<td class="center">'.$langs->trans('LMDB_PriceDirection').'</td>';
+		$html .= '<td class="right">'.$langs->trans('LMDB_AvailabilityId').'</td>';
 		$html .= '<td class="right">'.$langs->trans('Discount').'</td>';
 		$html .= '<td class="right">'.$langs->trans('DeliveryDelay').'</td>';
 		$html .= '<td class="right">'.$langs->trans('LMDB_SupplierReputation').'</td>';
@@ -223,8 +224,9 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][unitprice]" value="'.dol_escape_htmltag((string) $diff['new_unitprice']).'"></td>';
 			$html .= '<td class="right">'.dol_escape_htmltag($this->getPriceDeltaLabel($diff)).'</td>';
 			$html .= '<td class="center">'.$this->getPriceDirectionBadgeHtml($diff['price_direction']).'</td>';
+			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][fk_availability]" value="'.dol_escape_htmltag((string) $diff['fk_availability']).'"></td>';
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][discount]" value="'.dol_escape_htmltag((string) $diff['discount']).'"></td>';
-			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][delivery_time_days]" value="'.dol_escape_htmltag((string) $diff['delivery_time_days']).'"></td>';
+			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][delivery_time_days]" value="'.dol_escape_htmltag($diff['delivery_time_days'] === null ? '' : (string) $diff['delivery_time_days']).'"></td>';
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][supplier_reputation]" value="'.dol_escape_htmltag((string) $diff['supplier_reputation']).'"></td>';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_product]" value="'.((int) $diff['fk_product']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_soc]" value="'.((int) $diff['fk_soc']).'">';
@@ -290,7 +292,11 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$vat = price2num((float) $line->tva_tx, 'MS');
 			$discount = price2num((float) $line->remise_percent, 'MS');
 			$unitprice = $this->getLineUnitPrice($line);
-			$delivery = isset($line->fk_availability) ? (int) $line->fk_availability : 0;
+			$fkAvailability = isset($line->fk_availability) ? (int) $line->fk_availability : 0;
+			$deliveryTimeDays = null;
+			if (isset($line->delivery_time_days) && $line->delivery_time_days !== '') {
+				$deliveryTimeDays = (int) $line->delivery_time_days;
+			}
 			$reputation = isset($line->supplier_reputation) ? price2num((float) $line->supplier_reputation, 'MS') : 0;
 
 			$linkedSupplierPriceId = $this->getSupplierPriceIdFromOrderLine($line, (int) $object->id);
@@ -308,7 +314,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$isOtherFieldsDifferent = empty($current)
 				|| price2num((float) $current['tva_tx'], 'MS') !== $vat
 				|| price2num((float) $current['remise_percent'], 'MS') !== $discount
-				|| (int) $current['fk_availability'] !== $delivery
+				|| (int) $current['fk_availability'] !== $fkAvailability
+				|| ($deliveryTimeDays !== null && (int) $current['delivery_time_days'] !== $deliveryTimeDays)
 				|| price2num((float) $current['supplier_reputation'], 'MS') !== $reputation;
 			$isDifferent = $isPriceDifferent || $isOtherFieldsDifferent;
 
@@ -332,14 +339,15 @@ class ActionsDynamicsPrices extends CommonHookActions
 				'is_price_different' => $isPriceDifferent ? 1 : 0,
 				'is_other_fields_different' => $isOtherFieldsDifferent ? 1 : 0,
 				'discount' => $discount,
-				'delivery_time_days' => $delivery,
+				'fk_availability' => $fkAvailability,
+				'delivery_time_days' => $deliveryTimeDays,
 				'supplier_reputation' => $reputation,
 				'current_rowid' => !empty($current['rowid']) ? (int) $current['rowid'] : 0,
 				'ref' => isset($line->ref) ? $line->ref : '',
 				'supplier_ref' => $this->getSupplierReferenceFromLine($line, (int) $object->socid),
 				'label' => isset($line->product_label) ? $line->product_label : (isset($line->desc) ? $line->desc : ''),
 			);
-			dol_syslog(__METHOD__.' - Supplier price diff detected order='.(int) $object->id.' line='.(int) $line->id.' product='.(int) $line->fk_product.' supplier='.(int) $object->socid.' current='.$currentUnitprice.' proposed='.$newUnitprice.' delta='.$priceDelta.' direction='.$priceDirection, LOG_DEBUG);
+			dol_syslog(__METHOD__.' - Supplier price diff detected order='.(int) $object->id.' line='.(int) $line->id.' product='.(int) $line->fk_product.' supplier='.(int) $object->socid.' current='.$currentUnitprice.' proposed='.$newUnitprice.' delta='.$priceDelta.' direction='.$priceDirection.' fk_availability='.$fkAvailability.' delivery_time_days='.($deliveryTimeDays === null ? 'null' : $deliveryTimeDays), LOG_DEBUG);
 		}
 		dol_syslog(__METHOD__.' - Comparison completed with '.count($differences).' difference(s)', LOG_DEBUG);
 
@@ -359,7 +367,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	{
 		global $conf;
 		if (!empty($preferredRowid)) {
-			$sql = 'SELECT rowid, unitprice, tva_tx, remise_percent, fk_availability, supplier_reputation';
+			$sql = 'SELECT rowid, unitprice, tva_tx, remise_percent, fk_availability, delivery_time_days, supplier_reputation';
 			$sql .= ' FROM '.MAIN_DB_PREFIX.'product_fournisseur_price';
 			$sql .= ' WHERE rowid = '.((int) $preferredRowid);
 			$sql .= ' AND fk_product = '.((int) $fkProduct);
@@ -377,13 +385,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 						'tva_tx' => (float) $obj->tva_tx,
 						'remise_percent' => (float) $obj->remise_percent,
 						'fk_availability' => (int) $obj->fk_availability,
+						'delivery_time_days' => ($obj->delivery_time_days !== null ? (int) $obj->delivery_time_days : null),
 						'supplier_reputation' => (float) $obj->supplier_reputation,
 					);
 				}
 			}
 		}
 
-		$sql = 'SELECT rowid, unitprice, tva_tx, remise_percent, fk_availability, supplier_reputation';
+		$sql = 'SELECT rowid, unitprice, tva_tx, remise_percent, fk_availability, delivery_time_days, supplier_reputation';
 		$sql .= ' FROM '.MAIN_DB_PREFIX.'product_fournisseur_price';
 		$sql .= ' WHERE fk_product = '.((int) $fkProduct);
 		$sql .= ' AND fk_soc = '.((int) $fkSoc);
@@ -407,6 +416,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			'tva_tx' => (float) $obj->tva_tx,
 			'remise_percent' => (float) $obj->remise_percent,
 			'fk_availability' => (int) $obj->fk_availability,
+			'delivery_time_days' => ($obj->delivery_time_days !== null ? (int) $obj->delivery_time_days : null),
 			'supplier_reputation' => (float) $obj->supplier_reputation,
 		);
 	}
@@ -610,14 +620,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$user,
 			'HT',
 			$supplier,
-			((int) $diff['delivery_time_days']),
+			((int) $diff['fk_availability']),
 			(isset($diff['supplier_ref']) ? (string) $diff['supplier_ref'] : ''),
 			price2num((float) $diff['vat'], 'MS'),
 			0,
 			price2num((float) $diff['discount'], 'MS'),
 			0,
 			0,
-			((int) $diff['delivery_time_days']),
+			(isset($diff['delivery_time_days']) && $diff['delivery_time_days'] !== null ? (int) $diff['delivery_time_days'] : ''),
 			price2num((float) $diff['supplier_reputation'], 'MS')
 		);
 		if ($resultUpdate <= 0) {
@@ -654,7 +664,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$diff['vat'] = isset($rowData['vat']) ? price2num($rowData['vat'], 'MS') : $diff['vat'];
 		$diff['unitprice'] = isset($rowData['unitprice']) ? price2num($rowData['unitprice'], 'MS') : $diff['unitprice'];
 		$diff['discount'] = isset($rowData['discount']) ? price2num($rowData['discount'], 'MS') : $diff['discount'];
-		$diff['delivery_time_days'] = isset($rowData['delivery_time_days']) ? (int) $rowData['delivery_time_days'] : $diff['delivery_time_days'];
+		$diff['fk_availability'] = isset($rowData['fk_availability']) ? (int) $rowData['fk_availability'] : $diff['fk_availability'];
+		$diff['delivery_time_days'] = (isset($rowData['delivery_time_days']) && $rowData['delivery_time_days'] !== '') ? (int) $rowData['delivery_time_days'] : null;
 		$diff['supplier_reputation'] = isset($rowData['supplier_reputation']) ? price2num($rowData['supplier_reputation'], 'MS') : $diff['supplier_reputation'];
 		$diff['fk_product'] = isset($rowData['fk_product']) ? (int) $rowData['fk_product'] : $diff['fk_product'];
 		$diff['fk_soc'] = isset($rowData['fk_soc']) ? (int) $rowData['fk_soc'] : $diff['fk_soc'];

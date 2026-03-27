@@ -74,3 +74,4 @@ LMDB_PriceDirection = Variazione
 LMDB_PriceDirectionUp = AUMENTO
 LMDB_PriceDirectionDown = DIMINUZIONE
 LMDB_PriceDirectionSame = INVARIATO
+LMDB_AvailabilityId = ID disponibilità

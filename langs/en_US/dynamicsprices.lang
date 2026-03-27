@@ -74,3 +74,4 @@ LMDB_PriceDirection = Trend
 LMDB_PriceDirectionUp = INCREASE
 LMDB_PriceDirectionDown = DECREASE
 LMDB_PriceDirectionSame = UNCHANGED
+LMDB_AvailabilityId = Availability ID
