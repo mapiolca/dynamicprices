@@ -99,6 +99,16 @@ class ActionsDynamicsPrices extends CommonHookActions
 		if (!is_array($postedRowsData)) {
 			$postedRowsData = array();
 		}
+		$selectedLinesCsv = GETPOST('dynamicsprices_selected_lines', 'alphanohtml');
+		if (empty($selectedRows) && !empty($selectedLinesCsv)) {
+			$selectedLineIds = explode(',', $selectedLinesCsv);
+			foreach ($selectedLineIds as $selectedLineId) {
+				$selectedLineId = (int) trim($selectedLineId);
+				if ($selectedLineId > 0) {
+					$selectedRows[$selectedLineId] = 1;
+				}
+			}
+		}
 		if (empty($selectedRows) && !empty($postedRowsData) && GETPOST('confirm', 'alpha') === 'yes') {
 			foreach (array_keys($postedRowsData) as $lineIdFromPost) {
 				$selectedRows[(int) $lineIdFromPost] = 1;
@@ -248,6 +258,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$formquestion = array(
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_modal', 'value' => '1'),
+			array('type' => 'hidden', 'name' => 'dynamicsprices_selected_lines', 'value' => implode(',', array_keys($differences))),
 			array('type' => 'hidden', 'name' => 'datecommande', 'value' => $datecommande),
 			array('type' => 'hidden', 'name' => 'methodecommande', 'value' => $methodecommande),
 			array('type' => 'hidden', 'name' => 'comment', 'value' => $comment),
@@ -260,6 +271,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'dynamicsprices_confirm_commande', $formquestion, 1, 1, 600, '90%', '', $langs->trans('Validate'), $langs->trans('LMDB_Ignore'));
 		$this->resprints .= '<script>';
 		$this->resprints .= 'jQuery(function($){';
+		$this->resprints .= '$(document).on("click", ".ui-dialog-buttonset .ui-button", function(){';
+		$this->resprints .= 'var selected=[];';
+		$this->resprints .= '$("input[name^=\'dynamicsprices_apply_line\']:checked").each(function(){';
+		$this->resprints .= 'var m=($(this).attr("name")||"").match(/\\[(\\d+)\\]/);';
+		$this->resprints .= 'if(m&&m[1]) selected.push(m[1]);';
+		$this->resprints .= '});';
+		$this->resprints .= '$("input[name=\'dynamicsprices_selected_lines\']").val(selected.join(","));';
+		$this->resprints .= '});';
 		$this->resprints .= '$(document).on("click", ".ui-dialog-titlebar-close", function(){';
 		$this->resprints .= 'window.location.href = "'.$ignoreUrl.'";';
 		$this->resprints .= '});';
