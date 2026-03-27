@@ -210,7 +210,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$url .= '&token='.$csrfToken;
 
 		$html = '<div class="div-table-responsive">';
-		$html .= '<table class="noborder centpercent">';
+		$html .= '<table class="noborder">';
 		$html .= '<tr class="liste_titre">';
 		$html .= '<td>'.$langs->trans('LMDB_AddOrUpdate').'</td>';
 		$html .= '<td>'.$langs->trans('ProductRef').'</td>';
@@ -232,18 +232,18 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<tr class="oddeven">';
 			$html .= '<td><input type="checkbox" name="dynamicsprices_apply_line['.$lineId.']" value="1" checked></td>';
 			$html .= '<td>'.$this->getProductNomUrl((int) $diff['fk_product'], $diff['ref']).'</td>';
-			$html .= '<td><input class="minwidth150" type="text" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'"></td>';
-			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][qty]" value="'.dol_escape_htmltag((string) $diff['qty']).'"></td>';
-			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][unitquantity]" value="'.dol_escape_htmltag((string) $diff['unitquantity']).'"></td>';
-			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][vat]" value="'.dol_escape_htmltag((string) $diff['vat']).'"></td>';
+			$html .= '<td><input class="minwidth100 maxwidth150" type="text" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'"></td>';
+			$html .= '<td class="right"><input class="right width50" type="text" name="dynamicsprices_data['.$lineId.'][qty]" value="'.dol_escape_htmltag((string) $diff['qty']).'"></td>';
+			$html .= '<td class="right"><input class="right width50" type="text" name="dynamicsprices_data['.$lineId.'][unitquantity]" value="'.dol_escape_htmltag((string) $diff['unitquantity']).'"></td>';
+			$html .= '<td class="right"><input class="right width50" type="text" name="dynamicsprices_data['.$lineId.'][vat]" value="'.dol_escape_htmltag((string) $diff['vat']).'"></td>';
 			$html .= '<td class="right">'.dol_escape_htmltag((string) $diff['current_unitprice']).'</td>';
 			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][unitprice]" value="'.dol_escape_htmltag((string) $diff['new_unitprice']).'"></td>';
 			$html .= '<td class="right">'.dol_escape_htmltag($this->getPriceDeltaLabel($diff)).'</td>';
 			$html .= '<td class="center">'.$this->getPriceDirectionBadgeHtml($diff['price_direction']).'</td>';
-			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][fk_availability]" value="'.dol_escape_htmltag((string) $diff['fk_availability']).'"></td>';
-			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][discount]" value="'.dol_escape_htmltag((string) $diff['discount']).'"></td>';
-			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][delivery_time_days]" value="'.dol_escape_htmltag($diff['delivery_time_days'] === null ? '' : (string) $diff['delivery_time_days']).'"></td>';
-			$html .= '<td class="right"><input class="right width75" type="text" name="dynamicsprices_data['.$lineId.'][supplier_reputation]" value="'.dol_escape_htmltag((string) $diff['supplier_reputation']).'"></td>';
+			$html .= '<td class="right"><input class="right width50" type="text" name="dynamicsprices_data['.$lineId.'][fk_availability]" value="'.dol_escape_htmltag((string) $diff['fk_availability']).'"></td>';
+			$html .= '<td class="right"><input class="right width50" type="text" name="dynamicsprices_data['.$lineId.'][discount]" value="'.dol_escape_htmltag((string) $diff['discount']).'"></td>';
+			$html .= '<td class="right"><input class="right width50" type="text" name="dynamicsprices_data['.$lineId.'][delivery_time_days]" value="'.dol_escape_htmltag($diff['delivery_time_days'] === null ? '' : (string) $diff['delivery_time_days']).'"></td>';
+			$html .= '<td class="right"><input class="right width50" type="text" name="dynamicsprices_data['.$lineId.'][supplier_reputation]" value="'.dol_escape_htmltag((string) $diff['supplier_reputation']).'"></td>';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_product]" value="'.((int) $diff['fk_product']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_soc]" value="'.((int) $diff['fk_soc']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][current_rowid]" value="'.((int) $diff['current_rowid']).'">';
