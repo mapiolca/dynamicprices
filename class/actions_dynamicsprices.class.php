@@ -212,7 +212,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$html = '<div class="div-table-responsive">';
 		$html .= '<table class="noborder">';
 		$html .= '<tr class="liste_titre">';
-		$html .= '<td>'.$langs->trans('LMDB_AddOrUpdate').'</td>';
+		$html .= '<td>&nbsp;</td>';
 		$html .= '<td>'.$langs->trans('ProductRef').'</td>';
 		$html .= '<td>'.$langs->trans('LMDB_SupplierRef').'</td>';
 		$html .= '<td class="right">'.$langs->trans('QtyMin').'</td>';
@@ -222,7 +222,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$html .= '<td class="right">'.$langs->trans('LMDB_ProposedUnitPriceHT').'</td>';
 		$html .= '<td class="right">'.$langs->trans('LMDB_PriceDeltaHT').'</td>';
 		$html .= '<td class="center">'.$langs->trans('LMDB_PriceDirection').'</td>';
-		$html .= '<td class="right">'.$langs->trans('Discount').'</td>';
+		$html .= '<td class="right">'.$langs->trans('Discount').' (%)</td>';
 		$html .= '</tr>';
 
 		foreach ($differences as $lineId => $diff) {
@@ -237,7 +237,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<td class="right"><input class="right width50 maxwidth50" type="text" name="dynamicsprices_data['.$lineId.'][unitprice]" value="'.dol_escape_htmltag((string) $diff['new_unitprice']).'"></td>';
 			$html .= '<td class="right">'.dol_escape_htmltag($this->getPriceDeltaLabel($diff)).'</td>';
 			$html .= '<td class="center">'.$this->getPriceDirectionBadgeHtml($diff['price_direction']).'</td>';
-			$html .= '<td class="right"><input class="right width50 maxwidth50" type="text" name="dynamicsprices_data['.$lineId.'][discount]" value="'.dol_escape_htmltag((string) $diff['discount']).'"></td>';
+			$html .= '<td class="right"><input class="right width50 maxwidth50" type="text" name="dynamicsprices_data['.$lineId.'][discount]" value="'.dol_escape_htmltag((string) $diff['discount']).'" placeholder="%"></td>';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_product]" value="'.((int) $diff['fk_product']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_soc]" value="'.((int) $diff['fk_soc']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][current_rowid]" value="'.((int) $diff['current_rowid']).'">';
@@ -267,9 +267,22 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$ignoreUrl .= '&methodecommande='.urlencode($methodecommande);
 		$ignoreUrl .= '&methode='.urlencode($methodecommande);
 		$ignoreUrl .= '&comment='.urlencode($comment);
-		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'dynamicsprices_confirm_commande', $formquestion, 1, 1, 600, '90%', '', $langs->trans('Validate'), $langs->trans('LMDB_Ignore'));
+		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'dynamicsprices_confirm_commande', $formquestion, 1, 1, 0, 'auto', '', $langs->trans('Validate'), $langs->trans('LMDB_Ignore'));
 		$this->resprints .= '<script>';
 		$this->resprints .= 'jQuery(function($){';
+		$this->resprints .= 'var applyModalSizing=function(){';
+		$this->resprints .= 'var $dialog=$(".ui-dialog:has(input[name=\'dynamicsprices_modal\'])");';
+		$this->resprints .= 'if(!$dialog.length) return;';
+		$this->resprints .= 'var rows=$dialog.find("tr.oddeven").length;';
+		$this->resprints .= 'var maxHeight=Math.max(200,$(window).height()-100);';
+		$this->resprints .= 'var wantedHeight=Math.min(maxHeight,200+(rows*34));';
+		$this->resprints .= 'var wantedWidth=Math.min($(window).width()-100,Math.max(900,$dialog.find("table").outerWidth()+80));';
+		$this->resprints .= '$dialog.css("max-width",( $(window).width()-100 )+"px");';
+		$this->resprints .= '$dialog.find(".ui-dialog-content").css({"max-height":wantedHeight+"px","overflow-y":"auto"});';
+		$this->resprints .= '$dialog.dialog("option","width",wantedWidth);';
+		$this->resprints .= '};';
+		$this->resprints .= 'setTimeout(applyModalSizing,0);';
+		$this->resprints .= '$(window).on("resize", applyModalSizing);';
 		$this->resprints .= '$(document).on("click", ".ui-dialog-buttonset .ui-button", function(){';
 		$this->resprints .= 'var selected=[];';
 		$this->resprints .= '$("input[name^=\'dynamicsprices_apply_line\']:checked").each(function(){';
