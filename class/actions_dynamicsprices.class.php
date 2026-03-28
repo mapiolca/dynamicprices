@@ -99,6 +99,16 @@ class ActionsDynamicsPrices extends CommonHookActions
 		if (!is_array($postedRowsData)) {
 			$postedRowsData = array();
 		}
+		$selectedLinesCsv = GETPOST('dynamicsprices_selected_lines', 'alphanohtml');
+		if (empty($selectedRows) && !empty($selectedLinesCsv)) {
+			$selectedLineIds = explode(',', $selectedLinesCsv);
+			foreach ($selectedLineIds as $selectedLineId) {
+				$selectedLineId = (int) trim($selectedLineId);
+				if ($selectedLineId > 0) {
+					$selectedRows[$selectedLineId] = 1;
+				}
+			}
+		}
 		dol_syslog(__METHOD__.' - Selected supplier price lines='.implode(',', array_keys($selectedRows)), LOG_DEBUG);
 
 		$differences = $this->getOrderSupplierPriceDifferences($object);
