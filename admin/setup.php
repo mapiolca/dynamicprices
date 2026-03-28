@@ -136,7 +136,9 @@ function dynamicspricesGetCommercialCategoryOptions($db)
 	}
 
 	while ($obj = $db->fetch_object($resql)) {
-		$options[$obj->code] = $obj->label.' ('.$obj->code.')';
+		$label = $obj->label.' ('.$obj->code.')';
+		$options[$obj->code] = $label;
+		$options[(string) $obj->rowid] = $label;
 	}
 
 	return $options;
@@ -156,20 +158,25 @@ function dynamicspricesInjectCommercialCategorySelect($html, $form, $options)
 		return $html;
 	}
 
-	return preg_replace_callback(
-		'/<input\b[^>]*name=[\"\']code_commercial_category[\"\'][^>]*>/i',
-		function ($matches) use ($form, $options) {
-			$input = $matches[0];
-			$selected = 0;
-			if (preg_match('/value=[\"\']([^\"\']*)[\"\']/i', $input, $valueMatch)) {
-				$selected = $valueMatch[1];
-			} else {
-				$selected = GETPOST('code_commercial_category', 'aZ09');
-			}
-			return $form->selectarray('code_commercial_category', $options, $selected, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
-		},
-		$html
-	);
+	$fieldNames = array('code_commercial_category', 'fk_commercial_category', 'fk_nature', 'code_nature');
+	foreach ($fieldNames as $fieldName) {
+		$html = preg_replace_callback(
+			'/<input\b[^>]*name=[\"\']'.preg_quote($fieldName, '/').'[\"\'][^>]*>/i',
+			function ($matches) use ($form, $options, $fieldName) {
+				$input = $matches[0];
+				$selected = '';
+				if (preg_match('/value=[\"\']([^\"\']*)[\"\']/i', $input, $valueMatch)) {
+					$selected = $valueMatch[1];
+				} else {
+					$selected = GETPOST($fieldName, 'aZ09');
+				}
+				return $form->selectarray($fieldName, $options, $selected, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
+			},
+			$html
+		);
+	}
+
+	return $html;
 }
 
 
