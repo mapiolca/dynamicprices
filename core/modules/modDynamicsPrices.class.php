@@ -583,6 +583,7 @@ class modDynamicsPrices extends DolibarrModules
 		}
 
 		$this->migrateProductNatureToCommercialCategoryFor210($previousInstalledVersion);
+		$this->migrateProductNatureDictionaryToCommercialCategoryFor210($previousInstalledVersion);
 		dolibarr_set_const($this->db, 'DYNAMICSPRICES_INSTALLED_VERSION', $this->version, 'chaine', 0, '', $conf->entity);
 
 		// Permissions
@@ -711,6 +712,60 @@ class modDynamicsPrices extends DolibarrModules
 		$sqlUpdate .= " AND ".$sourceExpression." <> ''";
 		$sqlUpdate .= " AND p.entity IN (".getEntity('product').")";
 		$this->db->query($sqlUpdate);
+	}
+
+	/**
+	 * Migrate entries from product nature dictionary into commercial category dictionary for upgrades to v2.1+.
+	 *
+	 * @param string $previousInstalledVersion Previously installed module version
+	 * @return void
+	 */
+	private function migrateProductNatureDictionaryToCommercialCategoryFor210($previousInstalledVersion)
+	{
+		if (empty($previousInstalledVersion) || version_compare($previousInstalledVersion, '2.1', '>=') || version_compare($this->version, '2.1', '<')) {
+			return;
+		}
+
+		$productNatureTable = $this->db->prefix().'c_product_nature';
+		$commercialCategoryTable = $this->db->prefix().'c_commercial_category';
+		if (!$this->tableExists($productNatureTable)) {
+			return;
+		}
+
+		$codeField = $this->columnExists($productNatureTable, 'code') ? 'pn.code' : '';
+		$labelField = $this->columnExists($productNatureTable, 'label') ? 'pn.label' : '';
+		if (empty($codeField)) {
+			return;
+		}
+		if (empty($labelField)) {
+			$labelField = $codeField;
+		}
+
+		$sql = "INSERT INTO ".$commercialCategoryTable." (code, label, active)";
+		$sql .= " SELECT DISTINCT ".$codeField.", COALESCE(NULLIF(".$labelField.", ''), ".$codeField."), 1";
+		$sql .= " FROM ".$productNatureTable." as pn";
+		$sql .= " LEFT JOIN ".$commercialCategoryTable." as cc ON cc.code = ".$codeField;
+		$sql .= " WHERE ".$codeField." IS NOT NULL";
+		$sql .= " AND ".$codeField." <> ''";
+		$sql .= " AND cc.rowid IS NULL";
+		if ($this->columnExists($productNatureTable, 'active')) {
+			$sql .= " AND pn.active = 1";
+		}
+		$this->db->query($sql);
+	}
+
+	/**
+	 * Check if a table exists.
+	 *
+	 * @param string $tableName Table name
+	 * @return bool
+	 */
+	private function tableExists($tableName)
+	{
+		$sql = "SHOW TABLES LIKE '".$this->db->escape($tableName)."'";
+		$resql = $this->db->query($sql);
+
+		return ($resql && $this->db->num_rows($resql) > 0);
 	}
 
 	/**
