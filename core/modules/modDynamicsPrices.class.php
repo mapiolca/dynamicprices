@@ -537,6 +537,9 @@ class modDynamicsPrices extends DolibarrModules
 	public function init($options = '')
 	{
 		global $conf, $langs;
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+
+		$previousInstalledVersion = getDolGlobalString('DYNAMICSPRICES_INSTALLED_VERSION');
 
 		// Create tables of module at module activation
 		//$result = $this->_load_tables('/install/mysql/', 'dynamicsprices');
@@ -578,6 +581,9 @@ class modDynamicsPrices extends DolibarrModules
 				return -1;
 			}
 		}
+
+		$this->migrateProductNatureToCommercialCategoryFor210($previousInstalledVersion);
+		dolibarr_set_const($this->db, 'DYNAMICSPRICES_INSTALLED_VERSION', $this->version, 'chaine', 0, '', $conf->entity);
 
 		// Permissions
 		$this->remove($options);
@@ -638,6 +644,76 @@ class modDynamicsPrices extends DolibarrModules
 		}
 		$this->db->query("INSERT INTO ".$this->db->prefix()."c_commercial_category (code, label, active) SELECT DISTINCT t.code_nature, t.code_nature, 1 FROM ".$this->db->prefix()."c_margin_on_cost as t LEFT JOIN ".$this->db->prefix()."c_commercial_category as cc ON cc.code = t.code_nature WHERE t.code_nature IS NOT NULL AND t.code_nature <> '' AND cc.rowid IS NULL");
 		$this->db->query("UPDATE ".$this->db->prefix()."c_margin_on_cost SET code_commercial_category = code_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND code_nature IS NOT NULL AND code_nature <> ''");
+	}
+
+	/**
+	 * Migrate product nature into commercial category extrafield for upgrades to v2.1+.
+	 *
+	 * @param string $previousInstalledVersion Previously installed module version
+	 * @return void
+	 */
+	private function migrateProductNatureToCommercialCategoryFor210($previousInstalledVersion)
+	{
+		if (empty($previousInstalledVersion) || version_compare($previousInstalledVersion, '2.1', '>=') || version_compare($this->version, '2.1', '<')) {
+			return;
+		}
+
+		$productTable = $this->db->prefix().'product';
+		$productExtraTable = $this->db->prefix().'product_extrafields';
+		$sourceExpression = '';
+		$sourceFromExtrafields = false;
+
+		if ($this->columnExists($productExtraTable, 'fk_nature')) {
+			$sourceExpression = "pe.fk_nature";
+			$sourceFromExtrafields = true;
+		} elseif ($this->columnExists($productExtraTable, 'nature')) {
+			$sourceExpression = "pe.nature";
+			$sourceFromExtrafields = true;
+		} elseif ($this->columnExists($productTable, 'fk_nature')) {
+			$sourceExpression = "p.fk_nature";
+		} elseif ($this->columnExists($productTable, 'nature')) {
+			$sourceExpression = "p.nature";
+		}
+
+		if (empty($sourceExpression)) {
+			return;
+		}
+
+		if (!$sourceFromExtrafields) {
+			$sqlInsert = "INSERT INTO ".$productExtraTable." (fk_object, lmdb_commercial_category)";
+			$sqlInsert .= " SELECT p.rowid, ".$sourceExpression;
+			$sqlInsert .= " FROM ".$productTable." as p";
+			$sqlInsert .= " LEFT JOIN ".$productExtraTable." as pe ON pe.fk_object = p.rowid";
+			$sqlInsert .= " WHERE pe.fk_object IS NULL";
+			$sqlInsert .= " AND ".$sourceExpression." IS NOT NULL";
+			$sqlInsert .= " AND ".$sourceExpression." <> ''";
+			$sqlInsert .= " AND p.entity IN (".getEntity('product').")";
+			$this->db->query($sqlInsert);
+		}
+
+		$sqlUpdate = "UPDATE ".$productExtraTable." as pe";
+		$sqlUpdate .= " INNER JOIN ".$productTable." as p ON p.rowid = pe.fk_object";
+		$sqlUpdate .= " SET pe.lmdb_commercial_category = ".$sourceExpression;
+		$sqlUpdate .= " WHERE (pe.lmdb_commercial_category IS NULL OR pe.lmdb_commercial_category = '')";
+		$sqlUpdate .= " AND ".$sourceExpression." IS NOT NULL";
+		$sqlUpdate .= " AND ".$sourceExpression." <> ''";
+		$sqlUpdate .= " AND p.entity IN (".getEntity('product').")";
+		$this->db->query($sqlUpdate);
+	}
+
+	/**
+	 * Check if a column exists on a table.
+	 *
+	 * @param string $tableName Table name
+	 * @param string $columnName Column name
+	 * @return bool
+	 */
+	private function columnExists($tableName, $columnName)
+	{
+		$sql = "SHOW COLUMNS FROM ".$tableName." LIKE '".$this->db->escape($columnName)."'";
+		$resql = $this->db->query($sql);
+
+		return ($resql && $this->db->num_rows($resql) > 0);
 	}
 
 	/**
