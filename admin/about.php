@@ -16,9 +16,9 @@
  */
 
 /**
- * \file		diffusion/admin/about.php
- * \ingroup	diffusion
- * \brief	About page of Diffusion module.
+ * \file		dynamicsprices/admin/about.php
+ * \ingroup	dynamicsprices
+ * \brief	About page of DynamicsPrices module.
  */
 
 // Load Dolibarr environment
@@ -51,27 +51,27 @@ if (!$res) {
 }
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
-require_once '../lib/diffusion.lib.php';
-require_once '../core/modules/modDiffusion.class.php';
+require_once '../lib/dynamicsprices.lib.php';
+require_once '../core/modules/modDynamicsPrices.class.php';
 
 // Load translations required by this page.
-$langs->loadLangs(array('admin', 'diffusion@diffusion'));
+$langs->loadLangs(array('admin', 'dynamicsprices@dynamicsprices'));
 
 // Restrict access to administrators only.
 if (empty($user->admin)) {
 	accessforbidden();
 }
 
-$moduleDescriptor = new modDiffusion($db);
-$title = $langs->trans('DiffusionAbout');
+$moduleDescriptor = new modDynamicsPrices($db);
+$title = $langs->trans('LMDB_AboutTitle');
 
 llxHeader('', $title);
 
 print load_fiche_titre($title, '', 'info');
-$head = diffusionAdminPrepareHead();
-print dol_get_fiche_head($head, 'about', $title, -1, 'diffusion@diffusion');
+$head = dynamicspricesAdminPrepareHead();
+print dol_get_fiche_head($head, 'about', $title, -1, 'dynamicsprices@dynamicsprices');
 
-print '<div class="underbanner opacitymedium">'.$langs->trans('DiffusionAboutPage').'</div>';
+print '<div class="underbanner opacitymedium">'.$langs->trans('LMDB_AboutDescription').'</div>';
 print '<br>';
 
 print '<div class="fichecenter">';
@@ -80,11 +80,11 @@ print '<div class="fichecenter">';
 print '<div class="fichehalfleft">';
 print '<div class="div-table-responsive-no-min">';
 print '<table class="noborder centpercent">';
-print '<tr class="liste_titre"><th colspan="2">'.$langs->trans('DiffusionAboutGeneral').'</th></tr>';
-print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DiffusionAboutVersion').'</td><td>'.dol_escape_htmltag($moduleDescriptor->version).'</td></tr>';
-print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DiffusionAboutFamily').'</td><td>'.dol_escape_htmltag($moduleDescriptor->family).'</td></tr>';
-print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DiffusionAboutDescription').'</td><td>'.dol_escape_htmltag($langs->trans($moduleDescriptor->description)).'</td></tr>';
-print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DiffusionAboutMaintainer').'</td><td>'.dol_escape_htmltag($moduleDescriptor->editor_name).'</td></tr>';
+print '<tr class="liste_titre"><th colspan="2">'.$langs->trans('LMDB_AboutGeneral').'</th></tr>';
+print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('LMDB_AboutVersion').'</td><td>'.dol_escape_htmltag($moduleDescriptor->version).'</td></tr>';
+print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('LMDB_AboutFamily').'</td><td>'.dol_escape_htmltag($moduleDescriptor->family).'</td></tr>';
+print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('LMDB_AboutModuleDescription').'</td><td>'.dol_escape_htmltag($langs->trans($moduleDescriptor->description)).'</td></tr>';
+print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('LMDB_AboutMaintainer').'</td><td>'.dol_escape_htmltag($moduleDescriptor->editor_name).'</td></tr>';
 print '</table>';
 print '</div>';
 print '</div>';
@@ -93,10 +93,10 @@ print '</div>';
 print '<div class="fichehalfright">';
 print '<div class="div-table-responsive-no-min">';
 print '<table class="noborder centpercent">';
-print '<tr class="liste_titre"><th colspan="2">'.$langs->trans('DiffusionAboutResources').'</th></tr>';
-print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DiffusionAboutDocumentation').'</td><td><a href="'.dol_buildpath('/diffusion/README.md', 1).'" target="_blank" rel="noopener">'.$langs->trans('DiffusionAboutDocumentationLink').'</a></td></tr>';
-print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DiffusionAboutSupport').'</td><td>'.dol_escape_htmltag($langs->trans('DiffusionAboutSupportValue')).'</td></tr>';
-print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DiffusionAboutContact').'</td><td><a href="https://'.dol_escape_htmltag($moduleDescriptor->editor_url).'" target="_blank" rel="noopener">'.dol_escape_htmltag($moduleDescriptor->editor_url).'</a></td></tr>';
+print '<tr class="liste_titre"><th colspan="2">'.$langs->trans('LMDB_AboutResources').'</th></tr>';
+print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('LMDB_AboutDocumentation').'</td><td><a href="'.dol_buildpath('/dynamicsprices/README.md', 1).'" target="_blank" rel="noopener">'.$langs->trans('LMDB_AboutDocumentationLink').'</a></td></tr>';
+print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('LMDB_AboutSupport').'</td><td>'.dol_escape_htmltag($langs->trans('LMDB_AboutSupportValue')).'</td></tr>';
+print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('LMDB_AboutContact').'</td><td><a href="https://'.dol_escape_htmltag($moduleDescriptor->editor_url).'" target="_blank" rel="noopener">'.dol_escape_htmltag($moduleDescriptor->editor_url).'</a></td></tr>';
 print '</table>';
 print '</div>';
 print '</div>';
