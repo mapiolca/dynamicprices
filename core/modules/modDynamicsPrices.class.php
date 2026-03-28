@@ -536,7 +536,7 @@ class modDynamicsPrices extends DolibarrModules
 	 */
 	public function init($options = '')
 	{
-		global $conf, $langs;
+		global $conf;
 
 		// Create tables of module at module activation
 		//$result = $this->_load_tables('/install/mysql/', 'dynamicsprices');
