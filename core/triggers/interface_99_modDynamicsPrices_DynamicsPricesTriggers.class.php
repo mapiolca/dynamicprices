@@ -81,7 +81,7 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 			$productId = $this->resolveProductIdFromTriggerAction($db, $action, $object);
 			$product = new Product($db);
 			if ($productId > 0 && $product->fetch($productId) > 0) {
-				if ((int) $product->type !== Product::TYPE_PRODUCT) {
+				if (!in_array((int) $product->type, array(Product::TYPE_PRODUCT, Product::TYPE_SERVICE), true)) {
 					return 0;
 				}
 			}

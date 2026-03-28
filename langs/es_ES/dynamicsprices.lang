@@ -27,7 +27,7 @@ LMDB_ErrorUpdate = Error al actualizar:
 LMDB_NbLinesUpdated = Número de precios de venta actualizados:
 Fk_nature = Categoría comercial
 Fk_commercial_category = Categoría comercial
-Code_commercial_category = Categoría comercial
+Code_commercial_category = Código de la categoría comercial
 Margin_on_cost_percent = Tasa de margen sobre el precio de coste
 Code_nature = Categoría comercial
 Pricelevel = Código del nivel de precios
@@ -75,3 +75,11 @@ LMDB_PriceDirectionUp = SUBIDA
 LMDB_PriceDirectionDown = BAJADA
 LMDB_PriceDirectionSame = SIN CAMBIOS
 LMDB_AvailabilityId = ID disponibilidad
+
+
+LMDB_About = Acerca de
+LMDB_AboutTitle = Acerca del módulo
+LMDB_AboutDescription = Información general sobre el módulo DynamicsPrices.
+
+LMDB_AboutGeneral = Información general
+LMDB_AboutResources = Recursos

@@ -97,22 +97,6 @@ if (!$user->admin) {
 // Actions on module constants
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
-// Ensure commercial category code columns exist for dictionaries compatibility.
-// This keeps setup page functional before/after SQL migration scripts execution.
-$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_coefprice LIKE 'code_commercial_category'");
-if ($resql && $db->num_rows($resql) == 0) {
-	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_coefprice ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
-}
-$db->query("INSERT INTO ".MAIN_DB_PREFIX."c_commercial_category (code, label, active) SELECT DISTINCT t.fk_nature, t.fk_nature, 1 FROM ".MAIN_DB_PREFIX."c_coefprice as t LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON cc.code = t.fk_nature WHERE t.fk_nature IS NOT NULL AND t.fk_nature <> '' AND cc.rowid IS NULL");
-$db->query("UPDATE ".MAIN_DB_PREFIX."c_coefprice SET code_commercial_category = fk_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND fk_nature IS NOT NULL AND fk_nature <> ''");
-
-$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_margin_on_cost LIKE 'code_commercial_category'");
-if ($resql && $db->num_rows($resql) == 0) {
-	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_margin_on_cost ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
-}
-$db->query("INSERT INTO ".MAIN_DB_PREFIX."c_commercial_category (code, label, active) SELECT DISTINCT t.code_nature, t.code_nature, 1 FROM ".MAIN_DB_PREFIX."c_margin_on_cost as t LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON cc.code = t.code_nature WHERE t.code_nature IS NOT NULL AND t.code_nature <> '' AND cc.rowid IS NULL");
-$db->query("UPDATE ".MAIN_DB_PREFIX."c_margin_on_cost SET code_commercial_category = code_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND code_nature IS NOT NULL AND code_nature <> ''");
-
 // Load dictionary definitions
 $module = new modDynamicsPrices($db);
 $taborder = empty($module->dictionaries['taborder']) ? array() : $module->dictionaries['taborder'];

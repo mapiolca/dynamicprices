@@ -63,12 +63,12 @@ function dynamicspricesAdminPrepareHead()
 	$head[$h][2] = 'myobject_extrafieldsline';
 	$h++;
 	*/
-	/*
-	$head[$h][0] = dol_buildpath("/dynamicsprices/admin/other.php", 1);
-	$head[$h][1] = $langs->trans("About");
+	$head[$h][0] = dol_buildpath("/dynamicsprices/admin/about.php", 1);
+	$head[$h][1] = $langs->trans("LMDB_About");
 	$head[$h][2] = 'about';
 	$h++;
 
+	/*
 	// Show more tabs from modules
 	// Entries must be declared in modules descriptor with line
 	//$this->tabs = array(
@@ -84,7 +84,6 @@ function dynamicspricesAdminPrepareHead()
 
 	return $head;
 }
-
 
 // Check if a product is a Kit using product associations
 function dynamicsprices_is_kit($db, $productId)
@@ -410,30 +409,30 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		$entity = $conf->entity;
 	
 		if ($productid > 0) {
-		$product = new Product($db);
-		if ($product->fetch($productid) > 0 && (int) $product->type !== Product::TYPE_PRODUCT) {
-		return 0;
-		}
-		$products[] = $productid;
+			$product = new Product($db);
+			if ($product->fetch($productid) > 0 && !in_array((int) $product->type, array(Product::TYPE_PRODUCT, Product::TYPE_SERVICE), true)) {
+				return 0;
+			}
+			$products[] = $productid;
 		} else {
-		$sql = "SELECT p.rowid, cc.code as code_commercial_category";
-		$sql .= " FROM ".MAIN_DB_PREFIX."product";
-		$sql .= " as p";
-		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
-		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON (cc.rowid = ef.lmdb_commercial_category OR BINARY cc.code = BINARY ef.lmdb_commercial_category)";
-		$sql .= " WHERE p.tosell = 1";
-		$sql .= " AND p.fk_product_type = 0";
-		$sql .= " AND p.entity IN (".getEntity('product').")";
-	
-		$resql = $db->query($sql);
-		if ($resql === false) {
-		dol_print_error($db);
-		return 0;
-		}
-	
-		while ($obj = $db->fetch_object($resql)) {
-		$products[] = array('id' => $obj->rowid, 'commercial_category' => $obj->code_commercial_category);
-		}
+			$sql = "SELECT p.rowid, cc.code as code_commercial_category";
+			$sql .= " FROM ".MAIN_DB_PREFIX."product";
+			$sql .= " as p";
+			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
+			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON (cc.rowid = ef.lmdb_commercial_category OR BINARY cc.code = BINARY ef.lmdb_commercial_category)";
+			$sql .= " WHERE p.tosell = 1";
+			$sql .= " AND p.fk_product_type IN (0,1)";
+			$sql .= " AND p.entity IN (".getEntity('product').")";
+		
+			$resql = $db->query($sql);
+			if ($resql === false) {
+				dol_print_error($db);
+				return 0;
+			}
+		
+			while ($obj = $db->fetch_object($resql)) {
+				$products[] = array('id' => $obj->rowid, 'commercial_category' => $obj->code_commercial_category);
+			}
 		}
 	
 		foreach ($products as $prod) {
@@ -441,8 +440,8 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		$commercialCategoryId = is_array($prod) ? ((int) $prod['commercial_category']) : dynamicsprices_get_product_commercial_category($db, $prodid);
 		$product = new Product($db);
 		$product->fetch($prodid);
-		if ((int) $product->type !== Product::TYPE_PRODUCT) {
-		continue;
+		if (!in_array((int) $product->type, array(Product::TYPE_PRODUCT, Product::TYPE_SERVICE), true)) {
+			continue;
 		}
 		$tva_tx = (float) $product->tva_tx;
 	
@@ -504,30 +503,30 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		$entity = $conf->entity;
 	
 		if ($productid > 0) {
-		$product = new Product($db);
-		if ($product->fetch($productid) > 0 && (int) $product->type !== Product::TYPE_PRODUCT) {
-		return 0;
-		}
-		$products[] = $productid;
+			$product = new Product($db);
+			if ($product->fetch($productid) > 0 && !in_array((int) $product->type, array(Product::TYPE_PRODUCT, Product::TYPE_SERVICE), true)) {
+				return 0;
+			}
+			$products[] = $productid;
 		} else {
-		$sql = "SELECT p.rowid, p.cost_price, cc.code as code_commercial_category";
-		$sql .= " FROM ".MAIN_DB_PREFIX."product";
-		$sql .= " as p";
-		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
-		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON (cc.rowid = ef.lmdb_commercial_category OR BINARY cc.code = BINARY ef.lmdb_commercial_category)";
-		$sql .= " WHERE p.tosell = 1";
-		$sql .= " AND p.fk_product_type = 0";
-		$sql .= " AND p.entity IN (".getEntity('product').")";
-	
-		$resql = $db->query($sql);
-		if ($resql === false) {
-		dol_print_error($db);
-		return 0;
-		}
-	
-		while ($obj = $db->fetch_object($resql)) {
-		$products[] = array('id' => $obj->rowid, 'commercial_category' => $obj->code_commercial_category, 'cost_price' => $obj->cost_price);
-		}
+			$sql = "SELECT p.rowid, p.cost_price, cc.code as code_commercial_category";
+			$sql .= " FROM ".MAIN_DB_PREFIX."product";
+			$sql .= " as p";
+			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
+			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON (cc.rowid = ef.lmdb_commercial_category OR BINARY cc.code = BINARY ef.lmdb_commercial_category)";
+			$sql .= " WHERE p.tosell = 1";
+			$sql .= " AND p.fk_product_type IN (0,1)";
+			$sql .= " AND p.entity IN (".getEntity('product').")";
+		
+			$resql = $db->query($sql);
+			if ($resql === false) {
+				dol_print_error($db);
+				return 0;
+			}
+		
+			while ($obj = $db->fetch_object($resql)) {
+				$products[] = array('id' => $obj->rowid, 'commercial_category' => $obj->code_commercial_category, 'cost_price' => $obj->cost_price);
+			}
 		}
 	
 		foreach ($products as $prod) {
@@ -536,8 +535,8 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		$currentCost = is_array($prod) ? $prod['cost_price'] : 0;
 		$product = new Product($db);
 		$product->fetch($prodid);
-		if ((int) $product->type !== Product::TYPE_PRODUCT) {
-		continue;
+		if (!in_array((int) $product->type, array(Product::TYPE_PRODUCT, Product::TYPE_SERVICE), true)) {
+			continue;
 		}
 		$tva_tx = (float) $product->tva_tx;
 	
