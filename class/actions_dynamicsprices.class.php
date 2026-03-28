@@ -210,7 +210,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 
 		$langs->load('dynamicsprices@dynamicsprices');
 		$url = $_SERVER['PHP_SELF'].'?id='.(int) $object->id;
-		$datecommande = GETPOST('datecommande', 'alphanohtml');
+		$datecommande = dol_mktime(
+			GETPOSTINT('rehour'),
+			GETPOSTINT('remin'),
+			GETPOSTINT('resec'),
+			GETPOSTINT('remonth'),
+			GETPOSTINT('reday'),
+			GETPOSTINT('reyear')
+		);
 		$methodecommande = GETPOST('methodecommande', 'alpha');
 		$comment = GETPOST('comment', 'alphanohtml');
 		$csrfToken = newToken();
