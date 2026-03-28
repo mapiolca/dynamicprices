@@ -283,6 +283,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= '$dialog.css("max-width",( $(window).width()-100 )+"px");';
 		$this->resprints .= '$dialog.find(".ui-dialog-content").css({"max-height":wantedHeight+"px","overflow-y":"auto"});';
 		$this->resprints .= '$dialog.dialog("option","width",wantedWidth);';
+		$this->resprints .= '$dialog.dialog("option","position",{my:"center",at:"center",of:window});';
 		$this->resprints .= '};';
 		$this->resprints .= 'setTimeout(applyModalSizing,0);';
 		$this->resprints .= '$(window).on("resize", applyModalSizing);';
