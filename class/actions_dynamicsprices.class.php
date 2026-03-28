@@ -215,8 +215,13 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$comment = GETPOST('comment', 'alphanohtml');
 		$csrfToken = newToken();
 		$url .= '&token='.$csrfToken;
+		$rowCount = count($displayDifferences);
+		$dialogBaseHeight = 170;
+		$rowHeight = 42;
+		$targetDialogHeight = max(200, $dialogBaseHeight + ($rowCount * $rowHeight));
+		$dialogBodyHeight = max(120, $targetDialogHeight - 120);
 
-		$html = '<div class="div-table-responsive">';
+		$html = '<div id="dynamicsprices_diff_wrapper" class="div-table-responsive" style="height:'.$dialogBodyHeight.'px;max-height:'.$dialogBodyHeight.'px;overflow:auto;">';
 		$html .= '<table class="noborder">';
 		$html .= '<tr class="liste_titre">';
 		$html .= '<td>&nbsp;</td>';
@@ -274,11 +279,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$ignoreUrl .= '&methodecommande='.urlencode($methodecommande);
 		$ignoreUrl .= '&methode='.urlencode($methodecommande);
 		$ignoreUrl .= '&comment='.urlencode($comment);
-		$rowCount = count($displayDifferences);
-		$dialogBaseHeight = 170;
-		$rowHeight = 42;
-		$targetDialogHeight = max(200, $dialogBaseHeight + ($rowCount * $rowHeight));
-		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'dynamicsprices_confirm_commande', $formquestion, 1, 1, 0, 'auto', '', $langs->trans('Validate'), $langs->trans('LMDB_Ignore'));
+		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'dynamicsprices_confirm_commande', $formquestion, 1, 1, 0, (string) $targetDialogHeight, '', $langs->trans('Validate'), $langs->trans('LMDB_Ignore'));
 		$this->resprints .= '<script>';
 		$this->resprints .= 'jQuery(function($){';
 		$this->resprints .= 'var updateSelectedLines=function(){';
@@ -295,18 +296,12 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= 'var $content=$dialog.find(".ui-dialog-content");';
 		$this->resprints .= 'if(!$content.length) return;';
 		$this->resprints .= 'var viewportHeight=$(window).height();';
-		$this->resprints .= 'var maxDialogHeight=Math.max(200,viewportHeight-100);';
-		$this->resprints .= 'var targetDialogHeight=Math.min(maxDialogHeight,'.((int) $targetDialogHeight).');';
 		$this->resprints .= 'var wantedWidth=Math.min($(window).width()-100,Math.max(900,$dialog.find("table").outerWidth()+80));';
-		$this->resprints .= '$dialog.css({"max-width":($(window).width()-100)+"px","max-height":maxDialogHeight+"px"});';
+		$this->resprints .= '$dialog.css({"max-width":($(window).width()-100)+"px"});';
 		$this->resprints .= '$content.dialog("option","width",wantedWidth);';
-		$this->resprints .= 'var chromeHeight=Math.max(0,$dialog.outerHeight()-$content.outerHeight());';
-		$this->resprints .= 'var contentHeight=Math.max(120,targetDialogHeight-chromeHeight);';
-		$this->resprints .= '$dialog.find(".ui-dialog-content").css({"height":contentHeight+"px","max-height":contentHeight+"px","overflow-y":"auto"});';
-		$this->resprints .= '$dialog.find("#dynamicsprices_diff_wrapper").css({"height":Math.max(80,contentHeight-20)+"px","max-height":Math.max(80,contentHeight-20)+"px","overflow-y":"auto"});';
 		$this->resprints .= '$content.dialog("option","position",{my:"center",at:"center",of:window,collision:"fit"});';
 		$this->resprints .= 'var left=Math.max(0,($(window).width()-$dialog.outerWidth())/2);';
-		$this->resprints .= 'var top=Math.max(50,$(window).scrollTop()+((viewportHeight-$dialog.outerHeight())/2));';
+		$this->resprints .= 'var top=Math.max(10,$(window).scrollTop()+((viewportHeight-$dialog.outerHeight())/2));';
 		$this->resprints .= '$dialog.css({left:left+"px",top:top+"px"});';
 		$this->resprints .= '};';
 		$this->resprints .= 'setTimeout(applyModalSizing,0);';
