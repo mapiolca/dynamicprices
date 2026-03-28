@@ -232,7 +232,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<tr class="oddeven">';
 			$html .= '<td><input type="checkbox" name="dynamicsprices_apply_line['.$lineId.']" value="1" checked></td>';
 			$html .= '<td>'.$this->getProductNomUrl((int) $diff['fk_product'], $diff['ref']).'</td>';
-			$html .= '<td><input class="width75 maxwidth50" type="text" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'"></td>';
+			$html .= '<td><input class="width75 maxwidth100" type="text" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'"></td>';
 			$html .= '<td class="right"><input class="center width50" type="text" name="dynamicsprices_data['.$lineId.'][qty]" value="'.dol_escape_htmltag((string) $diff['qty']).'"></td>';
 			$html .= '<td class="right"><input class="center width100" type="text" name="dynamicsprices_data['.$lineId.'][unitquantity]" value="'.dol_escape_htmltag((string) $diff['unitquantity']).'"></td>';
 			$html .= '<td class="right"><input class="center width50" type="text" name="dynamicsprices_data['.$lineId.'][vat]" value="'.dol_escape_htmltag((string) $diff['vat']).'"></td>';
