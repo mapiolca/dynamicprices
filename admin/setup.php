@@ -235,6 +235,7 @@ print '<table class="noborder" width="100%">';
 setup_print_title($langs->trans("LMDB_UpdateOptions"));
 setup_print_on_off('LMDB_COST_PRICE_ONLY');
 setup_print_on_off('LMDB_SUPPLIER_BUYPRICE_ALTERED');
+setup_print_on_off('LMDB_ADD_UPDATE_SUPPLIER_PRICE_ON_SUBMIT');
 setup_print_on_off('LMDB_KIT_PRICE_FROM_COMPONENTS');
 
 print '</table>';

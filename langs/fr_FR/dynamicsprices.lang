@@ -58,7 +58,22 @@ LMDB_commercialcategories = Catégories commerciales
 LMDB_CommercialCategoryExtrafield = Catégorie commerciale
 LMDB_LabelTooltipHelp = Libellé de l'entrée du dictionnaire
 LMDB_ActiveTooltipHelp = Statut actif de l'entrée du dictionnaire
-
-
-
-
+LMDB_ADD_UPDATE_SUPPLIER_PRICE_ON_SUBMIT = Lors de l'envoi d'une commande fournisseur, proposer l'ajout/la mise à jour des prix d'achat fournisseur depuis les lignes de commande.
+LMDB_SupplierPriceModalTitle = Mise à jour des prix d'achat fournisseur
+LMDB_SupplierPriceModalDescription = Des différences de prix d'achat ont été détectées. Cochez les lignes à enregistrer.
+LMDB_AddOrUpdate = Ajouter/Mettre à jour
+LMDB_QuantityPackaging = Conditionnement des quantités
+LMDB_MinQtyPriceHT = Prix quantité min. (HT)
+LMDB_SupplierReputation = Réputation
+LMDB_SupplierPriceUpdatedCount = %s prix d'achat fournisseur ajoutés/mis à jour.
+LMDB_SupplierPriceUpdatedCountWithDirection = %s prix fournisseur mis à jour (%s hausse(s), %s baisse(s), %s inchangé(s)).
+LMDB_Ignore = Ignorer
+LMDB_SupplierRef = Réf. fournisseur
+LMDB_CurrentUnitPriceHT = Prix unitaire actuel (HT)
+LMDB_ProposedUnitPriceHT = Prix unitaire proposé (HT)
+LMDB_PriceDeltaHT = Écart (HT)
+LMDB_PriceDirection = Évolution
+LMDB_PriceDirectionUp = HAUSSE
+LMDB_PriceDirectionDown = BAISSE
+LMDB_PriceDirectionSame = INCHANGÉ
+LMDB_AvailabilityId = ID disponibilité
