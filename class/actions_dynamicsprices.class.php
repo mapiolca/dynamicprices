@@ -301,8 +301,9 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= '$dialog.css({"max-width":($(window).width()-100)+"px","max-height":maxDialogHeight+"px"});';
 		$this->resprints .= '$content.dialog("option","width",wantedWidth);';
 		$this->resprints .= 'var chromeHeight=Math.max(0,$dialog.outerHeight()-$content.outerHeight());';
-		$this->resprints .= 'var contentMaxHeight=Math.max(120,targetDialogHeight-chromeHeight);';
-		$this->resprints .= '$dialog.find(".ui-dialog-content").css({"height":"auto","max-height":contentMaxHeight+"px","overflow-y":"auto"});';
+		$this->resprints .= 'var contentHeight=Math.max(120,targetDialogHeight-chromeHeight);';
+		$this->resprints .= '$dialog.find(".ui-dialog-content").css({"height":contentHeight+"px","max-height":contentHeight+"px","overflow-y":"auto"});';
+		$this->resprints .= '$dialog.find("#dynamicsprices_diff_wrapper").css({"height":Math.max(80,contentHeight-20)+"px","max-height":Math.max(80,contentHeight-20)+"px","overflow-y":"auto"});';
 		$this->resprints .= '$content.dialog("option","position",{my:"center",at:"center",of:window,collision:"fit"});';
 		$this->resprints .= 'var left=Math.max(0,($(window).width()-$dialog.outerWidth())/2);';
 		$this->resprints .= 'var top=Math.max(50,$(window).scrollTop()+((viewportHeight-$dialog.outerHeight())/2));';
