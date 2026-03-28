@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS `llx_c_commercial_category`(
 
 ALTER TABLE `llx_c_coefprice` ADD COLUMN `code_commercial_category` VARCHAR(50) DEFAULT NULL;
 ALTER TABLE `llx_c_margin_on_cost` ADD COLUMN `code_commercial_category` VARCHAR(50) DEFAULT NULL;
+ALTER TABLE `llx_c_coefprice` ADD COLUMN `entity` INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE `llx_c_margin_on_cost` ADD COLUMN `entity` INTEGER NOT NULL DEFAULT 1;
 
 UPDATE `llx_c_coefprice` as t
 LEFT JOIN `llx_c_commercial_category` as cc ON cc.code = t.fk_nature
