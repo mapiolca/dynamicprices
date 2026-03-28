@@ -125,6 +125,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$updatedSame = 0;
 		foreach ($priceDifferences as $lineId => $diff) {
 			if (!array_key_exists((int) $lineId, $selectedRows) && !array_key_exists((string) $lineId, $selectedRows)) {
+				$updatedSame++;
 				dol_syslog(__METHOD__.' - Skip line '.$lineId.' (unchecked)', LOG_DEBUG);
 				continue;
 			}
@@ -150,7 +151,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			dol_syslog(__METHOD__.' - Applied supplier price update on order='.(int) $object->id.' line='.(int) $lineId.' product='.(int) $preparedDiff['fk_product'].' supplier='.(int) $preparedDiff['fk_soc'].' current='.(isset($preparedDiff['current_unitprice']) ? price2num((float) $preparedDiff['current_unitprice'], 'MS') : 0).' new='.price2num((float) $preparedDiff['unitprice'], 'MS').' delta='.(isset($preparedDiff['price_delta']) ? price2num((float) $preparedDiff['price_delta'], 'MS') : 0).' direction='.$direction, LOG_DEBUG);
 		}
 
-		if ($updatedLines > 0) {
+		if ($updatedLines > 0 || $updatedSame > 0) {
 			global $langs;
 			$langs->load('dynamicsprices@dynamicsprices');
 			setEventMessages($langs->trans('LMDB_SupplierPriceUpdatedCountWithDirection', $updatedLines, $updatedUp, $updatedDown, $updatedSame), null, 'mesgs');
