@@ -111,7 +111,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		}
 		dol_syslog(__METHOD__.' - Selected supplier price lines='.implode(',', array_keys($selectedRows)), LOG_DEBUG);
 
-		$differences = $this->getOrderSupplierPriceDifferences($object);
+		$differences = $this->getOrderSupplierPriceDifferences($object, true);
 		$priceDifferences = $this->filterPriceDifferences($differences);
 		if (empty($priceDifferences)) {
 			dol_syslog(__METHOD__.' - No supplier unit price difference found, nothing to update', LOG_DEBUG);
@@ -123,6 +123,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$updatedUp = 0;
 		$updatedDown = 0;
 		$updatedSame = 0;
+		foreach ($differences as $lineId => $diff) {
+			if (!array_key_exists((int) $lineId, $selectedRows) && !array_key_exists((string) $lineId, $selectedRows)) {
+				continue;
+			}
+			if (!array_key_exists((int) $lineId, $priceDifferences) && !array_key_exists((string) $lineId, $priceDifferences)) {
+				$updatedSame++;
+			}
+		}
 		foreach ($priceDifferences as $lineId => $diff) {
 			if (!array_key_exists((int) $lineId, $selectedRows) && !array_key_exists((string) $lineId, $selectedRows)) {
 				$updatedSame++;
