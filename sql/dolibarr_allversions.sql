@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS `llx_c_margin_on_cost`(
 
 CREATE TABLE IF NOT EXISTS `llx_c_commercial_category`(
 `rowid`INTEGER AUTO_INCREMENT PRIMARY KEY NOT NULL,
+`entity`INTEGER NOT NULL DEFAULT '1',
 `code`VARCHAR(50) NOT NULL,
 `label`VARCHAR(255) NOT NULL,
 `active`TINYINT NOT NULL DEFAULT '1'
@@ -33,6 +34,7 @@ CREATE TABLE IF NOT EXISTS `llx_c_commercial_category`(
 
 ALTER TABLE `llx_c_coefprice` ADD COLUMN `code_commercial_category` VARCHAR(50) DEFAULT NULL;
 ALTER TABLE `llx_c_margin_on_cost` ADD COLUMN `code_commercial_category` VARCHAR(50) DEFAULT NULL;
+ALTER TABLE `llx_c_commercial_category` ADD COLUMN `entity` INTEGER NOT NULL DEFAULT 1;
 
 UPDATE `llx_c_coefprice` as t
 LEFT JOIN `llx_c_commercial_category` as cc ON cc.code = t.fk_nature
@@ -44,14 +46,14 @@ LEFT JOIN `llx_c_commercial_category` as cc ON cc.code = t.code_nature
 SET t.`code_commercial_category` = t.code_nature
 WHERE (t.`code_commercial_category` IS NULL OR t.`code_commercial_category` = '') AND t.`code_nature` IS NOT NULL AND t.`code_nature` <> '';
 
-INSERT INTO `llx_c_commercial_category` (`code`, `label`, `active`)
-SELECT DISTINCT t.fk_nature, t.fk_nature, 1
+INSERT INTO `llx_c_commercial_category` (`entity`, `code`, `label`, `active`)
+SELECT DISTINCT 1, t.fk_nature, t.fk_nature, 1
 FROM `llx_c_coefprice` as t
 LEFT JOIN `llx_c_commercial_category` as cc ON cc.code = t.fk_nature
 WHERE t.fk_nature IS NOT NULL AND t.fk_nature <> '' AND cc.rowid IS NULL;
 
-INSERT INTO `llx_c_commercial_category` (`code`, `label`, `active`)
-SELECT DISTINCT t.code_nature, t.code_nature, 1
+INSERT INTO `llx_c_commercial_category` (`entity`, `code`, `label`, `active`)
+SELECT DISTINCT 1, t.code_nature, t.code_nature, 1
 FROM `llx_c_margin_on_cost` as t
 LEFT JOIN `llx_c_commercial_category` as cc ON cc.code = t.code_nature
 WHERE t.code_nature IS NOT NULL AND t.code_nature <> '' AND cc.rowid IS NULL;

@@ -260,7 +260,7 @@ class modDynamicsPrices extends DolibarrModules
 			'tabsql' => array(
 				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, cc.label as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.code = t.code_commercial_category WHERE t.entity = '.((int) $conf->entity),
 				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, cc.label as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.code = t.code_commercial_category WHERE t.entity = '.((int) $conf->entity),
-				'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t',
+				'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity = '.((int) $conf->entity),
 			),
 			'tabsqlsort' => array(
 				"code ASC",
@@ -275,12 +275,12 @@ class modDynamicsPrices extends DolibarrModules
 			'tabfieldvalue' => array(
 				"code,entity,code_commercial_category,pricelevel,targetrate,minrate",
 				"code,entity,code_commercial_category,margin_on_cost_percent",
-				"code,label",
+				"code,entity,label",
 			),
 			'tabfieldinsert' => array(
 				"code,entity,code_commercial_category,pricelevel,targetrate,minrate",
 				"code,entity,code_commercial_category,margin_on_cost_percent",
-				"code,label",
+				"code,entity,label",
 			),
 			'tabrowid' => array('rowid', 'rowid', 'rowid'),
 			'tabcond' => array(
@@ -536,7 +536,7 @@ class modDynamicsPrices extends DolibarrModules
 	 */
 	public function init($options = '')
 	{
-		global $conf, $langs;
+		global $conf;
 
 		// Create tables of module at module activation
 		//$result = $this->_load_tables('/install/mysql/', 'dynamicsprices');
@@ -544,9 +544,6 @@ class modDynamicsPrices extends DolibarrModules
 		if ($result < 0) {
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
 		}
-
-		// Ensure migration columns exist when module is activated/updated.
-		$this->ensureCommercialCategoryColumns();
 
 		// Create product/service extrafield during init.
 		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
@@ -616,28 +613,6 @@ class modDynamicsPrices extends DolibarrModules
 		}
 
 		return $this->_init($sql, $options);
-	}
-
-	/**
-	 * Ensure commercial category columns exist and are populated.
-	 *
-	 * @return void
-	 */
-	private function ensureCommercialCategoryColumns()
-	{
-		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_coefprice LIKE 'code_commercial_category'");
-		if ($resql && $this->db->num_rows($resql) == 0) {
-			$this->db->query("ALTER TABLE ".$this->db->prefix()."c_coefprice ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
-		}
-		$this->db->query("INSERT INTO ".$this->db->prefix()."c_commercial_category (code, label, active) SELECT DISTINCT t.fk_nature, t.fk_nature, 1 FROM ".$this->db->prefix()."c_coefprice as t LEFT JOIN ".$this->db->prefix()."c_commercial_category as cc ON cc.code = t.fk_nature WHERE t.fk_nature IS NOT NULL AND t.fk_nature <> '' AND cc.rowid IS NULL");
-		$this->db->query("UPDATE ".$this->db->prefix()."c_coefprice SET code_commercial_category = fk_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND fk_nature IS NOT NULL AND fk_nature <> ''");
-
-		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_margin_on_cost LIKE 'code_commercial_category'");
-		if ($resql && $this->db->num_rows($resql) == 0) {
-			$this->db->query("ALTER TABLE ".$this->db->prefix()."c_margin_on_cost ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
-		}
-		$this->db->query("INSERT INTO ".$this->db->prefix()."c_commercial_category (code, label, active) SELECT DISTINCT t.code_nature, t.code_nature, 1 FROM ".$this->db->prefix()."c_margin_on_cost as t LEFT JOIN ".$this->db->prefix()."c_commercial_category as cc ON cc.code = t.code_nature WHERE t.code_nature IS NOT NULL AND t.code_nature <> '' AND cc.rowid IS NULL");
-		$this->db->query("UPDATE ".$this->db->prefix()."c_margin_on_cost SET code_commercial_category = code_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND code_nature IS NOT NULL AND code_nature <> ''");
 	}
 
 	/**
