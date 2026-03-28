@@ -179,7 +179,7 @@ function dynamicsprices_run_manual_migrations($db)
 	$ok = ($ok && (bool) $res);
 
 	if (dynamicsprices_table_exists($db, $productNatureTable)) {
-		$res = $db->query("INSERT INTO ".$commercialCategoryTable." (code, label, active) SELECT DISTINCT pn.code, COALESCE(NULLIF(pn.label, ''), pn.code), 1 FROM ".$productNatureTable." as pn LEFT JOIN ".$commercialCategoryTable." as cc ON cc.code = pn.code WHERE pn.code IS NOT NULL AND pn.code <> '' AND cc.rowid IS NULL");
+		$res = $db->query("INSERT INTO ".$commercialCategoryTable." (code, label, active) SELECT DISTINCT CAST(pn.code AS CHAR), COALESCE(NULLIF(TRIM(CAST(pn.label AS CHAR)), ''), CAST(pn.code AS CHAR)), 1 FROM ".$productNatureTable." as pn LEFT JOIN ".$commercialCategoryTable." as cc ON cc.code = CAST(pn.code AS CHAR) WHERE pn.code IS NOT NULL AND CAST(pn.code AS CHAR) <> '' AND cc.rowid IS NULL");
 		dol_syslog(__FUNCTION__.' - Insert categories from c_product_nature result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
 		$ok = ($ok && (bool) $res);
 	} else {
