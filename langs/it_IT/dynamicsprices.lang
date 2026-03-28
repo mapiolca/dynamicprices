@@ -75,3 +75,11 @@ LMDB_PriceDirectionUp = AUMENTO
 LMDB_PriceDirectionDown = DIMINUZIONE
 LMDB_PriceDirectionSame = INVARIATO
 LMDB_AvailabilityId = ID disponibilità
+
+LMDB_MigrationScriptsExecuted = Script di migrazione eseguiti correttamente.
+LMDB_MigrationScriptsExecutedWithErrors = Script di migrazione eseguiti con errori. Controllare i log.
+LMDB_RunMigrationScripts = Script di migrazione
+LMDB_RunMigrationScriptsDesc = Esegue manualmente gli script di migrazione del modulo (schema e dati).
+LMDB_RunMigrationScriptsHelp = Usa questo pulsante per eseguire le migrazioni dopo un aggiornamento o per recupero dati.
+LMDB_RunMigrationScriptsButton = Esegui script
+LMDB_ClickButtonToRun = Fare clic sul pulsante per eseguire gli script.

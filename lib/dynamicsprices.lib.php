@@ -85,6 +85,138 @@ function dynamicspricesAdminPrepareHead()
 	return $head;
 }
 
+/**
+ * Check if a table exists.
+ *
+ * @param DoliDB $db Database handler
+ * @param string $tableName Table name
+ * @return bool
+ */
+function dynamicsprices_table_exists($db, $tableName)
+{
+	$sql = "SHOW TABLES LIKE '".$db->escape($tableName)."'";
+	$resql = $db->query($sql);
+
+	return ($resql && $db->num_rows($resql) > 0);
+}
+
+/**
+ * Check if a column exists on a table.
+ *
+ * @param DoliDB $db Database handler
+ * @param string $tableName Table name
+ * @param string $columnName Column name
+ * @return bool
+ */
+function dynamicsprices_column_exists($db, $tableName, $columnName)
+{
+	$sql = "SHOW COLUMNS FROM ".$tableName." LIKE '".$db->escape($columnName)."'";
+	$resql = $db->query($sql);
+
+	return ($resql && $db->num_rows($resql) > 0);
+}
+
+/**
+ * Run migration scripts manually from setup page.
+ *
+ * @param DoliDB $db Database handler
+ * @return bool
+ */
+function dynamicsprices_run_manual_migrations($db)
+{
+	dol_syslog(__FUNCTION__.' - Start manual migrations', LOG_DEBUG);
+	$ok = true;
+
+	$coefpriceTable = MAIN_DB_PREFIX."c_coefprice";
+	$marginOnCostTable = MAIN_DB_PREFIX."c_margin_on_cost";
+	$commercialCategoryTable = MAIN_DB_PREFIX."c_commercial_category";
+	$productNatureTable = MAIN_DB_PREFIX."c_product_nature";
+	$productTable = MAIN_DB_PREFIX."product";
+	$productExtraTable = MAIN_DB_PREFIX."product_extrafields";
+
+	if (!dynamicsprices_column_exists($db, $coefpriceTable, 'entity')) {
+		$res = $db->query("ALTER TABLE ".$coefpriceTable." ADD COLUMN entity INTEGER NOT NULL DEFAULT 1");
+		dol_syslog(__FUNCTION__.' - Add c_coefprice.entity result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+		$ok = ($ok && (bool) $res);
+	}
+	$res = $db->query("UPDATE ".$coefpriceTable." SET entity = 1 WHERE entity IS NULL");
+	dol_syslog(__FUNCTION__.' - Normalize c_coefprice.entity result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+	$ok = ($ok && (bool) $res);
+
+	if (!dynamicsprices_column_exists($db, $coefpriceTable, 'code_commercial_category')) {
+		$res = $db->query("ALTER TABLE ".$coefpriceTable." ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
+		dol_syslog(__FUNCTION__.' - Add c_coefprice.code_commercial_category result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+		$ok = ($ok && (bool) $res);
+	}
+
+	$res = $db->query("INSERT INTO ".$commercialCategoryTable." (code, label, active) SELECT DISTINCT t.fk_nature, t.fk_nature, 1 FROM ".$coefpriceTable." as t LEFT JOIN ".$commercialCategoryTable." as cc ON cc.code = t.fk_nature WHERE t.fk_nature IS NOT NULL AND t.fk_nature <> '' AND cc.rowid IS NULL");
+	dol_syslog(__FUNCTION__.' - Insert categories from c_coefprice result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+	$ok = ($ok && (bool) $res);
+	$res = $db->query("UPDATE ".$coefpriceTable." SET code_commercial_category = fk_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND fk_nature IS NOT NULL AND fk_nature <> ''");
+	dol_syslog(__FUNCTION__.' - Fill c_coefprice.code_commercial_category result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+	$ok = ($ok && (bool) $res);
+
+	if (!dynamicsprices_column_exists($db, $marginOnCostTable, 'entity')) {
+		$res = $db->query("ALTER TABLE ".$marginOnCostTable." ADD COLUMN entity INTEGER NOT NULL DEFAULT 1");
+		dol_syslog(__FUNCTION__.' - Add c_margin_on_cost.entity result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+		$ok = ($ok && (bool) $res);
+	}
+	$res = $db->query("UPDATE ".$marginOnCostTable." SET entity = 1 WHERE entity IS NULL");
+	dol_syslog(__FUNCTION__.' - Normalize c_margin_on_cost.entity result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+	$ok = ($ok && (bool) $res);
+
+	if (!dynamicsprices_column_exists($db, $marginOnCostTable, 'code_commercial_category')) {
+		$res = $db->query("ALTER TABLE ".$marginOnCostTable." ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
+		dol_syslog(__FUNCTION__.' - Add c_margin_on_cost.code_commercial_category result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+		$ok = ($ok && (bool) $res);
+	}
+
+	$res = $db->query("INSERT INTO ".$commercialCategoryTable." (code, label, active) SELECT DISTINCT t.code_nature, t.code_nature, 1 FROM ".$marginOnCostTable." as t LEFT JOIN ".$commercialCategoryTable." as cc ON cc.code = t.code_nature WHERE t.code_nature IS NOT NULL AND t.code_nature <> '' AND cc.rowid IS NULL");
+	dol_syslog(__FUNCTION__.' - Insert categories from c_margin_on_cost result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+	$ok = ($ok && (bool) $res);
+	$res = $db->query("UPDATE ".$marginOnCostTable." SET code_commercial_category = code_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND code_nature IS NOT NULL AND code_nature <> ''");
+	dol_syslog(__FUNCTION__.' - Fill c_margin_on_cost.code_commercial_category result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+	$ok = ($ok && (bool) $res);
+
+	if (dynamicsprices_table_exists($db, $productNatureTable)) {
+		$res = $db->query("INSERT INTO ".$commercialCategoryTable." (code, label, active) SELECT DISTINCT pn.code, COALESCE(NULLIF(pn.label, ''), pn.code), 1 FROM ".$productNatureTable." as pn LEFT JOIN ".$commercialCategoryTable." as cc ON cc.code = pn.code WHERE pn.code IS NOT NULL AND pn.code <> '' AND cc.rowid IS NULL");
+		dol_syslog(__FUNCTION__.' - Insert categories from c_product_nature result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+		$ok = ($ok && (bool) $res);
+	} else {
+		dol_syslog(__FUNCTION__.' - Table c_product_nature not found, skip dictionary copy', LOG_WARNING);
+	}
+
+	$sourceExpression = '';
+	$sourceFromExtrafields = false;
+	if (dynamicsprices_column_exists($db, $productExtraTable, 'fk_nature')) {
+		$sourceExpression = "pe.fk_nature";
+		$sourceFromExtrafields = true;
+	} elseif (dynamicsprices_column_exists($db, $productExtraTable, 'nature')) {
+		$sourceExpression = "pe.nature";
+		$sourceFromExtrafields = true;
+	} elseif (dynamicsprices_column_exists($db, $productTable, 'fk_nature')) {
+		$sourceExpression = "p.fk_nature";
+	} elseif (dynamicsprices_column_exists($db, $productTable, 'nature')) {
+		$sourceExpression = "p.nature";
+	}
+
+	if (!empty($sourceExpression)) {
+		if (!$sourceFromExtrafields) {
+			$res = $db->query("INSERT INTO ".$productExtraTable." (fk_object, lmdb_commercial_category) SELECT p.rowid, ".$sourceExpression." FROM ".$productTable." as p LEFT JOIN ".$productExtraTable." as pe ON pe.fk_object = p.rowid WHERE pe.fk_object IS NULL AND ".$sourceExpression." IS NOT NULL AND ".$sourceExpression." <> '' AND p.entity IN (".getEntity('product').")");
+			dol_syslog(__FUNCTION__.' - Insert product_extrafields rows result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+			$ok = ($ok && (bool) $res);
+		}
+		$res = $db->query("UPDATE ".$productExtraTable." as pe INNER JOIN ".$productTable." as p ON p.rowid = pe.fk_object SET pe.lmdb_commercial_category = ".$sourceExpression." WHERE (pe.lmdb_commercial_category IS NULL OR pe.lmdb_commercial_category = '') AND ".$sourceExpression." IS NOT NULL AND ".$sourceExpression." <> '' AND p.entity IN (".getEntity('product').")");
+		dol_syslog(__FUNCTION__.' - Update product_extrafields.lmdb_commercial_category result='.((int) $res), $res ? LOG_DEBUG : LOG_ERR);
+		$ok = ($ok && (bool) $res);
+	} else {
+		dol_syslog(__FUNCTION__.' - No product nature source found, skip extrafield migration', LOG_WARNING);
+	}
+
+	dol_syslog(__FUNCTION__.' - End manual migrations status='.((int) $ok), $ok ? LOG_DEBUG : LOG_ERR);
+	return $ok;
+}
+
 
 // Check if a product is a Kit using product associations
 function dynamicsprices_is_kit($db, $productId)

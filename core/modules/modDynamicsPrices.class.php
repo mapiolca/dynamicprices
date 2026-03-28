@@ -549,9 +549,6 @@ class modDynamicsPrices extends DolibarrModules
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
 		}
 
-		// Ensure migration columns exist when module is activated/updated.
-		$this->ensureCommercialCategoryColumns();
-
 		// Create product/service extrafield during init.
 		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 		$extrafields = new ExtraFields($this->db);
@@ -583,8 +580,6 @@ class modDynamicsPrices extends DolibarrModules
 			}
 		}
 
-		$this->migrateProductNatureToCommercialCategoryFor210($previousInstalledVersion);
-		$this->migrateProductNatureDictionaryToCommercialCategoryFor210($previousInstalledVersion);
 		dolibarr_set_const($this->db, 'DYNAMICSPRICES_INSTALLED_VERSION', $this->version, 'chaine', 0, '', $conf->entity);
 		dol_syslog(__METHOD__.' - Stored DYNAMICSPRICES_INSTALLED_VERSION='.$this->version, LOG_DEBUG);
 

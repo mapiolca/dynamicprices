@@ -97,33 +97,14 @@ if (!$user->admin) {
 // Actions on module constants
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
-// Ensure commercial category code columns exist for dictionaries compatibility.
-// This keeps setup page functional before/after SQL migration scripts execution.
-$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_coefprice LIKE 'entity'");
-if ($resql && $db->num_rows($resql) == 0) {
-	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_coefprice ADD COLUMN entity INTEGER NOT NULL DEFAULT 1");
+if ($action === 'run_migration_scripts') {
+	$resultMigration = dynamicsprices_run_manual_migrations($db);
+	if ($resultMigration) {
+		setEventMessages($langs->trans('LMDB_MigrationScriptsExecuted'), null, 'mesgs');
+	} else {
+		setEventMessages($langs->trans('LMDB_MigrationScriptsExecutedWithErrors'), null, 'errors');
+	}
 }
-$db->query("UPDATE ".MAIN_DB_PREFIX."c_coefprice SET entity = 1 WHERE entity IS NULL");
-
-$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_coefprice LIKE 'code_commercial_category'");
-if ($resql && $db->num_rows($resql) == 0) {
-	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_coefprice ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
-}
-$db->query("INSERT INTO ".MAIN_DB_PREFIX."c_commercial_category (code, label, active) SELECT DISTINCT t.fk_nature, t.fk_nature, 1 FROM ".MAIN_DB_PREFIX."c_coefprice as t LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON cc.code = t.fk_nature WHERE t.fk_nature IS NOT NULL AND t.fk_nature <> '' AND cc.rowid IS NULL");
-$db->query("UPDATE ".MAIN_DB_PREFIX."c_coefprice SET code_commercial_category = fk_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND fk_nature IS NOT NULL AND fk_nature <> ''");
-
-$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_margin_on_cost LIKE 'code_commercial_category'");
-if ($resql && $db->num_rows($resql) == 0) {
-	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_margin_on_cost ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
-}
-$resql = $db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."c_margin_on_cost LIKE 'entity'");
-if ($resql && $db->num_rows($resql) == 0) {
-	$db->query("ALTER TABLE ".MAIN_DB_PREFIX."c_margin_on_cost ADD COLUMN entity INTEGER NOT NULL DEFAULT 1");
-}
-$db->query("UPDATE ".MAIN_DB_PREFIX."c_margin_on_cost SET entity = 1 WHERE entity IS NULL");
-
-$db->query("INSERT INTO ".MAIN_DB_PREFIX."c_commercial_category (code, label, active) SELECT DISTINCT t.code_nature, t.code_nature, 1 FROM ".MAIN_DB_PREFIX."c_margin_on_cost as t LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON cc.code = t.code_nature WHERE t.code_nature IS NOT NULL AND t.code_nature <> '' AND cc.rowid IS NULL");
-$db->query("UPDATE ".MAIN_DB_PREFIX."c_margin_on_cost SET code_commercial_category = code_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND code_nature IS NOT NULL AND code_nature <> ''");
 
 // Load dictionary definitions
 $module = new modDynamicsPrices($db);
@@ -249,6 +230,20 @@ setup_print_on_off('LMDB_COST_PRICE_ONLY');
 setup_print_on_off('LMDB_SUPPLIER_BUYPRICE_ALTERED');
 setup_print_on_off('LMDB_ADD_UPDATE_SUPPLIER_PRICE_ON_SUBMIT');
 setup_print_on_off('LMDB_KIT_PRICE_FROM_COMPONENTS');
+print '<tr>';
+print '<td>';
+print $form->textwithtooltip($langs->trans('LMDB_RunMigrationScripts'), $langs->trans('LMDB_RunMigrationScriptsHelp'), 2, 1, img_help(1, ''));
+print '<br><small>'.$langs->trans('LMDB_RunMigrationScriptsDesc').'</small>';
+print '</td>';
+print '<td class="center" width="20">&nbsp;</td>';
+print '<td class="right">';
+print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+print '<input type="hidden" name="action" value="run_migration_scripts">';
+print '<input type="submit" class="button button-edit" value="'.$langs->trans('LMDB_RunMigrationScriptsButton').'">';
+print '</form>';
+print '</td>';
+print '</tr>';
 
 print '</table>';
 
