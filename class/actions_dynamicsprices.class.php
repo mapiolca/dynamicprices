@@ -274,6 +274,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$ignoreUrl .= '&methodecommande='.urlencode($methodecommande);
 		$ignoreUrl .= '&methode='.urlencode($methodecommande);
 		$ignoreUrl .= '&comment='.urlencode($comment);
+		$rowCount = count($displayDifferences);
+		$dialogBaseHeight = 170;
+		$rowHeight = 42;
+		$targetDialogHeight = max(200, $dialogBaseHeight + ($rowCount * $rowHeight));
 		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'dynamicsprices_confirm_commande', $formquestion, 1, 1, 0, 'auto', '', $langs->trans('Validate'), $langs->trans('LMDB_Ignore'));
 		$this->resprints .= '<script>';
 		$this->resprints .= 'jQuery(function($){';
@@ -290,12 +294,9 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= 'if(!$dialog.length) return;';
 		$this->resprints .= 'var $content=$dialog.find(".ui-dialog-content");';
 		$this->resprints .= 'if(!$content.length) return;';
-		$this->resprints .= 'var rows=$dialog.find("tr.oddeven").length;';
 		$this->resprints .= 'var viewportHeight=$(window).height();';
 		$this->resprints .= 'var maxDialogHeight=Math.max(200,viewportHeight-100);';
-		$this->resprints .= 'var rowHeight=42;';
-		$this->resprints .= 'var dialogBaseHeight=170;';
-		$this->resprints .= 'var targetDialogHeight=Math.min(maxDialogHeight,dialogBaseHeight+(rows*rowHeight));';
+		$this->resprints .= 'var targetDialogHeight=Math.min(maxDialogHeight,'.((int) $targetDialogHeight).');';
 		$this->resprints .= 'var wantedWidth=Math.min($(window).width()-100,Math.max(900,$dialog.find("table").outerWidth()+80));';
 		$this->resprints .= '$dialog.css({"max-width":($(window).width()-100)+"px","max-height":maxDialogHeight+"px"});';
 		$this->resprints .= '$content.dialog("option","width",wantedWidth);';
