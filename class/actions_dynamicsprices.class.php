@@ -109,14 +109,9 @@ class ActionsDynamicsPrices extends CommonHookActions
 				}
 			}
 		}
-		if (empty($selectedRows) && !empty($postedRowsData) && GETPOST('confirm', 'alpha') === 'yes') {
-			foreach (array_keys($postedRowsData) as $lineIdFromPost) {
-				$selectedRows[(int) $lineIdFromPost] = 1;
-			}
-		}
 		dol_syslog(__METHOD__.' - Selected supplier price lines='.implode(',', array_keys($selectedRows)), LOG_DEBUG);
 
-		$differences = $this->getOrderSupplierPriceDifferences($object);
+		$differences = $this->getOrderSupplierPriceDifferences($object, true);
 		$priceDifferences = $this->filterPriceDifferences($differences);
 		if (empty($priceDifferences)) {
 			dol_syslog(__METHOD__.' - No supplier unit price difference found, nothing to update', LOG_DEBUG);
@@ -128,8 +123,17 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$updatedUp = 0;
 		$updatedDown = 0;
 		$updatedSame = 0;
+		foreach ($differences as $lineId => $diff) {
+			if (!array_key_exists((int) $lineId, $selectedRows) && !array_key_exists((string) $lineId, $selectedRows)) {
+				continue;
+			}
+			if (!array_key_exists((int) $lineId, $priceDifferences) && !array_key_exists((string) $lineId, $priceDifferences)) {
+				$updatedSame++;
+			}
+		}
 		foreach ($priceDifferences as $lineId => $diff) {
 			if (!array_key_exists((int) $lineId, $selectedRows) && !array_key_exists((string) $lineId, $selectedRows)) {
+				$updatedSame++;
 				dol_syslog(__METHOD__.' - Skip line '.$lineId.' (unchecked)', LOG_DEBUG);
 				continue;
 			}
@@ -155,7 +159,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			dol_syslog(__METHOD__.' - Applied supplier price update on order='.(int) $object->id.' line='.(int) $lineId.' product='.(int) $preparedDiff['fk_product'].' supplier='.(int) $preparedDiff['fk_soc'].' current='.(isset($preparedDiff['current_unitprice']) ? price2num((float) $preparedDiff['current_unitprice'], 'MS') : 0).' new='.price2num((float) $preparedDiff['unitprice'], 'MS').' delta='.(isset($preparedDiff['price_delta']) ? price2num((float) $preparedDiff['price_delta'], 'MS') : 0).' direction='.$direction, LOG_DEBUG);
 		}
 
-		if ($updatedLines > 0) {
+		if ($updatedLines > 0 || $updatedSame > 0) {
 			global $langs;
 			$langs->load('dynamicsprices@dynamicsprices');
 			setEventMessages($langs->trans('LMDB_SupplierPriceUpdatedCountWithDirection', $updatedLines, $updatedUp, $updatedDown, $updatedSame), null, 'mesgs');
@@ -258,7 +262,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$formquestion = array(
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_modal', 'value' => '1'),
-			array('type' => 'hidden', 'name' => 'dynamicsprices_selected_lines', 'value' => implode(',', array_keys($displayDifferences))),
+			array('type' => 'hidden', 'name' => 'dynamicsprices_selected_lines', 'value' => ''),
 			array('type' => 'hidden', 'name' => 'datecommande', 'value' => $datecommande),
 			array('type' => 'hidden', 'name' => 'methodecommande', 'value' => $methodecommande),
 			array('type' => 'hidden', 'name' => 'methode', 'value' => $methodecommande),
@@ -273,6 +277,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'dynamicsprices_confirm_commande', $formquestion, 1, 1, 0, 'auto', '', $langs->trans('Validate'), $langs->trans('LMDB_Ignore'));
 		$this->resprints .= '<script>';
 		$this->resprints .= 'jQuery(function($){';
+		$this->resprints .= 'var updateSelectedLines=function(){';
+		$this->resprints .= 'var selected=[];';
+		$this->resprints .= '$("input[name^=\'dynamicsprices_apply_line\']:checked").each(function(){';
+		$this->resprints .= 'var m=($(this).attr("name")||"").match(/\\[(\\d+)\\]/);';
+		$this->resprints .= 'if(m&&m[1]) selected.push(m[1]);';
+		$this->resprints .= '});';
+		$this->resprints .= '$("input[name=\'dynamicsprices_selected_lines\']").val(selected.join(","));';
+		$this->resprints .= '};';
 		$this->resprints .= 'var applyModalSizing=function(){';
 		$this->resprints .= 'var $dialog=$(".ui-dialog:has(input[name=\'dynamicsprices_modal\'])");';
 		$this->resprints .= 'if(!$dialog.length) return;';
@@ -291,15 +303,13 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= '$dialog.css({left:left+"px",top:top+"px"});';
 		$this->resprints .= '};';
 		$this->resprints .= 'setTimeout(applyModalSizing,0);';
+		$this->resprints .= 'setTimeout(updateSelectedLines,0);';
 		$this->resprints .= '$(window).on("resize", applyModalSizing);';
+		$this->resprints .= '$(document).on("change", "input[name^=\'dynamicsprices_apply_line\']", updateSelectedLines);';
+		$this->resprints .= '$(document).on("submit", "form", updateSelectedLines);';
 		$this->resprints .= '$(document).on("click", ".ui-dialog-buttonset .ui-button", function(){';
 		$this->resprints .= 'if($.trim($(this).text())==="'.$langs->transnoentitiesnoconv('LMDB_Ignore').'"){window.location.href="'.$ignoreUrl.'";return false;}';
-		$this->resprints .= 'var selected=[];';
-		$this->resprints .= '$("input[name^=\'dynamicsprices_apply_line\']:checked").each(function(){';
-		$this->resprints .= 'var m=($(this).attr("name")||"").match(/\\[(\\d+)\\]/);';
-		$this->resprints .= 'if(m&&m[1]) selected.push(m[1]);';
-		$this->resprints .= '});';
-		$this->resprints .= '$("input[name=\'dynamicsprices_selected_lines\']").val(selected.join(","));';
+		$this->resprints .= 'updateSelectedLines();';
 		$this->resprints .= '});';
 		$this->resprints .= '$(document).on("click", ".ui-dialog-titlebar-close", function(){';
 		$this->resprints .= 'window.location.href = "'.$ignoreUrl.'";';
