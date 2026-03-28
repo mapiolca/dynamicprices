@@ -293,7 +293,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= 'var rows=$dialog.find("tr.oddeven").length;';
 		$this->resprints .= 'var viewportHeight=$(window).height();';
 		$this->resprints .= 'var maxDialogHeight=Math.max(200,viewportHeight-100);';
-		$this->resprints .= 'var rowHeight=34;';
+		$this->resprints .= 'var rowHeight=42;';
 		$this->resprints .= 'var dialogBaseHeight=170;';
 		$this->resprints .= 'var targetDialogHeight=Math.min(maxDialogHeight,dialogBaseHeight+(rows*rowHeight));';
 		$this->resprints .= 'var wantedWidth=Math.min($(window).width()-100,Math.max(900,$dialog.find("table").outerWidth()+80));';
