@@ -63,12 +63,12 @@ function dynamicspricesAdminPrepareHead()
 	$head[$h][2] = 'myobject_extrafieldsline';
 	$h++;
 	*/
-	/*
-	$head[$h][0] = dol_buildpath("/dynamicsprices/admin/other.php", 1);
-	$head[$h][1] = $langs->trans("About");
+	$head[$h][0] = dol_buildpath("/dynamicsprices/admin/about.php", 1);
+	$head[$h][1] = $langs->trans("LMDB_About");
 	$head[$h][2] = 'about';
 	$h++;
 
+	/*
 	// Show more tabs from modules
 	// Entries must be declared in modules descriptor with line
 	//$this->tabs = array(

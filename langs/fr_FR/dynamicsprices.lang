@@ -78,3 +78,7 @@ LMDB_PriceDirectionDown = BAISSE
 LMDB_PriceDirectionSame = INCHANGÉ
 LMDB_AvailabilityId = ID disponibilité
 
+
+LMDB_About = A propos
+LMDB_AboutTitle = A propos du module
+LMDB_AboutDescription = Informations generales sur le module DynamicsPrices.
