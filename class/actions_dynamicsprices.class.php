@@ -253,7 +253,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$formquestion = array(
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_modal', 'value' => '1'),
-			array('type' => 'hidden', 'name' => 'dynamicsprices_selected_lines', 'value' => implode(',', array_keys($displayDifferences))),
+			array('type' => 'hidden', 'name' => 'dynamicsprices_selected_lines', 'value' => ''),
 			array('type' => 'hidden', 'name' => 'datecommande', 'value' => $datecommande),
 			array('type' => 'hidden', 'name' => 'methodecommande', 'value' => $methodecommande),
 			array('type' => 'hidden', 'name' => 'methode', 'value' => $methodecommande),
@@ -268,6 +268,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'dynamicsprices_confirm_commande', $formquestion, 1, 1, 0, 'auto', '', $langs->trans('Validate'), $langs->trans('LMDB_Ignore'));
 		$this->resprints .= '<script>';
 		$this->resprints .= 'jQuery(function($){';
+		$this->resprints .= 'var updateSelectedLines=function(){';
+		$this->resprints .= 'var selected=[];';
+		$this->resprints .= '$("input[name^=\'dynamicsprices_apply_line\']:checked").each(function(){';
+		$this->resprints .= 'var m=($(this).attr("name")||"").match(/\\[(\\d+)\\]/);';
+		$this->resprints .= 'if(m&&m[1]) selected.push(m[1]);';
+		$this->resprints .= '});';
+		$this->resprints .= '$("input[name=\'dynamicsprices_selected_lines\']").val(selected.join(","));';
+		$this->resprints .= '};';
 		$this->resprints .= 'var applyModalSizing=function(){';
 		$this->resprints .= 'var $dialog=$(".ui-dialog:has(input[name=\'dynamicsprices_modal\'])");';
 		$this->resprints .= 'if(!$dialog.length) return;';
@@ -286,15 +294,13 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= '$dialog.css({left:left+"px",top:top+"px"});';
 		$this->resprints .= '};';
 		$this->resprints .= 'setTimeout(applyModalSizing,0);';
+		$this->resprints .= 'setTimeout(updateSelectedLines,0);';
 		$this->resprints .= '$(window).on("resize", applyModalSizing);';
+		$this->resprints .= '$(document).on("change", "input[name^=\'dynamicsprices_apply_line\']", updateSelectedLines);';
+		$this->resprints .= '$(document).on("submit", "form", updateSelectedLines);';
 		$this->resprints .= '$(document).on("click", ".ui-dialog-buttonset .ui-button", function(){';
 		$this->resprints .= 'if($.trim($(this).text())==="'.$langs->transnoentitiesnoconv('LMDB_Ignore').'"){window.location.href="'.$ignoreUrl.'";return false;}';
-		$this->resprints .= 'var selected=[];';
-		$this->resprints .= '$("input[name^=\'dynamicsprices_apply_line\']:checked").each(function(){';
-		$this->resprints .= 'var m=($(this).attr("name")||"").match(/\\[(\\d+)\\]/);';
-		$this->resprints .= 'if(m&&m[1]) selected.push(m[1]);';
-		$this->resprints .= '});';
-		$this->resprints .= '$("input[name=\'dynamicsprices_selected_lines\']").val(selected.join(","));';
+		$this->resprints .= 'updateSelectedLines();';
 		$this->resprints .= '});';
 		$this->resprints .= '$(document).on("click", ".ui-dialog-titlebar-close", function(){';
 		$this->resprints .= 'window.location.href = "'.$ignoreUrl.'";';
