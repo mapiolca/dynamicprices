@@ -80,3 +80,6 @@ LMDB_AvailabilityId = ID disponibilidad
 LMDB_About = Acerca de
 LMDB_AboutTitle = Acerca del módulo
 LMDB_AboutDescription = Información general sobre el módulo DynamicsPrices.
+
+LMDB_AboutGeneral = Información general
+LMDB_AboutResources = Recursos

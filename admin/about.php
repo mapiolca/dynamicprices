@@ -51,6 +51,7 @@ if (!$res) {
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 require_once '../lib/dynamicsprices.lib.php';
+require_once '../core/modules/modDynamicsPrices.class.php';
 
 $langs->loadLangs(array("admin", "dynamicsprices@dynamicsprices"));
 
@@ -60,6 +61,7 @@ if (!$user->admin) {
 
 $title = $langs->trans('LMDB_AboutTitle');
 $help_url = '';
+$moduleDescriptor = new modDynamicsPrices($db);
 
 llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'mod-dynamicsprices page-admin');
 
@@ -71,15 +73,25 @@ print dol_get_fiche_head($head, 'about', $title, -1, "dynamicsprices@dynamicspri
 
 print '<div class="opacitymedium">'.$langs->trans('LMDB_AboutDescription').'</div>';
 print '<br>';
+print '<div class="div-table-responsive-no-min">';
 print '<table class="noborder centpercent">';
+print '<tr class="liste_titre"><td colspan="2">'.$langs->trans('LMDB_AboutGeneral').'</td></tr>';
 print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('Module').'</td><td>'.$langs->trans('ModuleDynamicsPricesName').'</td></tr>';
-print '<tr class="oddeven"><td>'.$langs->trans('Description').'</td><td>'.$langs->trans('ModuleDynamicsPricesDesc').'</td></tr>';
-print '<tr class="oddeven"><td>'.$langs->trans('Version').'</td><td>2.1</td></tr>';
-print '<tr class="oddeven"><td>'.$langs->trans('Author').'</td><td>Les Métiers du Bâtiment</td></tr>';
-print '<tr class="oddeven"><td>'.$langs->trans('Website').'</td><td><a href="https://lesmetiersdubatiment.fr" target="_blank" rel="noopener noreferrer">lesmetiersdubatiment.fr</a></td></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('Description').'</td><td>'.dol_escape_htmltag($langs->trans($moduleDescriptor->description)).'</td></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('Version').'</td><td>'.dol_escape_htmltag((string) $moduleDescriptor->version).'</td></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('Author').'</td><td>'.dol_escape_htmltag((string) $moduleDescriptor->editor_name).'</td></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('Website').'</td><td><a href="https://'.dol_escape_htmltag((string) $moduleDescriptor->editor_url).'" target="_blank" rel="noopener noreferrer">'.dol_escape_htmltag((string) $moduleDescriptor->editor_url).'</a></td></tr>';
 print '</table>';
+print '</div>';
+print '<br>';
+print '<div class="div-table-responsive-no-min">';
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre"><td colspan="2">'.$langs->trans('LMDB_AboutResources').'</td></tr>';
+print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('Documentation').'</td><td><a href="https://wiki.dolibarr.org/" target="_blank" rel="noopener noreferrer">wiki.dolibarr.org</a></td></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('Support').'</td><td><a href="https://'.dol_escape_htmltag((string) $moduleDescriptor->editor_url).'" target="_blank" rel="noopener noreferrer">'.dol_escape_htmltag((string) $moduleDescriptor->editor_url).'</a></td></tr>';
+print '</table>';
+print '</div>';
 
 print dol_get_fiche_end();
 llxFooter();
 $db->close();
-
