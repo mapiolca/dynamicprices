@@ -262,7 +262,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			array('type' => 'hidden', 'name' => 'comment', 'value' => $comment),
 		);
 
-		$ignoreUrl = $url.'&action=dynamicsprices_confirm_commande&confirm=no&dynamicsprices_modal=1';
+		$ignoreUrl = $url.'&action=dynamicsprices_confirm_commande&confirm=yes&dynamicsprices_modal=1&dynamicsprices_skip_update=1';
 		$ignoreUrl .= '&datecommande='.urlencode($datecommande);
 		$ignoreUrl .= '&methodecommande='.urlencode($methodecommande);
 		$ignoreUrl .= '&methode='.urlencode($methodecommande);
@@ -275,7 +275,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= 'if(!$dialog.length) return;';
 		$this->resprints .= 'var rows=$dialog.find("tr.oddeven").length;';
 		$this->resprints .= 'var maxHeight=Math.max(200,$(window).height()-100);';
-		$this->resprints .= 'var wantedHeight=Math.min(maxHeight,200+(rows*34));';
+		$this->resprints .= 'var wantedHeight=Math.min(maxHeight,210+(rows*34));';
 		$this->resprints .= 'var wantedWidth=Math.min($(window).width()-100,Math.max(900,$dialog.find("table").outerWidth()+80));';
 		$this->resprints .= '$dialog.css("max-width",( $(window).width()-100 )+"px");';
 		$this->resprints .= '$dialog.find(".ui-dialog-content").css({"max-height":wantedHeight+"px","overflow-y":"auto"});';
@@ -284,6 +284,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= 'setTimeout(applyModalSizing,0);';
 		$this->resprints .= '$(window).on("resize", applyModalSizing);';
 		$this->resprints .= '$(document).on("click", ".ui-dialog-buttonset .ui-button", function(){';
+		$this->resprints .= 'if($.trim($(this).text())==="'.$langs->transnoentitiesnoconv('LMDB_Ignore').'"){window.location.href="'.$ignoreUrl.'";return false;}';
 		$this->resprints .= 'var selected=[];';
 		$this->resprints .= '$("input[name^=\'dynamicsprices_apply_line\']:checked").each(function(){';
 		$this->resprints .= 'var m=($(this).attr("name")||"").match(/\\[(\\d+)\\]/);';
