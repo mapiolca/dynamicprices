@@ -218,7 +218,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$rowCount = count($displayDifferences);
 		$dialogBaseHeight = 170;
 		$rowHeight = 42;
-		$targetDialogHeight = max(200, $dialogBaseHeight + ($rowCount * $rowHeight));
+		$tableHeaderHeight = 35;
+		$targetDialogHeight = max(200, $dialogBaseHeight + $tableHeaderHeight + ($rowCount * $rowHeight));
 		$dialogBodyHeight = max(120, $targetDialogHeight - 70);
 
 		$html = '<div id="dynamicsprices_diff_wrapper" class="div-table-responsive" style="height:'.$dialogBodyHeight.'px;max-height:'.$dialogBodyHeight.'px;overflow:auto;">';
