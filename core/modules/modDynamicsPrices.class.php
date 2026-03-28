@@ -253,6 +253,12 @@ class modDynamicsPrices extends DolibarrModules
 		 );
 		 */
 /* BEGIN MODULEBUILDER DICTIONARIES */
+		$commercialCategoryHasEntity = $this->columnExists(MAIN_DB_PREFIX."c_commercial_category", 'entity');
+		$commercialCategorySelectSql = $commercialCategoryHasEntity
+			? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity = '.((int) $conf->entity)
+			: 'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t';
+		$commercialCategoryFieldValue = $commercialCategoryHasEntity ? "code,entity,label" : "code,label";
+
 		$this->dictionaries = array(
 			'langs' => 'dynamicsprices@dynamicsprices',
 			'tabname' => array(MAIN_DB_PREFIX."c_coefprice", MAIN_DB_PREFIX."c_margin_on_cost", MAIN_DB_PREFIX."c_commercial_category"),
@@ -260,7 +266,7 @@ class modDynamicsPrices extends DolibarrModules
 			'tabsql' => array(
 				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, cc.label as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.code = t.code_commercial_category WHERE t.entity = '.((int) $conf->entity),
 				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, cc.label as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.code = t.code_commercial_category WHERE t.entity = '.((int) $conf->entity),
-				'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity = '.((int) $conf->entity),
+				$commercialCategorySelectSql,
 			),
 			'tabsqlsort' => array(
 				"code ASC",
@@ -275,12 +281,12 @@ class modDynamicsPrices extends DolibarrModules
 			'tabfieldvalue' => array(
 				"code,entity,code_commercial_category,pricelevel,targetrate,minrate",
 				"code,entity,code_commercial_category,margin_on_cost_percent",
-				"code,entity,label",
+				$commercialCategoryFieldValue,
 			),
 			'tabfieldinsert' => array(
 				"code,entity,code_commercial_category,pricelevel,targetrate,minrate",
 				"code,entity,code_commercial_category,margin_on_cost_percent",
-				"code,entity,label",
+				$commercialCategoryFieldValue,
 			),
 			'tabrowid' => array('rowid', 'rowid', 'rowid'),
 			'tabcond' => array(
@@ -613,6 +619,21 @@ class modDynamicsPrices extends DolibarrModules
 		}
 
 		return $this->_init($sql, $options);
+	}
+
+	/**
+	 * Check if a column exists on a table.
+	 *
+	 * @param string $tableName Table name
+	 * @param string $columnName Column name
+	 * @return bool
+	 */
+	private function columnExists($tableName, $columnName)
+	{
+		$sql = "SHOW COLUMNS FROM ".$tableName." LIKE '".$this->db->escape($columnName)."'";
+		$resql = $this->db->query($sql);
+
+		return ($resql && $this->db->num_rows($resql) > 0);
 	}
 
 	/**
