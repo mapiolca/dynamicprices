@@ -254,12 +254,6 @@ class modDynamicsPrices extends DolibarrModules
 		 */
 /* BEGIN MODULEBUILDER DICTIONARIES */
 		$commercialCategoryHasEntity = $this->columnExists(MAIN_DB_PREFIX."c_commercial_category", 'entity');
-		$coefCategoryColumn = $this->getFirstExistingColumn(MAIN_DB_PREFIX."c_coefprice", array('code_commercial_category', 'fk_commercial_category', 'fk_nature'));
-		$marginCategoryColumn = $this->getFirstExistingColumn(MAIN_DB_PREFIX."c_margin_on_cost", array('code_commercial_category', 'fk_commercial_category', 'code_nature'));
-		$coefCategoryJoin = $this->buildCommercialCategoryJoinCondition('t', $coefCategoryColumn);
-		$marginCategoryJoin = $this->buildCommercialCategoryJoinCondition('t', $marginCategoryColumn);
-		$coefCategoryField = $coefCategoryColumn ? $coefCategoryColumn : 'code_commercial_category';
-		$marginCategoryField = $marginCategoryColumn ? $marginCategoryColumn : 'code_commercial_category';
 		$commercialCategorySelectSql = $commercialCategoryHasEntity
 			? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity = '.((int) $conf->entity)
 			: 'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t';
@@ -270,8 +264,8 @@ class modDynamicsPrices extends DolibarrModules
 			'tabname' => array(MAIN_DB_PREFIX."c_coefprice", MAIN_DB_PREFIX."c_margin_on_cost", MAIN_DB_PREFIX."c_commercial_category"),
 			'tablib' => array("LMDB_coefprice", "LMDB_marginoncost", "LMDB_commercialcategories"),
 			'tabsql' => array(
-				'SELECT t.rowid as rowid, t.entity, t.code, t.'.$coefCategoryField.' as '.$coefCategoryField.', cc.label as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON '.$coefCategoryJoin.' WHERE t.entity = '.((int) $conf->entity),
-				'SELECT t.rowid as rowid, t.entity, t.code, t.'.$marginCategoryField.' as '.$marginCategoryField.', cc.label as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON '.$marginCategoryJoin.' WHERE t.entity = '.((int) $conf->entity),
+				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, cc.label as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.code = t.code_commercial_category WHERE t.entity = '.((int) $conf->entity),
+				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, cc.label as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.code = t.code_commercial_category WHERE t.entity = '.((int) $conf->entity),
 				$commercialCategorySelectSql,
 			),
 			'tabsqlsort' => array(
@@ -280,18 +274,18 @@ class modDynamicsPrices extends DolibarrModules
 				"label ASC",
 			),
 			'tabfield' => array(
-				"code,".$coefCategoryField.",pricelevel,targetrate,minrate",
-				"code,".$marginCategoryField.",margin_on_cost_percent",
+				"code,code_commercial_category,pricelevel,targetrate,minrate",
+				"code,code_commercial_category,margin_on_cost_percent",
 				"code,label",
 			),
 			'tabfieldvalue' => array(
-				"code,entity,".$coefCategoryField.",pricelevel,targetrate,minrate",
-				"code,entity,".$marginCategoryField.",margin_on_cost_percent",
+				"code,entity,code_commercial_category,pricelevel,targetrate,minrate",
+				"code,entity,code_commercial_category,margin_on_cost_percent",
 				$commercialCategoryFieldValue,
 			),
 			'tabfieldinsert' => array(
-				"code,entity,".$coefCategoryField.",pricelevel,targetrate,minrate",
-				"code,entity,".$marginCategoryField.",margin_on_cost_percent",
+				"code,entity,code_commercial_category,pricelevel,targetrate,minrate",
+				"code,entity,code_commercial_category,margin_on_cost_percent",
 				$commercialCategoryFieldValue,
 			),
 			'tabrowid' => array('rowid', 'rowid', 'rowid'),
@@ -304,9 +298,6 @@ class modDynamicsPrices extends DolibarrModules
 				'code' => $langs->trans('LMDB_CodeTooltipHelp'),
 				'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
 				'code_commercial_category' => $langs->trans('LMDB_CodeCommercialCategoryTooltipHelp'),
-				'fk_commercial_category' => $langs->trans('LMDB_FkCommercialCategoryTooltipHelp'),
-				'fk_nature' => $langs->trans('LMDB_FkNatureTooltipHelp'),
-				'code_nature' => $langs->trans('LMDB_CodeNatureTooltipHelp'),
 				'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
 				'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
 				'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
@@ -559,6 +550,10 @@ class modDynamicsPrices extends DolibarrModules
 		if ($result < 0) {
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
 		}
+		$result = $this->ensureCommercialCategoryColumns();
+		if ($result < 0) {
+			return -1;
+		}
 
 		// Create product/service extrafield during init.
 		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
@@ -646,41 +641,36 @@ class modDynamicsPrices extends DolibarrModules
 	}
 
 	/**
-	 * Return first existing column from a list.
+	 * Add and populate code_commercial_category columns for module dictionaries.
 	 *
-	 * @param string $tableName Table name
-	 * @param array<int,string> $columnNames Ordered column list
-	 * @return string
+	 * @return int
 	 */
-	private function getFirstExistingColumn($tableName, $columnNames)
+	private function ensureCommercialCategoryColumns()
 	{
-		foreach ($columnNames as $columnName) {
-			if ($this->columnExists($tableName, $columnName)) {
-				return $columnName;
+		$queries = array();
+
+		if (!$this->columnExists(MAIN_DB_PREFIX."c_coefprice", 'code_commercial_category')) {
+			$queries[] = "ALTER TABLE ".MAIN_DB_PREFIX."c_coefprice ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL";
+		}
+		if (!$this->columnExists(MAIN_DB_PREFIX."c_margin_on_cost", 'code_commercial_category')) {
+			$queries[] = "ALTER TABLE ".MAIN_DB_PREFIX."c_margin_on_cost ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL";
+		}
+		if ($this->columnExists(MAIN_DB_PREFIX."c_coefprice", 'fk_nature')) {
+			$queries[] = "UPDATE ".MAIN_DB_PREFIX."c_coefprice SET code_commercial_category = fk_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND fk_nature IS NOT NULL AND fk_nature <> ''";
+		}
+		if ($this->columnExists(MAIN_DB_PREFIX."c_margin_on_cost", 'code_nature')) {
+			$queries[] = "UPDATE ".MAIN_DB_PREFIX."c_margin_on_cost SET code_commercial_category = code_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND code_nature IS NOT NULL AND code_nature <> ''";
+		}
+
+		foreach ($queries as $sql) {
+			$resql = $this->db->query($sql);
+			if (!$resql) {
+				$this->error = $this->db->lasterror();
+				return -1;
 			}
 		}
 
-		return '';
-	}
-
-	/**
-	 * Build SQL join condition between dictionary table and commercial category table.
-	 *
-	 * @param string $tableAlias Alias of dictionary table
-	 * @param string $columnName Commercial category column on dictionary table
-	 * @return string
-	 */
-	private function buildCommercialCategoryJoinCondition($tableAlias, $columnName)
-	{
-		if (empty($columnName)) {
-			return '1 = 0';
-		}
-
-		if (preg_match('/^fk_/', $columnName)) {
-			return 'cc.rowid = '.$tableAlias.'.'.$columnName;
-		}
-
-		return 'cc.code = '.$tableAlias.'.'.$columnName;
+		return 1;
 	}
 
 	/**
