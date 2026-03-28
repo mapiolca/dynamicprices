@@ -219,7 +219,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$dialogBaseHeight = 170;
 		$rowHeight = 42;
 		$tableHeaderHeight = 35;
-		$targetDialogHeight = max(200, $dialogBaseHeight + $tableHeaderHeight + ($rowCount * $rowHeight));
+		$confirmQuestionsHeight = max(120, $tableHeaderHeight + ($rowCount * $rowHeight));
+		$targetDialogHeight = max(200, $dialogBaseHeight + $confirmQuestionsHeight);
 		$dialogBodyHeight = max(120, $targetDialogHeight - 70);
 
 		$html = '<div id="dynamicsprices_diff_wrapper" class="div-table-responsive" style="height:'.$dialogBodyHeight.'px;max-height:'.$dialogBodyHeight.'px;overflow:auto;">';
@@ -296,6 +297,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= 'if(!$dialog.length) return;';
 		$this->resprints .= 'var $content=$dialog.find(".ui-dialog-content");';
 		$this->resprints .= 'if(!$content.length) return;';
+		$this->resprints .= '$dialog.find(".confirmquestions").css({"height":"'.((int) $confirmQuestionsHeight).'px","max-height":"'.((int) $confirmQuestionsHeight).'px","overflow-y":"auto"});';
 		$this->resprints .= 'var viewportHeight=$(window).height();';
 		$this->resprints .= 'var wantedWidth=Math.min($(window).width()-100,Math.max(900,$dialog.find("table").outerWidth()+80));';
 		$this->resprints .= '$dialog.css({"max-width":($(window).width()-100)+"px"});';
