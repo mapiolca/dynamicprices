@@ -201,7 +201,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 			dol_syslog(__METHOD__.' - No supplier unit price difference found, native confirmation will be used', LOG_DEBUG);
 			return 0;
 		}
-		dol_syslog(__METHOD__.' - Prepare modal for '.count($priceDifferences).' line(s) with supplier unit price differences', LOG_DEBUG);
+		$displayDifferences = $this->getOrderSupplierPriceDifferences($object, true);
+		dol_syslog(__METHOD__.' - Prepare modal with '.count($displayDifferences).' line(s), including unchanged lines, because at least one supplier unit price differs', LOG_DEBUG);
 
 		$langs->load('dynamicsprices@dynamicsprices');
 		$url = $_SERVER['PHP_SELF'].'?id='.(int) $object->id;
@@ -227,7 +228,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$html .= '<td class="right">'.$langs->trans('Discount').' (%)</td>';
 		$html .= '</tr>';
 
-		foreach ($priceDifferences as $lineId => $diff) {
+		foreach ($displayDifferences as $lineId => $diff) {
 			$html .= '<tr class="oddeven">';
 			$html .= '<td><input type="checkbox" name="dynamicsprices_apply_line['.$lineId.']" value="1" checked></td>';
 			$html .= '<td>'.$this->getProductNomUrl((int) $diff['fk_product'], $diff['ref']).'</td>';
@@ -257,7 +258,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$formquestion = array(
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_modal', 'value' => '1'),
-			array('type' => 'hidden', 'name' => 'dynamicsprices_selected_lines', 'value' => implode(',', array_keys($priceDifferences))),
+			array('type' => 'hidden', 'name' => 'dynamicsprices_selected_lines', 'value' => implode(',', array_keys($displayDifferences))),
 			array('type' => 'hidden', 'name' => 'datecommande', 'value' => $datecommande),
 			array('type' => 'hidden', 'name' => 'methodecommande', 'value' => $methodecommande),
 			array('type' => 'hidden', 'name' => 'methode', 'value' => $methodecommande),
@@ -307,9 +308,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 * Get supplier price differences between order lines and current supplier prices.
 	 *
 	 * @param CommandeFournisseur $object Supplier order
+	 * @param bool $includeUnchanged Include unchanged lines for display purposes
 	 * @return array<int,array<string,mixed>>
 	 */
-	private function getOrderSupplierPriceDifferences($object)
+	private function getOrderSupplierPriceDifferences($object, $includeUnchanged = false)
 	{
 		$differences = array();
 		if (empty($object->id) || empty($object->socid)) {
@@ -359,7 +361,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 				|| price2num((float) $current['supplier_reputation'], 'MS') !== $reputation;
 			$isDifferent = $isPriceDifferent || $isOtherFieldsDifferent;
 
-			if (!$isDifferent) {
+			if (!$isDifferent && !$includeUnchanged) {
 				continue;
 			}
 
