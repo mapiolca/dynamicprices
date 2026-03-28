@@ -215,15 +215,11 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$comment = GETPOST('comment', 'alphanohtml');
 		$csrfToken = newToken();
 		$url .= '&token='.$csrfToken;
-		$rowCount = count($displayDifferences);
-		$dialogBaseHeight = 170;
-		$rowHeight = 42;
-		$tableHeaderHeight = 35;
-		$confirmQuestionsHeight = max(120, $tableHeaderHeight + ($rowCount * $rowHeight));
-		$targetDialogHeight = max(200, $dialogBaseHeight + $confirmQuestionsHeight);
-		$dialogBodyHeight = max(120, $targetDialogHeight - 70);
+				$url .= '&token='.$csrfToken;
 
-		$html = '<div id="dynamicsprices_diff_wrapper" class="div-table-responsive" style="height:'.$dialogBodyHeight.'px;max-height:'.$dialogBodyHeight.'px;overflow:auto;">';
+		$initialSelectedLines = implode(',', array_map('intval', array_keys($displayDifferences)));
+
+		$html = '<div id="dynamicsprices_diff_wrapper" class="div-table-responsive">';
 		$html .= '<table class="noborder">';
 		$html .= '<tr class="liste_titre">';
 		$html .= '<td>&nbsp;</td>';
@@ -261,6 +257,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'">';
 			$html .= '</tr>';
 		}
+
 		$html .= '</table>';
 		$html .= '</div>';
 
@@ -269,7 +266,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$formquestion = array(
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_modal', 'value' => '1'),
-			array('type' => 'hidden', 'name' => 'dynamicsprices_selected_lines', 'value' => ''),
+			array('type' => 'hidden', 'name' => 'dynamicsprices_selected_lines', 'value' => $initialSelectedLines),
 			array('type' => 'hidden', 'name' => 'datecommande', 'value' => $datecommande),
 			array('type' => 'hidden', 'name' => 'methodecommande', 'value' => $methodecommande),
 			array('type' => 'hidden', 'name' => 'methode', 'value' => $methodecommande),
@@ -281,8 +278,56 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$ignoreUrl .= '&methodecommande='.urlencode($methodecommande);
 		$ignoreUrl .= '&methode='.urlencode($methodecommande);
 		$ignoreUrl .= '&comment='.urlencode($comment);
-		$this->resprints = $form->formconfirm($url, $langs->trans('LMDB_SupplierPriceModalTitle'), $langs->trans('LMDB_SupplierPriceModalDescription'), 'dynamicsprices_confirm_commande', $formquestion, 1, 1, 0, (string) $targetDialogHeight, '', $langs->trans('Validate'), $langs->trans('LMDB_Ignore'));
-		$this->resprints .= '<script>';
+
+		$this->resprints = $form->formconfirm(
+			$url,
+			$langs->trans('LMDB_SupplierPriceModalTitle'),
+			$langs->trans('LMDB_SupplierPriceModalDescription'),
+			'dynamicsprices_confirm_commande',
+			$formquestion,
+			1,
+			1,
+			'auto',
+			'auto',
+			0,
+			$langs->trans('Validate'),
+			$langs->trans('LMDB_Ignore')
+		);
+
+		$this->resprints .= '<style nonce="'.getNonce().'">';
+		$this->resprints .= '.ui-dialog[aria-describedby="dialog-confirm"]{';
+		$this->resprints .= 'position:fixed !important;';
+		$this->resprints .= 'top:50% !important;';
+		$this->resprints .= 'left:50% !important;';
+		$this->resprints .= 'transform:translate(-50%, -50%);';
+		$this->resprints .= 'margin:0;';
+		$this->resprints .= 'width:auto !important;';
+		$this->resprints .= 'max-width:calc(100vw - 100px);';
+		$this->resprints .= 'max-height:calc(100vh - 100px);';
+		$this->resprints .= 'display:flex;';
+		$this->resprints .= 'flex-direction:column;';
+		$this->resprints .= '}';
+		$this->resprints .= '.ui-dialog[aria-describedby="dialog-confirm"] .ui-dialog-titlebar{flex:0 0 auto;}';
+		$this->resprints .= '.ui-dialog[aria-describedby="dialog-confirm"] .ui-dialog-buttonpane{flex:0 0 auto;}';
+		$this->resprints .= '#dialog-confirm{';
+		$this->resprints .= 'box-sizing:border-box;';
+		$this->resprints .= 'height:auto !important;';
+		$this->resprints .= 'max-height:none !important;';
+		$this->resprints .= 'overflow:hidden !important;';
+		$this->resprints .= 'display:flex !important;';
+		$this->resprints .= 'flex-direction:column;';
+		$this->resprints .= 'min-height:0;';
+		$this->resprints .= '}';
+		$this->resprints .= '#dialog-confirm .confirmquestions{';
+		$this->resprints .= 'flex:1 1 auto;';
+		$this->resprints .= 'min-height:0;';
+		$this->resprints .= 'overflow-y:auto;';
+		$this->resprints .= '}';
+		$this->resprints .= '#dialog-confirm .confirmmessage{flex:0 0 auto;}';
+		$this->resprints .= '#dynamicsprices_diff_wrapper{overflow-x:auto;overflow-y:visible;}';
+		$this->resprints .= '</style>';
+
+		$this->resprints .= '<script nonce="'.getNonce().'">';
 		$this->resprints .= 'jQuery(function($){';
 		$this->resprints .= 'var updateSelectedLines=function(){';
 		$this->resprints .= 'var selected=[];';
@@ -292,35 +337,24 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= '});';
 		$this->resprints .= '$("input[name=\'dynamicsprices_selected_lines\']").val(selected.join(","));';
 		$this->resprints .= '};';
-		$this->resprints .= 'var applyModalSizing=function(){';
-		$this->resprints .= 'var $dialog=$(".ui-dialog:has(input[name=\'dynamicsprices_modal\'])");';
-		$this->resprints .= 'if(!$dialog.length) return;';
-		$this->resprints .= 'var $content=$dialog.find(".ui-dialog-content");';
-		$this->resprints .= 'if(!$content.length) return;';
-		$this->resprints .= '$dialog.find(".confirmquestions").css({"height":"'.((int) $confirmQuestionsHeight).'px","max-height":"'.((int) $confirmQuestionsHeight).'px","overflow-y":"auto"});';
-		$this->resprints .= 'var viewportHeight=$(window).height();';
-		$this->resprints .= 'var wantedWidth=Math.min($(window).width()-100,Math.max(900,$dialog.find("table").outerWidth()+80));';
-		$this->resprints .= '$dialog.css({"max-width":($(window).width()-100)+"px"});';
-		$this->resprints .= '$content.dialog("option","width",wantedWidth);';
-		$this->resprints .= '$content.dialog("option","position",{my:"center",at:"center",of:window,collision:"fit"});';
-		$this->resprints .= 'var left=Math.max(0,($(window).width()-$dialog.outerWidth())/2);';
-		$this->resprints .= 'var top=Math.max(10,$(window).scrollTop()+((viewportHeight-$dialog.outerHeight())/2));';
-		$this->resprints .= '$dialog.css({left:left+"px",top:top+"px"});';
-		$this->resprints .= '};';
-		$this->resprints .= 'setTimeout(applyModalSizing,0);';
-		$this->resprints .= 'setTimeout(updateSelectedLines,0);';
-		$this->resprints .= '$(window).on("resize", applyModalSizing);';
+
 		$this->resprints .= '$(document).on("change", "input[name^=\'dynamicsprices_apply_line\']", updateSelectedLines);';
 		$this->resprints .= '$(document).on("submit", "form", updateSelectedLines);';
-		$this->resprints .= '$(document).on("click", ".ui-dialog-buttonset .ui-button", function(){';
-		$this->resprints .= 'if($.trim($(this).text())==="'.$langs->transnoentitiesnoconv('LMDB_Ignore').'"){window.location.href="'.$ignoreUrl.'";return false;}';
+
+		$this->resprints .= '$(document).on("click", ".ui-dialog[aria-describedby=\'dialog-confirm\'] .ui-dialog-buttonset .ui-button", function(){';
+		$this->resprints .= 'if($.trim($(this).text())==="'.$langs->transnoentitiesnoconv('LMDB_Ignore').'"){';
+		$this->resprints .= 'window.location.href="'.$ignoreUrl.'";';
+		$this->resprints .= 'return false;';
+		$this->resprints .= '}';
 		$this->resprints .= 'updateSelectedLines();';
 		$this->resprints .= '});';
-		$this->resprints .= '$(document).on("click", ".ui-dialog-titlebar-close", function(){';
-		$this->resprints .= 'window.location.href = "'.$ignoreUrl.'";';
+
+		$this->resprints .= '$(document).on("click", ".ui-dialog[aria-describedby=\'dialog-confirm\'] .ui-dialog-titlebar-close", function(){';
+		$this->resprints .= 'window.location.href="'.$ignoreUrl.'";';
 		$this->resprints .= '});';
 		$this->resprints .= '});';
 		$this->resprints .= '</script>';
+
 		dol_syslog(__METHOD__.' - Custom confirmation modal rendered', LOG_DEBUG);
 		return 1;
 	}
