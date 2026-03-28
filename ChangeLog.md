@@ -1,5 +1,11 @@
 # Changelog DynamicsPrices
 
+## 2.1.0
+- Refonte de la gestion des dictionnaires avec l'ajout du dictionnaire "Catégories commerciales" pour remplacer l'usage du dictionnaire "Nature de produit" dans les calculs métier. / Refactored dictionary management by adding the "Commercial categories" dictionary to replace the "Product nature" dictionary in business calculations.
+- Ajout de l'extrafield "Catégorie commerciale" sur les produits et services afin de piloter les règles tarifaires depuis une donnée dédiée. / Added the "Commercial category" extrafield on products and services to drive pricing rules from a dedicated field.
+- Mise en place de la migration des données depuis l'ancien dictionnaire vers le nouveau et routage de tous les calculs de DynamicPrices vers ce nouveau référentiel. / Implemented data migration from the legacy dictionary to the new one and rerouted all DynamicPrices computations to this new reference.
+- Ajout d'une confirmation à l'envoi de commande fournisseur pour proposer la mise à jour des prix d'achat via une modale affichant les écarts et les choix utilisateur (valider/ignorer). / Added a confirmation step on supplier-order submission to propose purchase-price updates through a modal showing differences and user choices (apply/ignore).
+
 ## 2.0.1
 - Correction du déclenchement des recalculs de prix lors des événements de prix d'achat/vente quand l'identifiant produit n'est pas directement porté par l'objet trigger. / Fixed price recalculation trigger execution on buy/sell price events when the product identifier is not directly available on the trigger object.
 
