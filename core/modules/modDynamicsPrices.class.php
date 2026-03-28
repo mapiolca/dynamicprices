@@ -550,6 +550,10 @@ class modDynamicsPrices extends DolibarrModules
 		if ($result < 0) {
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
 		}
+		$result = $this->ensureCommercialCategoryColumns();
+		if ($result < 0) {
+			return -1;
+		}
 
 		// Create product/service extrafield during init.
 		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
@@ -634,6 +638,39 @@ class modDynamicsPrices extends DolibarrModules
 		$resql = $this->db->query($sql);
 
 		return ($resql && $this->db->num_rows($resql) > 0);
+	}
+
+	/**
+	 * Add and populate code_commercial_category columns for module dictionaries.
+	 *
+	 * @return int
+	 */
+	private function ensureCommercialCategoryColumns()
+	{
+		$queries = array();
+
+		if (!$this->columnExists(MAIN_DB_PREFIX."c_coefprice", 'code_commercial_category')) {
+			$queries[] = "ALTER TABLE ".MAIN_DB_PREFIX."c_coefprice ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL";
+		}
+		if (!$this->columnExists(MAIN_DB_PREFIX."c_margin_on_cost", 'code_commercial_category')) {
+			$queries[] = "ALTER TABLE ".MAIN_DB_PREFIX."c_margin_on_cost ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL";
+		}
+		if ($this->columnExists(MAIN_DB_PREFIX."c_coefprice", 'fk_nature')) {
+			$queries[] = "UPDATE ".MAIN_DB_PREFIX."c_coefprice SET code_commercial_category = fk_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND fk_nature IS NOT NULL AND fk_nature <> ''";
+		}
+		if ($this->columnExists(MAIN_DB_PREFIX."c_margin_on_cost", 'code_nature')) {
+			$queries[] = "UPDATE ".MAIN_DB_PREFIX."c_margin_on_cost SET code_commercial_category = code_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND code_nature IS NOT NULL AND code_nature <> ''";
+		}
+
+		foreach ($queries as $sql) {
+			$resql = $this->db->query($sql);
+			if (!$resql) {
+				$this->error = $this->db->lasterror();
+				return -1;
+			}
+		}
+
+		return 1;
 	}
 
 	/**

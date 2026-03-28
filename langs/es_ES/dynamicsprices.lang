@@ -83,3 +83,13 @@ LMDB_AboutDescription = Información general sobre el módulo DynamicsPrices.
 
 LMDB_AboutGeneral = Información general
 LMDB_AboutResources = Recursos
+
+LMDB_AboutVersion = Versión
+LMDB_AboutFamily = Familia
+LMDB_AboutModuleDescription = Descripción
+LMDB_AboutMaintainer = Mantenedor
+LMDB_AboutDocumentation = Documentación
+LMDB_AboutDocumentationLink = Abrir README
+LMDB_AboutSupport = Soporte
+LMDB_AboutSupportValue = Contacte al mantenedor para soporte.
+LMDB_AboutContact = Contacto
