@@ -537,10 +537,6 @@ class modDynamicsPrices extends DolibarrModules
 	public function init($options = '')
 	{
 		global $conf, $langs;
-		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
-
-		$previousInstalledVersion = getDolGlobalString('DYNAMICSPRICES_INSTALLED_VERSION');
-		dol_syslog(__METHOD__.' - Start init. previousInstalledVersion='.$previousInstalledVersion.' targetVersion='.$this->version, LOG_DEBUG);
 
 		// Create tables of module at module activation
 		//$result = $this->_load_tables('/install/mysql/', 'dynamicsprices');
@@ -580,9 +576,6 @@ class modDynamicsPrices extends DolibarrModules
 			}
 		}
 
-		dolibarr_set_const($this->db, 'DYNAMICSPRICES_INSTALLED_VERSION', $this->version, 'chaine', 0, '', $conf->entity);
-		dol_syslog(__METHOD__.' - Stored DYNAMICSPRICES_INSTALLED_VERSION='.$this->version, LOG_DEBUG);
-
 		// Permissions
 		$this->remove($options);
 
@@ -620,187 +613,6 @@ class modDynamicsPrices extends DolibarrModules
 		}
 
 		return $this->_init($sql, $options);
-	}
-
-	/**
-	 * Ensure commercial category columns exist and are populated.
-	 *
-	 * @return void
-	 */
-	private function ensureCommercialCategoryColumns()
-	{
-		dol_syslog(__METHOD__.' - Start schema checks for c_coefprice/c_margin_on_cost', LOG_DEBUG);
-
-		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_coefprice LIKE 'entity'");
-		if ($resql && $this->db->num_rows($resql) == 0) {
-			$resAdd = $this->db->query("ALTER TABLE ".$this->db->prefix()."c_coefprice ADD COLUMN entity INTEGER NOT NULL DEFAULT 1");
-			dol_syslog(__METHOD__.' - Add column entity on c_coefprice result='.((int) $resAdd), $resAdd ? LOG_DEBUG : LOG_ERR);
-		}
-		$resUpdateCoefEntity = $this->db->query("UPDATE ".$this->db->prefix()."c_coefprice SET entity = 1 WHERE entity IS NULL");
-		dol_syslog(__METHOD__.' - Normalize entity on c_coefprice result='.((int) $resUpdateCoefEntity), $resUpdateCoefEntity ? LOG_DEBUG : LOG_ERR);
-
-		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_coefprice LIKE 'code_commercial_category'");
-		if ($resql && $this->db->num_rows($resql) == 0) {
-			$resAdd = $this->db->query("ALTER TABLE ".$this->db->prefix()."c_coefprice ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
-			dol_syslog(__METHOD__.' - Add column code_commercial_category on c_coefprice result='.((int) $resAdd), $resAdd ? LOG_DEBUG : LOG_ERR);
-		}
-		$resInsertFromCoef = $this->db->query("INSERT INTO ".$this->db->prefix()."c_commercial_category (code, label, active) SELECT DISTINCT t.fk_nature, t.fk_nature, 1 FROM ".$this->db->prefix()."c_coefprice as t LEFT JOIN ".$this->db->prefix()."c_commercial_category as cc ON cc.code = t.fk_nature WHERE t.fk_nature IS NOT NULL AND t.fk_nature <> '' AND cc.rowid IS NULL");
-		dol_syslog(__METHOD__.' - Insert commercial categories from c_coefprice result='.((int) $resInsertFromCoef), $resInsertFromCoef ? LOG_DEBUG : LOG_ERR);
-		$resUpdateCoefCode = $this->db->query("UPDATE ".$this->db->prefix()."c_coefprice SET code_commercial_category = fk_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND fk_nature IS NOT NULL AND fk_nature <> ''");
-		dol_syslog(__METHOD__.' - Fill code_commercial_category from fk_nature result='.((int) $resUpdateCoefCode), $resUpdateCoefCode ? LOG_DEBUG : LOG_ERR);
-
-		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_margin_on_cost LIKE 'code_commercial_category'");
-		if ($resql && $this->db->num_rows($resql) == 0) {
-			$resAdd = $this->db->query("ALTER TABLE ".$this->db->prefix()."c_margin_on_cost ADD COLUMN code_commercial_category VARCHAR(50) DEFAULT NULL");
-			dol_syslog(__METHOD__.' - Add column code_commercial_category on c_margin_on_cost result='.((int) $resAdd), $resAdd ? LOG_DEBUG : LOG_ERR);
-		}
-		$resql = $this->db->query("SHOW COLUMNS FROM ".$this->db->prefix()."c_margin_on_cost LIKE 'entity'");
-		if ($resql && $this->db->num_rows($resql) == 0) {
-			$resAdd = $this->db->query("ALTER TABLE ".$this->db->prefix()."c_margin_on_cost ADD COLUMN entity INTEGER NOT NULL DEFAULT 1");
-			dol_syslog(__METHOD__.' - Add column entity on c_margin_on_cost result='.((int) $resAdd), $resAdd ? LOG_DEBUG : LOG_ERR);
-		}
-		$resUpdateMarginEntity = $this->db->query("UPDATE ".$this->db->prefix()."c_margin_on_cost SET entity = 1 WHERE entity IS NULL");
-		dol_syslog(__METHOD__.' - Normalize entity on c_margin_on_cost result='.((int) $resUpdateMarginEntity), $resUpdateMarginEntity ? LOG_DEBUG : LOG_ERR);
-
-		$resInsertFromMargin = $this->db->query("INSERT INTO ".$this->db->prefix()."c_commercial_category (code, label, active) SELECT DISTINCT t.code_nature, t.code_nature, 1 FROM ".$this->db->prefix()."c_margin_on_cost as t LEFT JOIN ".$this->db->prefix()."c_commercial_category as cc ON cc.code = t.code_nature WHERE t.code_nature IS NOT NULL AND t.code_nature <> '' AND cc.rowid IS NULL");
-		dol_syslog(__METHOD__.' - Insert commercial categories from c_margin_on_cost result='.((int) $resInsertFromMargin), $resInsertFromMargin ? LOG_DEBUG : LOG_ERR);
-		$resUpdateMarginCode = $this->db->query("UPDATE ".$this->db->prefix()."c_margin_on_cost SET code_commercial_category = code_nature WHERE (code_commercial_category IS NULL OR code_commercial_category = '') AND code_nature IS NOT NULL AND code_nature <> ''");
-		dol_syslog(__METHOD__.' - Fill code_commercial_category from code_nature result='.((int) $resUpdateMarginCode), $resUpdateMarginCode ? LOG_DEBUG : LOG_ERR);
-	}
-
-	/**
-	 * Migrate product nature into commercial category extrafield for upgrades to v2.1+.
-	 *
-	 * @param string $previousInstalledVersion Previously installed module version
-	 * @return void
-	 */
-	private function migrateProductNatureToCommercialCategoryFor210($previousInstalledVersion)
-	{
-		if (empty($previousInstalledVersion) || version_compare($previousInstalledVersion, '2.1', '>=') || version_compare($this->version, '2.1', '<')) {
-			dol_syslog(__METHOD__.' - Skip migration for product extrafield. previousInstalledVersion='.$previousInstalledVersion, LOG_DEBUG);
-			return;
-		}
-		dol_syslog(__METHOD__.' - Run migration for product extrafield values', LOG_DEBUG);
-
-		$productTable = $this->db->prefix().'product';
-		$productExtraTable = $this->db->prefix().'product_extrafields';
-		$sourceExpression = '';
-		$sourceFromExtrafields = false;
-
-		if ($this->columnExists($productExtraTable, 'fk_nature')) {
-			$sourceExpression = "pe.fk_nature";
-			$sourceFromExtrafields = true;
-		} elseif ($this->columnExists($productExtraTable, 'nature')) {
-			$sourceExpression = "pe.nature";
-			$sourceFromExtrafields = true;
-		} elseif ($this->columnExists($productTable, 'fk_nature')) {
-			$sourceExpression = "p.fk_nature";
-		} elseif ($this->columnExists($productTable, 'nature')) {
-			$sourceExpression = "p.nature";
-		}
-
-		if (empty($sourceExpression)) {
-			dol_syslog(__METHOD__.' - No source field found (fk_nature/nature), nothing to migrate', LOG_WARNING);
-			return;
-		}
-		dol_syslog(__METHOD__.' - Source expression selected: '.$sourceExpression, LOG_DEBUG);
-
-		if (!$sourceFromExtrafields) {
-			$sqlInsert = "INSERT INTO ".$productExtraTable." (fk_object, lmdb_commercial_category)";
-			$sqlInsert .= " SELECT p.rowid, ".$sourceExpression;
-			$sqlInsert .= " FROM ".$productTable." as p";
-			$sqlInsert .= " LEFT JOIN ".$productExtraTable." as pe ON pe.fk_object = p.rowid";
-			$sqlInsert .= " WHERE pe.fk_object IS NULL";
-			$sqlInsert .= " AND ".$sourceExpression." IS NOT NULL";
-			$sqlInsert .= " AND ".$sourceExpression." <> ''";
-			$sqlInsert .= " AND p.entity IN (".getEntity('product').")";
-			$resInsert = $this->db->query($sqlInsert);
-			dol_syslog(__METHOD__.' - Insert missing product_extrafields rows result='.((int) $resInsert), $resInsert ? LOG_DEBUG : LOG_ERR);
-		}
-
-		$sqlUpdate = "UPDATE ".$productExtraTable." as pe";
-		$sqlUpdate .= " INNER JOIN ".$productTable." as p ON p.rowid = pe.fk_object";
-		$sqlUpdate .= " SET pe.lmdb_commercial_category = ".$sourceExpression;
-		$sqlUpdate .= " WHERE (pe.lmdb_commercial_category IS NULL OR pe.lmdb_commercial_category = '')";
-		$sqlUpdate .= " AND ".$sourceExpression." IS NOT NULL";
-		$sqlUpdate .= " AND ".$sourceExpression." <> ''";
-		$sqlUpdate .= " AND p.entity IN (".getEntity('product').")";
-		$resUpdate = $this->db->query($sqlUpdate);
-		dol_syslog(__METHOD__.' - Update lmdb_commercial_category from source result='.((int) $resUpdate), $resUpdate ? LOG_DEBUG : LOG_ERR);
-	}
-
-	/**
-	 * Migrate entries from product nature dictionary into commercial category dictionary for upgrades to v2.1+.
-	 *
-	 * @param string $previousInstalledVersion Previously installed module version
-	 * @return void
-	 */
-	private function migrateProductNatureDictionaryToCommercialCategoryFor210($previousInstalledVersion)
-	{
-		if (empty($previousInstalledVersion) || version_compare($previousInstalledVersion, '2.1', '>=') || version_compare($this->version, '2.1', '<')) {
-			dol_syslog(__METHOD__.' - Skip migration for dictionary values. previousInstalledVersion='.$previousInstalledVersion, LOG_DEBUG);
-			return;
-		}
-		dol_syslog(__METHOD__.' - Run migration from c_product_nature to c_commercial_category', LOG_DEBUG);
-
-		$productNatureTable = $this->db->prefix().'c_product_nature';
-		$commercialCategoryTable = $this->db->prefix().'c_commercial_category';
-		if (!$this->tableExists($productNatureTable)) {
-			dol_syslog(__METHOD__.' - Table '.$productNatureTable.' does not exist, skip', LOG_WARNING);
-			return;
-		}
-
-		$codeField = $this->columnExists($productNatureTable, 'code') ? 'pn.code' : '';
-		$labelField = $this->columnExists($productNatureTable, 'label') ? 'pn.label' : '';
-		if (empty($codeField)) {
-			dol_syslog(__METHOD__.' - Column code not found on '.$productNatureTable.', skip', LOG_WARNING);
-			return;
-		}
-		if (empty($labelField)) {
-			$labelField = $codeField;
-		}
-
-		$sql = "INSERT INTO ".$commercialCategoryTable." (code, label, active)";
-		$sql .= " SELECT DISTINCT ".$codeField.", COALESCE(NULLIF(".$labelField.", ''), ".$codeField."), 1";
-		$sql .= " FROM ".$productNatureTable." as pn";
-		$sql .= " LEFT JOIN ".$commercialCategoryTable." as cc ON cc.code = ".$codeField;
-		$sql .= " WHERE ".$codeField." IS NOT NULL";
-		$sql .= " AND ".$codeField." <> ''";
-		$sql .= " AND cc.rowid IS NULL";
-		if ($this->columnExists($productNatureTable, 'active')) {
-			$sql .= " AND pn.active = 1";
-		}
-		$resInsert = $this->db->query($sql);
-		dol_syslog(__METHOD__.' - Insert dictionary values result='.((int) $resInsert), $resInsert ? LOG_DEBUG : LOG_ERR);
-	}
-
-	/**
-	 * Check if a table exists.
-	 *
-	 * @param string $tableName Table name
-	 * @return bool
-	 */
-	private function tableExists($tableName)
-	{
-		$sql = "SHOW TABLES LIKE '".$this->db->escape($tableName)."'";
-		$resql = $this->db->query($sql);
-
-		return ($resql && $this->db->num_rows($resql) > 0);
-	}
-
-	/**
-	 * Check if a column exists on a table.
-	 *
-	 * @param string $tableName Table name
-	 * @param string $columnName Column name
-	 * @return bool
-	 */
-	private function columnExists($tableName, $columnName)
-	{
-		$sql = "SHOW COLUMNS FROM ".$tableName." LIKE '".$this->db->escape($columnName)."'";
-		$resql = $this->db->query($sql);
-
-		return ($resql && $this->db->num_rows($resql) > 0);
 	}
 
 	/**

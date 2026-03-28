@@ -97,15 +97,6 @@ if (!$user->admin) {
 // Actions on module constants
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
-if ($action === 'run_migration_scripts') {
-	$resultMigration = dynamicsprices_run_manual_migrations($db);
-	if ($resultMigration) {
-		setEventMessages($langs->trans('LMDB_MigrationScriptsExecuted'), null, 'mesgs');
-	} else {
-		setEventMessages($langs->trans('LMDB_MigrationScriptsExecutedWithErrors'), null, 'errors');
-	}
-}
-
 // Load dictionary definitions
 $module = new modDynamicsPrices($db);
 $taborder = empty($module->dictionaries['taborder']) ? array() : $module->dictionaries['taborder'];
@@ -230,20 +221,6 @@ setup_print_on_off('LMDB_COST_PRICE_ONLY');
 setup_print_on_off('LMDB_SUPPLIER_BUYPRICE_ALTERED');
 setup_print_on_off('LMDB_ADD_UPDATE_SUPPLIER_PRICE_ON_SUBMIT');
 setup_print_on_off('LMDB_KIT_PRICE_FROM_COMPONENTS');
-print '<tr>';
-print '<td>';
-print $form->textwithtooltip($langs->trans('LMDB_RunMigrationScripts'), $langs->trans('LMDB_RunMigrationScriptsHelp'), 2, 1, img_help(1, ''));
-print '<br><small>'.$langs->trans('LMDB_RunMigrationScriptsDesc').'</small>';
-print '</td>';
-print '<td class="center" width="20">&nbsp;</td>';
-print '<td class="right">';
-print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
-print '<input type="hidden" name="token" value="'.newToken().'">';
-print '<input type="hidden" name="action" value="run_migration_scripts">';
-print '<input type="submit" class="button button-edit" value="'.$langs->trans('LMDB_RunMigrationScriptsButton').'">';
-print '</form>';
-print '</td>';
-print '</tr>';
 
 print '</table>';
 
