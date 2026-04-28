@@ -16,6 +16,14 @@ DynamicsPrices automatise le recalcul des prix des produits en s'appuyant sur le
 - Plus grand nombre de triggers pour couvrir les actions courantes (création, modification, réception d'achat, etc.).
 - Calcul automatique des prix de revient à partir des nouveaux dictionnaires et de la moyenne des prix d'achat.
 
+### Nouveautés 2.2
+
+- Déduplication par requête des recalculs trigger pour éviter les doubles recalculs d'un même produit/kit.
+- Recalcul trigger recentré sur les événements de prix d'achat (`SUPPLIER_PRODUCT_BUYPRICE_*`, `PRODUCT_BUYPRICE_*`) avec mise à jour des kits parents dépendants.
+- Sécurisation du calcul du coût des kits avec fallback : prix fournisseur moyen -> prix de revient -> PMP.
+- Si aucune valeur n'est disponible (ni prix fournisseur, ni prix de revient, ni PMP), la procédure est interrompue avec message d'erreur.
+- Les notifications warning/error précisent désormais le composant et le kit concernés avec des liens cliquables vers leurs fiches.
+
 ### Compatibilité
 
 - Dolibarr ≥ 19.0 (minimum recommandé).
@@ -92,6 +100,14 @@ DynamicsPrices automates price recalculations using average purchase prices, mar
 - Service filtering: only physical products (`fk_product_type = 0`) are recalculated to avoid unintended updates.
 - Expanded trigger coverage for common actions (creation, modification, purchase receipt, etc.).
 - Automatic cost-price computation from dedicated dictionaries and purchase-price averages.
+
+### What's new in 2.2
+
+- Per-request trigger deduplication to avoid duplicate recomputation of the same product/kit.
+- Trigger recomputation narrowed to buy-price events (`SUPPLIER_PRODUCT_BUYPRICE_*`, `PRODUCT_BUYPRICE_*`) while still updating dependent parent kits.
+- Hardened kit-cost computation with fallback chain: average supplier purchase price -> cost price -> PMP.
+- When no value is available (no supplier price, no cost price, no PMP), the process is aborted with an error message.
+- Warning/error notifications now include both component and kit references with clickable links to their product cards.
 
 ### Compatibility
 
