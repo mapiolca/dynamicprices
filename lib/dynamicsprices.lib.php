@@ -275,13 +275,17 @@ function dynamicsprices_update_kit_cost_price($db, $productId)
 	global $langs;
 
 	$langs->load("dynamicsprices@dynamicsprices");
+	dol_include_once('/product/class/product.class.php');
+
+	$kit = new Product($db);
+	$kit->fetch((int) $productId);
+
 	$components = dynamicsprices_get_kit_components($db, $productId);
 	$totalCost = 0;
 
 	foreach ($components as $component) {
-		$componentUnitCost = dynamicsprices_get_component_unit_cost_for_kit($db, (int) $component['id']);
+		$componentUnitCost = dynamicsprices_get_component_unit_cost_for_kit($db, (int) $component['id'], $kit);
 		if ($componentUnitCost === null) {
-			setEventMessages($langs->trans('LMDB_KitCostMissingAllPricesError', (int) $component['id']), null, 'errors');
 			return false;
 		}
 		$totalCost += $componentUnitCost * (float) $component['qty'];
@@ -298,9 +302,10 @@ function dynamicsprices_update_kit_cost_price($db, $productId)
  *
  * @param DoliDB $db Database handler
  * @param int    $componentId Component product id
+ * @param Product $kit Kit product object
  * @return float|null Null when no usable price is available
  */
-function dynamicsprices_get_component_unit_cost_for_kit($db, $componentId)
+function dynamicsprices_get_component_unit_cost_for_kit($db, $componentId, $kit)
 {
 	global $langs;
 
@@ -314,20 +319,37 @@ function dynamicsprices_get_component_unit_cost_for_kit($db, $componentId)
 
 	$component = new Product($db);
 	if ($component->fetch($componentId) > 0) {
+		$componentLink = dynamicsprices_get_product_ref_link($component->id, $component->ref);
+		$kitLink = dynamicsprices_get_product_ref_link($kit->id, $kit->ref);
 		$costPrice = price2num($component->cost_price, 'MU');
 		if ($costPrice > 0) {
-			setEventMessages($langs->trans('LMDB_KitCostFallbackToCostPriceWarning', $component->ref), null, 'warnings');
+			setEventMessages($langs->trans('LMDB_KitCostFallbackToCostPriceWarning', $componentLink, $kitLink), null, 'warnings');
 			return (float) $costPrice;
 		}
 
 		$pmp = price2num($component->pmp, 'MU');
 		if ($pmp > 0) {
-			setEventMessages($langs->trans('LMDB_KitCostFallbackToPmpWarning', $component->ref), null, 'warnings');
+			setEventMessages($langs->trans('LMDB_KitCostFallbackToPmpWarning', $componentLink, $kitLink), null, 'warnings');
 			return (float) $pmp;
 		}
+
+		setEventMessages($langs->trans('LMDB_KitCostMissingAllPricesError', $componentLink, $kitLink), null, 'errors');
 	}
 
 	return null;
+}
+
+/**
+ * Build HTML link to product card.
+ *
+ * @param int    $productId Product id
+ * @param string $productRef Product ref
+ * @return string
+ */
+function dynamicsprices_get_product_ref_link($productId, $productRef)
+{
+	$url = dol_buildpath('/product/card.php?id='.(int) $productId, 1);
+	return '<a href="'.$url.'" target="_blank" rel="noopener noreferrer">'.dol_escape_htmltag((string) $productRef).'</a>';
 }
 
 // Update selling prices from a base cost and rules
