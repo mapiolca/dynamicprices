@@ -95,3 +95,6 @@ LMDB_AboutDocumentationLink = Ouvrir le README
 LMDB_AboutSupport = Support
 LMDB_AboutSupportValue = Contactez le mainteneur pour le support.
 LMDB_AboutContact = Contact
+LMDB_KitCostFallbackToCostPriceWarning = Le composant %s n'a pas de prix d'achat fournisseur. Le prix de revient est utilisé pour calculer le coût du kit.
+LMDB_KitCostFallbackToPmpWarning = Le composant %s n'a ni prix d'achat fournisseur ni prix de revient. Le PMP est utilisé pour calculer le coût du kit.
+LMDB_KitCostMissingAllPricesError = Le composant ID %s n'a ni prix d'achat fournisseur, ni prix de revient, ni PMP. Le calcul du coût du kit est abandonné.

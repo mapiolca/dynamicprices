@@ -93,3 +93,6 @@ LMDB_AboutDocumentationLink = README öffnen
 LMDB_AboutSupport = Support
 LMDB_AboutSupportValue = Kontaktieren Sie den Maintainer für Support.
 LMDB_AboutContact = Kontakt
+LMDB_KitCostFallbackToCostPriceWarning = Komponente %s hat keinen Lieferanten-Einkaufspreis. Der Einstandspreis wird für die Kit-Kostenberechnung verwendet.
+LMDB_KitCostFallbackToPmpWarning = Komponente %s hat keinen Lieferanten-Einkaufspreis und keinen Einstandspreis. Der PMP wird für die Kit-Kostenberechnung verwendet.
+LMDB_KitCostMissingAllPricesError = Komponenten-ID %s hat keinen Lieferanten-Einkaufspreis, keinen Einstandspreis und keinen PMP. Die Kit-Kostenberechnung wird abgebrochen.
