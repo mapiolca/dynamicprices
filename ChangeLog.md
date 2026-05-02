@@ -5,7 +5,6 @@
 - Ajout d'une chaîne de fallback pour le calcul du coût des kits : prix fournisseur moyen, puis prix de revient, puis PMP, avec arrêt en erreur si aucune valeur n'est disponible. / Added a fallback chain for kit-cost computation: average supplier price, then cost price, then PMP, with hard stop on error when no value is available.
 - Enrichissement des notifications de fallback/erreur avec références composant + kit et liens cliquables vers les fiches produit concernées. / Enriched fallback/error notifications with component + kit references and clickable links to the related product cards.
 - Ajout des traductions multilingues associées (en_US, fr_FR, de_DE, es_ES, it_IT) pour les nouveaux messages warning/error. / Added associated multilingual translations (en_US, fr_FR, de_DE, es_ES, it_IT) for the new warning/error messages.
-- Passage de la version module à 2.2. / Bumped module version to 2.2.
 
 ## 2.1.0
 - Refonte de la gestion des dictionnaires avec l'ajout du dictionnaire "Catégories commerciales" pour remplacer l'usage du dictionnaire "Nature de produit" dans les calculs métier. / Refactored dictionary management by adding the "Commercial categories" dictionary to replace the "Product nature" dictionary in business calculations.
