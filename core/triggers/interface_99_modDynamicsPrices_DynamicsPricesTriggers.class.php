@@ -38,6 +38,13 @@ require_once DOL_DOCUMENT_ROOT.'/core/triggers/dolibarrtriggers.class.php';
 class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 {
 	/**
+	 * Keep track of products already processed during the current request.
+	 *
+	 * @var array<int,bool>
+	 */
+	private static $processedProductsInRequest = array();
+
+	/**
 	* Constructor
 	*
 	* @param DoliDB $db Database handler
@@ -75,10 +82,14 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 
 		require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
 		$updateFunction = getDolGlobalString('LMDB_COST_PRICE_ONLY') ? 'update_customer_prices_from_cost_price' : 'update_customer_prices_from_suppliers';
-		$affectedActions = array('SUPPLIER_PRODUCT_BUYPRICE_CREATE', 'SUPPLIER_PRODUCT_BUYPRICE_MODIFY', 'SUPPLIER_PRODUCT_BUYPRICE_DELETE', 'PRODUCT_MODIFY', 'PRODUCT_CREATE', 'PRODUCT_CLONE', 'PRODUCT_PRICE_CREATE', 'PRODUCT_PRICE_MODIFY', 'PRODUCT_PRICE_DELETE', 'PRODUCT_BUYPRICE_CREATE', 'PRODUCT_BUYPRICE_MODIFY', 'PRODUCT_BUYPRICE_DELETE', 'PRODUCT_SUBPRODUCT_ADD', 'PRODUCT_SUBPRODUCT_UPDATE', 'PRODUCT_SUBPRODUCT_DELETE');
-		if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED') && in_array($action, $affectedActions, true)) {
+		$buyPriceActions = array('SUPPLIER_PRODUCT_BUYPRICE_CREATE', 'SUPPLIER_PRODUCT_BUYPRICE_MODIFY', 'SUPPLIER_PRODUCT_BUYPRICE_DELETE', 'PRODUCT_BUYPRICE_CREATE', 'PRODUCT_BUYPRICE_MODIFY', 'PRODUCT_BUYPRICE_DELETE');
+		if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED') && in_array($action, $buyPriceActions, true)) {
 			dol_include_once('/product/class/product.class.php');
 			$productId = $this->resolveProductIdFromTriggerAction($db, $action, $object);
+			if (!$this->shouldProcessProductForAction($productId)) {
+				dol_syslog(__METHOD__." - Skip duplicated recompute for product ".$productId." on action ".$action, LOG_DEBUG);
+				return 0;
+			}
 			$product = new Product($db);
 			if ($productId > 0 && $product->fetch($productId) > 0) {
 				if (!in_array((int) $product->type, array(Product::TYPE_PRODUCT, Product::TYPE_SERVICE), true)) {
@@ -89,6 +100,11 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 				call_user_func($updateFunction, $db, $user, $langs, $conf, $productId);
 				$parentKits = dynamicsprices_get_parent_kits($db, $productId);
 				foreach ($parentKits as $kitId) {
+					$kitId = (int) $kitId;
+					if (!$this->shouldProcessProductForAction($kitId)) {
+						dol_syslog(__METHOD__." - Skip duplicated recompute for parent kit ".$kitId." after product ".$productId, LOG_DEBUG);
+						continue;
+					}
 					call_user_func($updateFunction, $db, $user, $langs, $conf, $kitId);
 				}
 			}
@@ -332,6 +348,26 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		}
 
 		return 0;
+	}
+
+	/**
+	 * Ensure a product is recalculated only once per request for trigger actions.
+	 *
+	 * @param int    $productId Product id
+	 * @return bool
+	 */
+	private function shouldProcessProductForAction($productId)
+	{
+		if ($productId <= 0) {
+			return false;
+		}
+
+		if (!isset(self::$processedProductsInRequest[$productId])) {
+			self::$processedProductsInRequest[$productId] = true;
+			return true;
+		}
+
+		return false;
 	}
 
 	/**

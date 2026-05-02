@@ -272,18 +272,84 @@ function dynamicsprices_get_product_commercial_category($db, $productId)
 // Calculate and persist Kit cost price based on components
 function dynamicsprices_update_kit_cost_price($db, $productId)
 {
+	global $langs;
+
+	$langs->load("dynamicsprices@dynamicsprices");
+	dol_include_once('/product/class/product.class.php');
+
+	$kit = new Product($db);
+	$kit->fetch((int) $productId);
+
 	$components = dynamicsprices_get_kit_components($db, $productId);
 	$totalCost = 0;
 
 	foreach ($components as $component) {
-		$avg = dynamicsprices_get_average_supplier_price($db, $component['id']);
-		$avg = ($avg === null) ? 0 : $avg;
-		$totalCost += $avg * (float) $component['qty'];
+		$componentUnitCost = dynamicsprices_get_component_unit_cost_for_kit($db, (int) $component['id'], $kit);
+		if ($componentUnitCost === null) {
+			return false;
+		}
+		$totalCost += $componentUnitCost * (float) $component['qty'];
 	}
 
 	dynamicsprices_save_cost_price($db, $productId, $totalCost);
 
 	return $totalCost;
+}
+
+/**
+ * Resolve component unit cost used for kit cost computation.
+ * Priority is: supplier average price, then cost price, then PMP.
+ *
+ * @param DoliDB $db Database handler
+ * @param int    $componentId Component product id
+ * @param Product $kit Kit product object
+ * @return float|null Null when no usable price is available
+ */
+function dynamicsprices_get_component_unit_cost_for_kit($db, $componentId, $kit)
+{
+	global $langs;
+
+	$langs->load("dynamicsprices@dynamicsprices");
+	dol_include_once('/product/class/product.class.php');
+
+	$avg = dynamicsprices_get_average_supplier_price($db, $componentId);
+	if ($avg !== null) {
+		return (float) $avg;
+	}
+
+	$component = new Product($db);
+	if ($component->fetch($componentId) > 0) {
+		$componentLink = dynamicsprices_get_product_ref_link($component->id, $component->ref);
+		$kitLink = dynamicsprices_get_product_ref_link($kit->id, $kit->ref);
+		$costPrice = price2num($component->cost_price, 'MU');
+		if ($costPrice > 0) {
+			setEventMessages($langs->trans('LMDB_KitCostFallbackToCostPriceWarning', $componentLink, $kitLink), null, 'warnings');
+			return (float) $costPrice;
+		}
+
+		$pmp = price2num($component->pmp, 'MU');
+		if ($pmp > 0) {
+			setEventMessages($langs->trans('LMDB_KitCostFallbackToPmpWarning', $componentLink, $kitLink), null, 'warnings');
+			return (float) $pmp;
+		}
+
+		setEventMessages($langs->trans('LMDB_KitCostMissingAllPricesError', $componentLink, $kitLink), null, 'errors');
+	}
+
+	return null;
+}
+
+/**
+ * Build HTML link to product card.
+ *
+ * @param int    $productId Product id
+ * @param string $productRef Product ref
+ * @return string
+ */
+function dynamicsprices_get_product_ref_link($productId, $productRef)
+{
+	$url = dol_buildpath('/product/card.php?id='.(int) $productId, 1);
+	return '<a href="'.$url.'" target="_blank" rel="noopener noreferrer">'.dol_escape_htmltag((string) $productRef).'</a>';
 }
 
 // Update selling prices from a base cost and rules
@@ -471,6 +537,9 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		$product->fetch($prodid);
 
 		$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
+		if ($costPrice === false) {
+			return -1;
+		}
 		$rules = dynamicsprices_get_price_rules($db, $commercialCategoryId);
 		if (getDolGlobalInt('LMDB_KIT_PRICE_FROM_COMPONENTS')) {
 		$components = dynamicsprices_get_kit_components($db, $prodid);
@@ -564,6 +633,9 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		$product->fetch($prodid);
 
 		$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
+		if ($costPrice === false) {
+			return -1;
+		}
 		$rules = dynamicsprices_get_price_rules($db, $commercialCategoryId);
 		if (getDolGlobalInt('LMDB_KIT_PRICE_FROM_COMPONENTS')) {
 		$components = dynamicsprices_get_kit_components($db, $prodid);

@@ -12,9 +12,9 @@ DynamicsPrices automatise le recalcul des prix des produits en s'appuyant sur le
 
 - Mise à jour automatique des prix de vente en fonction du prix d'achat moyen et d'un dictionnaire de coefficients dédié.
 - Recalcul des kits après leurs composants pour éviter les doublons de prix de vente et refléter le coût cumulé des sous-produits et services.
-- Filtrage des services : seuls les produits physiques (`fk_product_type = 0`) sont recalculés pour éviter les mises à jour intempestives.
 - Plus grand nombre de triggers pour couvrir les actions courantes (création, modification, réception d'achat, etc.).
 - Calcul automatique des prix de revient à partir des nouveaux dictionnaires et de la moyenne des prix d'achat.
+- Alerte sur les prix des kits : si aucune valeur n'est disponible (ni prix fournisseur, ni prix de revient, ni PMP), la procédure est interrompue avec message d'erreur.
 
 ### Compatibilité
 
@@ -89,9 +89,9 @@ DynamicsPrices automates price recalculations using average purchase prices, mar
 
 - Automatic selling-price updates driven by average purchase price and a dedicated coefficient dictionary.
 - Kits recalculated after their components to avoid duplicate selling prices and to reflect cumulative component and service costs.
-- Service filtering: only physical products (`fk_product_type = 0`) are recalculated to avoid unintended updates.
 - Expanded trigger coverage for common actions (creation, modification, purchase receipt, etc.).
 - Automatic cost-price computation from dedicated dictionaries and purchase-price averages.
+- Alert on kit's prices : when no value is available (no supplier price, no cost price, no PMP), the process is aborted with an error message.
 
 ### Compatibility
 
