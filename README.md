@@ -15,14 +15,7 @@ DynamicsPrices automatise le recalcul des prix des produits en s'appuyant sur le
 - Filtrage des services : seuls les produits physiques (`fk_product_type = 0`) sont recalculés pour éviter les mises à jour intempestives.
 - Plus grand nombre de triggers pour couvrir les actions courantes (création, modification, réception d'achat, etc.).
 - Calcul automatique des prix de revient à partir des nouveaux dictionnaires et de la moyenne des prix d'achat.
-
-### Nouveautés 2.2
-
-- Déduplication par requête des recalculs trigger pour éviter les doubles recalculs d'un même produit/kit.
-- Recalcul trigger recentré sur les événements de prix d'achat (`SUPPLIER_PRODUCT_BUYPRICE_*`, `PRODUCT_BUYPRICE_*`) avec mise à jour des kits parents dépendants.
-- Sécurisation du calcul du coût des kits avec fallback : prix fournisseur moyen -> prix de revient -> PMP.
-- Si aucune valeur n'est disponible (ni prix fournisseur, ni prix de revient, ni PMP), la procédure est interrompue avec message d'erreur.
-- Les notifications warning/error précisent désormais le composant et le kit concernés avec des liens cliquables vers leurs fiches.
+- Alerte sur les prix des kits : si aucune valeur n'est disponible (ni prix fournisseur, ni prix de revient, ni PMP), la procédure est interrompue avec message d'erreur.
 
 ### Compatibilité
 
