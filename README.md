@@ -93,14 +93,7 @@ DynamicsPrices automates price recalculations using average purchase prices, mar
 - Service filtering: only physical products (`fk_product_type = 0`) are recalculated to avoid unintended updates.
 - Expanded trigger coverage for common actions (creation, modification, purchase receipt, etc.).
 - Automatic cost-price computation from dedicated dictionaries and purchase-price averages.
-
-### What's new in 2.2
-
-- Per-request trigger deduplication to avoid duplicate recomputation of the same product/kit.
-- Trigger recomputation narrowed to buy-price events (`SUPPLIER_PRODUCT_BUYPRICE_*`, `PRODUCT_BUYPRICE_*`) while still updating dependent parent kits.
-- Hardened kit-cost computation with fallback chain: average supplier purchase price -> cost price -> PMP.
-- When no value is available (no supplier price, no cost price, no PMP), the process is aborted with an error message.
-- Warning/error notifications now include both component and kit references with clickable links to their product cards.
+- Alert on kit's prices : when no value is available (no supplier price, no cost price, no PMP), the process is aborted with an error message.
 
 ### Compatibility
 
