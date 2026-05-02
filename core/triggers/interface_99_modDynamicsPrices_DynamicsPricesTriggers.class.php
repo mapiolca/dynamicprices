@@ -76,19 +76,17 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
 		$updateFunction = getDolGlobalString('LMDB_COST_PRICE_ONLY') ? 'update_customer_prices_from_cost_price' : 'update_customer_prices_from_suppliers';
 		$affectedActions = array('SUPPLIER_PRODUCT_BUYPRICE_CREATE', 'SUPPLIER_PRODUCT_BUYPRICE_MODIFY', 'SUPPLIER_PRODUCT_BUYPRICE_DELETE', 'PRODUCT_MODIFY', 'PRODUCT_CREATE', 'PRODUCT_CLONE', 'PRODUCT_PRICE_CREATE', 'PRODUCT_PRICE_MODIFY', 'PRODUCT_PRICE_DELETE', 'PRODUCT_BUYPRICE_CREATE', 'PRODUCT_BUYPRICE_MODIFY', 'PRODUCT_BUYPRICE_DELETE', 'PRODUCT_SUBPRODUCT_ADD', 'PRODUCT_SUBPRODUCT_UPDATE', 'PRODUCT_SUBPRODUCT_DELETE');
-		//var_dump($updateFunction);
-		//var_dump($action);
-                if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED') && in_array($action, $affectedActions, true)) {
-                        dol_include_once('/product/class/product.class.php');
-                        $productId = !empty($object->fk_product) ? $object->fk_product : (isset($object->id) ? $object->id : 0);
-                        $product = new Product($db);
-                        if ($productId > 0 && $product->fetch($productId) > 0) {
-                                if ((int) $product->type !== Product::TYPE_PRODUCT) {
-                                        return 0;
-                                }
-                        }
-                        if ($productId > 0) {
-                                call_user_func($updateFunction, $db, $user, $langs, $conf, $productId);
+		if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED') && in_array($action, $affectedActions, true)) {
+			dol_include_once('/product/class/product.class.php');
+			$productId = $this->resolveProductIdFromTriggerAction($db, $action, $object);
+			$product = new Product($db);
+			if ($productId > 0 && $product->fetch($productId) > 0) {
+				if ((int) $product->type !== Product::TYPE_PRODUCT) {
+					return 0;
+				}
+			}
+			if ($productId > 0) {
+				call_user_func($updateFunction, $db, $user, $langs, $conf, $productId);
 				$parentKits = dynamicsprices_get_parent_kits($db, $productId);
 				foreach ($parentKits as $kitId) {
 					call_user_func($updateFunction, $db, $user, $langs, $conf, $kitId);
@@ -331,6 +329,58 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 			default:
 				dol_syslog("Trigger '".$this->name."' for action '".$action."' launched by ".__FILE__.". id=".$object->id);
 				break;
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Resolve related product id from trigger context.
+	 *
+	 * @param DoliDB      $db     Database handler
+	 * @param string      $action Trigger action
+	 * @param CommonObject $object Trigger object
+	 * @return int
+	 */
+	private function resolveProductIdFromTriggerAction($db, $action, $object)
+	{
+		if (!empty($object->fk_product)) {
+			return (int) $object->fk_product;
+		}
+
+		if (in_array($action, array('PRODUCT_CREATE', 'PRODUCT_MODIFY', 'PRODUCT_CLONE', 'PRODUCT_SUBPRODUCT_ADD', 'PRODUCT_SUBPRODUCT_UPDATE', 'PRODUCT_SUBPRODUCT_DELETE'), true) && !empty($object->id)) {
+			return (int) $object->id;
+		}
+
+		if (in_array($action, array('PRODUCT_PRICE_CREATE', 'PRODUCT_PRICE_MODIFY', 'PRODUCT_PRICE_DELETE'), true) && !empty($object->id)) {
+			$sql = "SELECT fk_product FROM ".MAIN_DB_PREFIX."product_price WHERE rowid = ".((int) $object->id);
+			$resql = $db->query($sql);
+			if ($resql) {
+				$obj = $db->fetch_object($resql);
+				if (!empty($obj->fk_product)) {
+					return (int) $obj->fk_product;
+				}
+			}
+		}
+
+		if (in_array($action, array('SUPPLIER_PRODUCT_BUYPRICE_CREATE', 'SUPPLIER_PRODUCT_BUYPRICE_MODIFY', 'SUPPLIER_PRODUCT_BUYPRICE_DELETE', 'PRODUCT_BUYPRICE_CREATE', 'PRODUCT_BUYPRICE_MODIFY', 'PRODUCT_BUYPRICE_DELETE'), true)) {
+			$priceRowId = 0;
+			if (!empty($object->product_fourn_price_id)) {
+				$priceRowId = (int) $object->product_fourn_price_id;
+			} elseif (!empty($object->id)) {
+				$priceRowId = (int) $object->id;
+			}
+
+			if ($priceRowId > 0) {
+				$sql = "SELECT fk_product FROM ".MAIN_DB_PREFIX."product_fournisseur_price WHERE rowid = ".$priceRowId;
+				$resql = $db->query($sql);
+				if ($resql) {
+					$obj = $db->fetch_object($resql);
+					if (!empty($obj->fk_product)) {
+						return (int) $obj->fk_product;
+					}
+				}
+			}
 		}
 
 		return 0;
