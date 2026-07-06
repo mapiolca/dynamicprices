@@ -144,8 +144,13 @@ $tabcond = empty($module->dictionaries['tabcond']) ? array() : $module->dictiona
 $tabhelp = empty($module->dictionaries['tabhelp']) ? array() : $module->dictionaries['tabhelp'];
 $tabsave = empty($module->dictionaries['tabsave']) ? array() : $module->dictionaries['tabsave'];
 $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
+$dictionaryActionsFile = DOL_DOCUMENT_ROOT.'/core/actions_dictionnaire.inc.php';
+$dictionaryTemplateFile = DOL_DOCUMENT_ROOT.'/core/tpl/admin/dict.tpl.php';
+$canRenderEmbeddedDictionaries = is_readable($dictionaryActionsFile) && is_readable($dictionaryTemplateFile);
 
-include DOL_DOCUMENT_ROOT.'/core/actions_dictionnaire.inc.php';
+if ($canRenderEmbeddedDictionaries) {
+	include $dictionaryActionsFile;
+}
 
 /**
  * Build options list for commercial category select.
@@ -205,6 +210,42 @@ function dynamicspricesInjectCommercialCategorySelect($html, $form, $options)
 		},
 		$html
 	);
+}
+
+/**
+ * Print fallback links to native dictionary administration when old embedded core tpl/actions are unavailable.
+ *
+ * @param array<int|string,string> $tablib Dictionary label keys
+ * @param array<int|string,string> $tabname Dictionary table names
+ * @return void
+ */
+function dynamicspricesPrintNativeDictionaryFallback(array $tablib, array $tabname)
+{
+	global $langs;
+
+	print '<table class="noborder centpercent">';
+	print '<tr class="liste_titre">';
+	print '<td>'.$langs->trans('DynamicPricesDictionaries').'</td>';
+	print '<td class="right">'.$langs->trans('Action').'</td>';
+	print '</tr>';
+	print '<tr class="oddeven">';
+	print '<td colspan="2"><span class="opacitymedium">'.$langs->trans('DynamicPricesNativeDictionaryAdminHelp').'</span></td>';
+	print '</tr>';
+
+	foreach ($tabname as $key => $tableName) {
+		$labelKey = isset($tablib[$key]) ? (string) $tablib[$key] : (string) $tableName;
+		print '<tr class="oddeven">';
+		print '<td>';
+		print dol_escape_htmltag($langs->trans($labelKey));
+		print '<br><span class="opacitymedium">'.dol_escape_htmltag((string) $tableName).'</span>';
+		print '</td>';
+		print '<td class="right">';
+		print '<a class="button" href="'.DOL_URL_ROOT.'/admin/dict.php">'.$langs->trans('DynamicPricesOpenNativeDictionaries').'</a>';
+		print '</td>';
+		print '</tr>';
+	}
+
+	print '</table>';
 }
 
 /**
@@ -470,11 +511,15 @@ print '</table>';
 print '<br>';
 
 // Dictionary management
-$commercialCategoryOptions = dynamicspricesGetCommercialCategoryOptions($db);
-ob_start();
-include DOL_DOCUMENT_ROOT.'/core/tpl/admin/dict.tpl.php';
-$dictionaryHtml = ob_get_clean();
-echo dynamicspricesInjectCommercialCategorySelect($dictionaryHtml, $form, $commercialCategoryOptions);
+if ($canRenderEmbeddedDictionaries) {
+	$commercialCategoryOptions = dynamicspricesGetCommercialCategoryOptions($db);
+	ob_start();
+	include $dictionaryTemplateFile;
+	$dictionaryHtml = ob_get_clean();
+	echo dynamicspricesInjectCommercialCategorySelect($dictionaryHtml, $form, $commercialCategoryOptions);
+} else {
+	dynamicspricesPrintNativeDictionaryFallback($tablib, $tabname);
+}
 
 if (empty($setupnotempty)) {
 print '<br>'.$langs->trans("NothingToSetup");

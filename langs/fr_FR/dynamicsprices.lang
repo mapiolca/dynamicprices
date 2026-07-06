@@ -14,6 +14,9 @@ ModuleDynamicsPricesDesc = Ce module permet de mettre à jour les prix de vente 
 #
 DynamicsPricesSetup = Réglages des prix de vente dynamiques
 DynamicsPricesSetupPage = Page de réglage du module de Prix de vente dynamiques
+DynamicPricesDictionaries = Dictionnaires DynamicPrices
+DynamicPricesNativeDictionaryAdminHelp = Cette version de Dolibarr ne fournit plus le rendu embarqué des dictionnaires utilisé par les anciennes pages de configuration. Utilisez l'administration native des dictionnaires pour gérer ces tables.
+DynamicPricesOpenNativeDictionaries = Ouvrir les dictionnaires natifs
 LMDB_UpdateOptions=Options de mise à jour des prix de vente
 LMDB_KIT_PRICE_FROM_COMPONENTS = Calculer les prix des Kits à partir de vente des composants plutot que le prix de revient
 

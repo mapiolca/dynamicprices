@@ -14,6 +14,9 @@ ModuleDynamicsPricesDesc = This module allows you to update sales prices based o
 #
 DynamicsPricesSetup = Dynamic sales price settings
 DynamicsPricesSetupPage = Dynamic sales price module settings page
+DynamicPricesDictionaries = DynamicPrices dictionaries
+DynamicPricesNativeDictionaryAdminHelp = This Dolibarr version no longer provides the embedded dictionary rendering used by older setup pages. Use the native dictionary administration to manage these tables.
+DynamicPricesOpenNativeDictionaries = Open native dictionaries
 LMDB_UpdateOptions = Sales price update options
 LMDB_KIT_PRICE_FROM_COMPONENTS = Calculate kit prices from the selling price of the components rather than from the cost price.
 LMDB_COST_PRICE_ONLY = Update sales prices based on cost prices only.

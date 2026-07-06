@@ -14,6 +14,9 @@ ModuleDynamicsPricesDesc = Dieses Modul ermöglicht die Aktualisierung der Verka
 #
 DynamicsPricesSetup = Einstellungen für dynamische Verkaufspreise
 DynamicsPricesSetupPage = Einstellungsseite des Moduls Dynamische Verkaufspreise
+DynamicPricesDictionaries = DynamicPrices-Wörterbücher
+DynamicPricesNativeDictionaryAdminHelp = Diese Dolibarr-Version stellt die eingebettete Wörterbuchanzeige älterer Einstellungsseiten nicht mehr bereit. Verwenden Sie die native Wörterbuchverwaltung, um diese Tabellen zu verwalten.
+DynamicPricesOpenNativeDictionaries = Native Wörterbücher öffnen
 LMDB_UpdateOptions = Optionen zur Aktualisierung der Verkaufspreise
 LMDB_KIT_PRICE_FROM_COMPONENTS = Kit-Preise aus den Verkaufspreisen der Komponenten statt aus dem Selbstkostenpreis berechnen.
 LMDB_COST_PRICE_ONLY = Verkaufspreise nur auf Basis der Selbstkosten aktualisieren.
