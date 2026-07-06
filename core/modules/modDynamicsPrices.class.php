@@ -268,6 +268,9 @@ class modDynamicsPrices extends DolibarrModules
 		 );
 		 */
 /* BEGIN MODULEBUILDER DICTIONARIES */
+		$coefPriceDictionaryKey = 0;
+		$marginOnCostDictionaryKey = 1;
+		$commercialCategoryDictionaryKey = 2;
 		$commercialCategoryHasEntity = $this->columnExists(MAIN_DB_PREFIX."c_commercial_category", 'entity');
 		$commercialCategoryEntityList = getEntity('product');
 		$commercialCategorySelectSql = $commercialCategoryHasEntity
@@ -280,41 +283,53 @@ class modDynamicsPrices extends DolibarrModules
 
 		$this->dictionaries = array(
 			'langs' => 'dynamicsprices@dynamicsprices',
-			'tabname' => array(MAIN_DB_PREFIX."c_coefprice", MAIN_DB_PREFIX."c_margin_on_cost", MAIN_DB_PREFIX."c_commercial_category"),
-			'tablib' => array("LMDB_coefprice", "LMDB_marginoncost", "LMDB_commercialcategories"),
+			'tabname' => array(
+				$coefPriceDictionaryKey => "c_coefprice",
+				$marginOnCostDictionaryKey => "c_margin_on_cost",
+				$commercialCategoryDictionaryKey => "c_commercial_category",
+			),
+			'tablib' => array(
+				$coefPriceDictionaryKey => "LMDB_coefprice",
+				$marginOnCostDictionaryKey => "LMDB_marginoncost",
+				$commercialCategoryDictionaryKey => "LMDB_commercialcategories",
+			),
 			'tabsql' => array(
-				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, '.$commercialCategoryLabelSql.' as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
-				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, '.$commercialCategoryLabelSql.' as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t WHERE t.entity = '.((int) $conf->entity),
-				$commercialCategorySelectSql,
+				$coefPriceDictionaryKey => 'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, '.$commercialCategoryLabelSql.' as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
+				$marginOnCostDictionaryKey => 'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, '.$commercialCategoryLabelSql.' as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t WHERE t.entity = '.((int) $conf->entity),
+				$commercialCategoryDictionaryKey => $commercialCategorySelectSql,
 			),
 			'tabsqlsort' => array(
-				"code ASC",
-				"code ASC",
-				"label ASC",
+				$coefPriceDictionaryKey => "code ASC",
+				$marginOnCostDictionaryKey => "code ASC",
+				$commercialCategoryDictionaryKey => "label ASC",
 			),
 			'tabfield' => array(
-				"code,code_commercial_category,pricelevel,targetrate,minrate",
-				"code,code_commercial_category,margin_on_cost_percent",
-				"code,label",
+				$coefPriceDictionaryKey => "code,code_commercial_category,pricelevel,targetrate,minrate",
+				$marginOnCostDictionaryKey => "code,code_commercial_category,margin_on_cost_percent",
+				$commercialCategoryDictionaryKey => "code,label",
 			),
 			'tabfieldvalue' => array(
-				"code,entity,code_commercial_category,pricelevel,targetrate,minrate",
-				"code,entity,code_commercial_category,margin_on_cost_percent",
-				$commercialCategoryFieldValue,
+				$coefPriceDictionaryKey => "code,entity,code_commercial_category,pricelevel,targetrate,minrate",
+				$marginOnCostDictionaryKey => "code,entity,code_commercial_category,margin_on_cost_percent",
+				$commercialCategoryDictionaryKey => $commercialCategoryFieldValue,
 			),
 			'tabfieldinsert' => array(
-				"code,entity,code_commercial_category,pricelevel,targetrate,minrate",
-				"code,entity,code_commercial_category,margin_on_cost_percent",
-				$commercialCategoryFieldValue,
+				$coefPriceDictionaryKey => "code,entity,code_commercial_category,pricelevel,targetrate,minrate",
+				$marginOnCostDictionaryKey => "code,entity,code_commercial_category,margin_on_cost_percent",
+				$commercialCategoryDictionaryKey => $commercialCategoryFieldValue,
 			),
-			'tabrowid' => array('rowid', 'rowid', 'rowid'),
+			'tabrowid' => array(
+				$coefPriceDictionaryKey => 'rowid',
+				$marginOnCostDictionaryKey => 'rowid',
+				$commercialCategoryDictionaryKey => 'rowid',
+			),
 			'tabcond' => array(
-				isModEnabled('dynamicsprices'),
-				isModEnabled('dynamicsprices'),
-				isModEnabled('dynamicsprices'),
+				$coefPriceDictionaryKey => isModEnabled('dynamicsprices'),
+				$marginOnCostDictionaryKey => isModEnabled('dynamicsprices'),
+				$commercialCategoryDictionaryKey => isModEnabled('dynamicsprices'),
 			),
 			'tabhelp' => array(
-				array(
+				$coefPriceDictionaryKey => array(
 					'code' => $langs->trans('LMDB_CodeTooltipHelp'),
 					'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
 					'code_commercial_category' => $langs->trans('LMDB_CodeCommercialCategoryTooltipHelp'),
@@ -324,7 +339,7 @@ class modDynamicsPrices extends DolibarrModules
 					'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
 					'active' => $langs->trans('LMDB_ActiveTooltipHelp'),
 				),
-				array(
+				$marginOnCostDictionaryKey => array(
 					'code' => $langs->trans('LMDB_CodeTooltipHelp'),
 					'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
 					'code_commercial_category' => $langs->trans('LMDB_CodeCommercialCategoryTooltipHelp'),
@@ -332,7 +347,7 @@ class modDynamicsPrices extends DolibarrModules
 					'margin_on_cost_percent' => $langs->trans('LMDB_MarginOnCostTooltipHelp'),
 					'active' => $langs->trans('LMDB_ActiveTooltipHelp'),
 				),
-				array(
+				$commercialCategoryDictionaryKey => array(
 					'code' => $langs->trans('LMDB_CodeTooltipHelp'),
 					'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
 					'label' => $langs->trans('LMDB_LabelTooltipHelp'),
