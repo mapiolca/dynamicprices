@@ -4,7 +4,7 @@
 
 DynamicsPrices est un module externe Dolibarr qui calcule et exploite des prix dynamiques à partir des coûts, prix fournisseurs et coefficients métier.
 
-Depuis la version 2.2.0, le module dispose d'un prix de revient propre par produit et par entité Multicompany. Ce prix est stocké dans les tables du module, historisé, exposé en API/export et peut être utilisé pour alimenter les coûts de lignes commerciales sans écraser le champ natif Dolibarr `llx_product.cost_price`.
+Depuis la version 3.0, le module dispose d'un prix de revient propre par produit et par entité Multicompany. Ce prix est stocké dans les tables du module, historisé, exposé en API/export et peut être utilisé pour alimenter les coûts de lignes commerciales sans écraser le champ natif Dolibarr `llx_product.cost_price`.
 
 ## Fonctionnalités
 
