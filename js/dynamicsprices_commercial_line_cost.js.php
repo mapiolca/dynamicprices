@@ -65,14 +65,17 @@ header('Content-Type: application/javascript; charset=UTF-8');
 	var defaultPriority = ['dynamicprices', 'dolibarr_default', 'pmp', 'native_cost_price'];
 
 	function getCommercialLineForm() {
-		var form = document.querySelector('form[name="addproduct"]');
-		if (form) {
-			return form;
-		}
-
 		var actionInput = document.querySelector('form input[name="action"][value="addline"]');
 		if (actionInput && actionInput.form) {
 			return actionInput.form;
+		}
+
+		var form = document.querySelector('form[name="addproduct"]');
+		if (form) {
+			var formActionInput = form.querySelector('input[name="action"]');
+			if (formActionInput && formActionInput.value === 'addline') {
+				return form;
+			}
 		}
 
 		return null;
