@@ -12,7 +12,7 @@ Depuis la version 2.2.0, le module dispose d'un prix de revient propre par produ
 - Historique des recalculs et des valeurs appliquées.
 - Sources configurables : PMP, moyenne fournisseur, meilleur prix fournisseur, fournisseur principal, coût natif Dolibarr, valeur manuelle.
 - Fallback configurable lorsque le coût DynamicPrices est absent.
-- Recalcul unitaire depuis la fiche produit.
+- Recalcul unitaire depuis l'onglet **Prix d'achat** du produit.
 - Prévisualisation sans écriture.
 - Recalcul de masse avec simulation, confirmation et export CSV.
 - Migration non destructive depuis l'ancien comportement.
@@ -84,7 +84,7 @@ La migration est filtrée par entité courante, protégée par token CSRF et rej
 
 ## Utilisation
 
-Sur la fiche produit, le module affiche le coût DynamicPrices courant, la source, la règle, le dernier calcul et l'accès à l'historique lorsque l'utilisateur dispose des droits.
+Sur l'onglet **Prix d'achat** du produit, le module affiche le coût DynamicPrices courant, la source, la règle, le dernier calcul et l'accès à l'historique lorsque l'utilisateur dispose des droits.
 
 Le recalcul de masse est disponible via `cost_mass_update.php`. Il permet de filtrer les produits, prévisualiser les résultats, exporter la simulation en CSV, puis confirmer l'écriture.
 

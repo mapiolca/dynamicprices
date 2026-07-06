@@ -123,7 +123,7 @@ class modDynamicsPrices extends DolibarrModules
 			'hooks' => array(
 				'data' => array(
 					'ordersuppliercard',
-					'productcard',
+					'pricesuppliercard',
 				),
 				'entity' => '0',
 			),

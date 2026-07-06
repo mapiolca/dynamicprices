@@ -160,7 +160,7 @@ Ajouter une couche coût DynamicPrices séparée :
    - garder `product.cost_price` comme source lisible et comme écriture legacy optionnelle désactivée par défaut.
 
 4. Interface
-   - hook `productcard` pour afficher le bloc coût DynamicPrices ;
+   - hook `pricesuppliercard` pour afficher le bloc coût DynamicPrices dans l'onglet prix d'achat ;
    - page d'historique paginée ;
    - page de recalcul de masse avec simulation puis confirmation.
 
@@ -228,7 +228,7 @@ Tests prioritaires :
 - Kit recalculé après composants.
 - Historique créé au recalcul.
 - Aucune écriture dans `product.cost_price` lorsque `DYNAMICPRICES_COST_ALLOW_NATIVE_WRITE = 0`.
-- Affichage fiche produit avec coût Dolibarr et coût DynamicPrices.
+- Affichage dans l'onglet prix d'achat avec coût Dolibarr et coût DynamicPrices.
 - Recalcul de masse en simulation puis confirmation.
 - Deux entités avec coûts différents pour le même produit partagé.
 - PHPStan si l'outillage est disponible.

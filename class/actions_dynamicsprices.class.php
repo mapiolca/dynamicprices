@@ -53,7 +53,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		dol_syslog(__METHOD__.' - Start doActions with action='.$action, LOG_DEBUG);
 		dol_syslog(__METHOD__.' - WARNING trace: entering doActions', LOG_WARNING);
 
-		if ($this->isHookContext($parameters, 'productcard')) {
+		if ($this->isProductCostContext($parameters)) {
 			return $this->doProductCostActions($parameters, $object, $action, $hookmanager);
 		}
 
@@ -175,7 +175,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	}
 
 	/**
-	 * Display DynamicPrices cost block on product card.
+	 * Display DynamicPrices cost block in the native supplier prices tab form.
 	 *
 	 * @param array<string,mixed> $parameters Hook parameters
 	 * @param CommonObject $object Current object
@@ -185,7 +185,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	public function formObjectOptions($parameters, &$object, &$action, $hookmanager)
 	{
-		if (!$this->isHookContext($parameters, 'productcard')) {
+		if (!$this->isProductCostContext($parameters)) {
 			return 0;
 		}
 
@@ -203,7 +203,45 @@ class ActionsDynamicsPrices extends CommonHookActions
 
 		$service = new DynamicPricesCostService($this->db);
 		$record = $service->getDynamicCostRecord($productId, !empty($object->entity) ? (int) $object->entity : 0);
-		$this->resprints .= $this->renderProductCostBlock($object, $record);
+		$this->resprints .= $this->renderProductCostBlock($object, $record, true);
+
+		return 0;
+	}
+
+	/**
+	 * Display DynamicPrices cost block on supplier prices tab view.
+	 *
+	 * @param array<string,mixed> $parameters Hook parameters
+	 * @param CommonObject $object Current object
+	 * @param string $action Current action
+	 * @param HookManager $hookmanager Hook manager
+	 * @return int
+	 */
+	public function addMoreActionsButtons($parameters, &$object, &$action, $hookmanager)
+	{
+		if (!$this->isProductCostContext($parameters)) {
+			return 0;
+		}
+		if (in_array($action, array('create_price', 'edit_price'), true)) {
+			return 0;
+		}
+
+		global $langs, $user;
+		$langs->load('dynamicsprices@dynamicsprices');
+
+		if (!$this->canUseCost($user, 'read')) {
+			return 0;
+		}
+
+		$productId = $this->getProductIdFromObject($object);
+		if ($productId <= 0) {
+			return 0;
+		}
+
+		$service = new DynamicPricesCostService($this->db);
+		$record = $service->getDynamicCostRecord($productId, !empty($object->entity) ? (int) $object->entity : 0);
+
+		print $this->renderProductCostBlock($object, $record, false);
 
 		return 0;
 	}
@@ -238,7 +276,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			if (!$this->canUseCost($user, 'read')) {
 				accessforbidden();
 			}
-			$calculation = $service->calculateProductCost($productId, array('entity' => $entity, 'calculation_context' => 'productcard_preview'));
+			$calculation = $service->calculateProductCost($productId, array('entity' => $entity, 'calculation_context' => 'pricesuppliercard_preview'));
 			if (array_key_exists('dynamic_cost_price', $calculation) && $calculation['dynamic_cost_price'] !== null) {
 				setEventMessages($langs->trans('DynamicPricesCostPreviewResult', price($calculation['dynamic_cost_price'])), null, 'mesgs');
 			} else {
@@ -256,7 +294,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			accessforbidden($langs->trans('ErrorBadToken'));
 		}
 
-		$result = $service->recalculateProductCost($productId, $user, array('entity' => $entity, 'calculation_context' => 'productcard'));
+		$result = $service->recalculateProductCost($productId, $user, array('entity' => $entity, 'calculation_context' => 'pricesuppliercard'));
 		if ($result < 0) {
 			setEventMessages($service->error, $service->errors, 'errors');
 			return -1;
@@ -922,6 +960,17 @@ class ActionsDynamicsPrices extends CommonHookActions
 	}
 
 	/**
+	 * Check whether current hook context is the native supplier prices product tab.
+	 *
+	 * @param array<string,mixed> $parameters Hook parameters
+	 * @return bool
+	 */
+	private function isProductCostContext($parameters)
+	{
+		return $this->isHookContext($parameters, 'pricesuppliercard');
+	}
+
+	/**
 	 * Check DynamicPrices cost permission with admin elevation.
 	 *
 	 * @param User $user User
@@ -966,9 +1015,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 *
 	 * @param Product|stdClass $product Product object
 	 * @param stdClass|null $record Current DynamicPrices cost record
+	 * @param bool $asTableRow Return as a table row for formObjectOptions
 	 * @return string
 	 */
-	private function renderProductCostBlock($product, $record)
+	private function renderProductCostBlock($product, $record, $asTableRow = true)
 	{
 		global $langs, $user;
 
@@ -988,9 +1038,12 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$previewUrl = $baseUrl.'&action=dynamicsprices_preview_cost&token='.newToken();
 		$recalculateUrl = $baseUrl.'&action=dynamicsprices_recalculate_cost&token='.newToken();
 
-		$html = '<tr class="oddeven">';
-		$html .= '<td colspan="4">';
-		$html .= '<div class="div-table-responsive-no-min">';
+		$html = '';
+		if ($asTableRow) {
+			$html .= '<tr class="oddeven">';
+			$html .= '<td colspan="4">';
+		}
+		$html .= '<div class="div-table-responsive-no-min dynamicsprices-cost-block">';
 		$html .= '<table class="noborder centpercent">';
 		$html .= '<tr class="liste_titre"><td colspan="2">'.$langs->trans('DynamicPricesCostBlockTitle').'</td></tr>';
 		$html .= '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DynamicPricesNativeCostPrice').'</td><td class="right">'.$nativeCost.'</td></tr>';
@@ -1011,8 +1064,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$html .= '</td></tr>';
 		$html .= '</table>';
 		$html .= '</div>';
-		$html .= '</td>';
-		$html .= '</tr>';
+		if ($asTableRow) {
+			$html .= '</td>';
+			$html .= '</tr>';
+		}
 
 		return $html;
 	}

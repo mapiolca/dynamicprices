@@ -40,7 +40,7 @@ Les hooks servent à intégrer l'UI ou brancher un point d'entrée Dolibarr exis
 
 Hooks prévus pour cette feature :
 
-- `productcard` pour le bloc coût DynamicPrices ;
+- `pricesuppliercard` pour le bloc coût DynamicPrices dans l'onglet prix d'achat ;
 - `productlist` ou contexte liste produit si disponible pour colonne optionnelle ;
 - contextes commerciaux à vérifier pour devis, commandes et factures.
 
