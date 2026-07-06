@@ -216,6 +216,9 @@ function dynamicspricesPrintSelectSetting($confkey, array $options, $help = '')
 	global $conf, $form, $langs;
 
 	$value = getDolGlobalString($confkey);
+	if ($confkey === 'DYNAMICPRICES_COST_LINE_STRATEGY' && $value === 'on_create_and_update') {
+		$value = 'on_create_only';
+	}
 	print '<tr>';
 	print '<td>';
 	if ($help !== '') {
@@ -389,7 +392,6 @@ setup_print_on_off('DYNAMICPRICES_COST_ENABLE');
 setup_print_on_off('DYNAMICPRICES_COST_USE_FOR_SALES');
 dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_LINE_STRATEGY', array(
 	'on_create_only' => $langs->trans('DynamicPricesCostLineStrategyOnCreateOnly'),
-	'on_create_and_update' => $langs->trans('DynamicPricesCostLineStrategyOnCreateAndUpdate'),
 	'manual_button' => $langs->trans('DynamicPricesCostLineStrategyManualButton'),
 	'preserve_origin' => $langs->trans('DynamicPricesCostLineStrategyPreserveOrigin'),
 	'never' => $langs->trans('DynamicPricesCostLineStrategyNever'),

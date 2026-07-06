@@ -87,10 +87,10 @@ L'application aux ventes est optionnelle.
 
 Si `DYNAMICPRICES_COST_USE_FOR_SALES` est actif :
 
-1. Le hook ou trigger détecte une création ou modification de ligne.
-2. Il applique la stratégie configurée : `on_create_only`, `on_create_and_update`, `manual_button`, `preserve_origin`.
+1. Le hook ou trigger détecte une création de ligne ; les modifications de lignes existantes conservent le prix de revient déjà défini.
+2. Il applique la stratégie configurée : `on_create_only`, `manual_button`, `preserve_origin`.
 3. Si un utilisateur autorisé par le droit natif `margins/creer` a choisi manuellement un prix de revient, le service conserve ce choix.
-4. Sinon, le service résout la première source disponible selon `DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY` : coût DynamicPrices, valeur par défaut Dolibarr, PMP, puis coût Dolibarr par défaut.
+4. Sinon, à la création uniquement, le service résout la première source disponible selon `DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY` : coût DynamicPrices, valeur par défaut Dolibarr, PMP, puis coût Dolibarr par défaut.
 5. Il applique le fallback uniquement si aucune source prioritaire n'est disponible.
 6. Il renseigne le coût de ligne (`pa_ht`) lorsque le contexte Dolibarr le permet.
 7. Il crée un snapshot dans `llx_dynamicprices_line_cost_snapshot`.

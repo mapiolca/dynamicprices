@@ -432,6 +432,9 @@ class DynamicPricesCostService
 		if ($strategy === 'never') {
 			return 0;
 		}
+		if (!empty($context['line_action']) && (string) $context['line_action'] === 'update') {
+			return 0;
+		}
 		if ($strategy === 'on_create_only' && !empty($context['line_action']) && $context['line_action'] !== 'create') {
 			return 0;
 		}

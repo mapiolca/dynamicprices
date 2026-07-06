@@ -75,8 +75,7 @@ header('Content-Type: application/javascript; charset=UTF-8');
 			return actionInput.form;
 		}
 
-		actionInput = document.querySelector('form input[name="action"][value="updateline"]');
-		return actionInput && actionInput.form ? actionInput.form : null;
+		return null;
 	}
 
 	function getProductId(form) {
