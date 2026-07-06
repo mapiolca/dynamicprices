@@ -77,6 +77,7 @@ class DynamicPricesCostService
 		$sql .= " FROM ".MAIN_DB_PREFIX."dynamicprices_product_cost";
 		$sql .= " WHERE fk_product = ".$productId;
 		$sql .= " AND entity = ".$entity;
+		$sql .= " ORDER BY date_calculation DESC, rowid DESC";
 		$sql .= " LIMIT 1";
 
 		$resql = $this->db->query($sql);
