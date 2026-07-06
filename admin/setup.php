@@ -60,6 +60,7 @@ require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once '../lib/dynamicsprices.lib.php';
 //require_once "../class/myclass.class.php";
 require_once __DIR__.'/../core/modules/modDynamicsPrices.class.php';
+require_once __DIR__.'/../class/dynamicpricescostservice.class.php';
 
 /**
 * @var Conf $conf
@@ -99,6 +100,7 @@ if (preg_match('/^set_(DYNAMICPRICES_COST_[A-Z0-9_]+)$/', $action, $matches)) {
 	$allowedConstants = array(
 		'DYNAMICPRICES_COST_LINE_STRATEGY',
 		'DYNAMICPRICES_COST_FALLBACK',
+		'DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY',
 		'DYNAMICPRICES_COST_ROUNDING_MODE',
 		'DYNAMICPRICES_COST_LOG_MODE',
 	);
@@ -108,7 +110,11 @@ if (preg_match('/^set_(DYNAMICPRICES_COST_[A-Z0-9_]+)$/', $action, $matches)) {
 	if (GETPOST('token', 'alphanohtml') === '') {
 		accessforbidden($langs->trans('ErrorBadToken'));
 	}
-	$constValue = GETPOST($constName, 'alphanohtml');
+	if ($constName === 'DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY') {
+		$constValue = dynamicspricesGetPostedLineSourcePriority();
+	} else {
+		$constValue = GETPOST($constName, 'alphanohtml');
+	}
 	$result = dolibarr_set_const($db, $constName, $constValue, 'chaine', 0, '', (int) $conf->entity);
 	if ($result < 0) {
 		setEventMessages($db->lasterror(), null, 'errors');
@@ -231,6 +237,86 @@ function dynamicspricesPrintSelectSetting($confkey, array $options, $help = '')
 }
 
 /**
+ * Return source options for commercial line automatic cost priority.
+ *
+ * @return array<string,string>
+ */
+function dynamicspricesGetLineSourcePriorityOptions()
+{
+	global $langs;
+
+	return array(
+		'dynamicprices' => $langs->trans('DynamicPricesCostLineSourceDynamicPrices'),
+		'dolibarr_default' => $langs->trans('DynamicPricesCostLineSourceDolibarrDefault'),
+		'pmp' => $langs->trans('DynamicPricesCostLineSourcePmp'),
+		'native_cost_price' => $langs->trans('DynamicPricesCostLineSourceNativeCostPrice'),
+	);
+}
+
+/**
+ * Normalize posted commercial line cost source priority.
+ *
+ * @return string
+ */
+function dynamicspricesGetPostedLineSourcePriority()
+{
+	$allowed = array_keys(dynamicspricesGetLineSourcePriorityOptions());
+	$priority = array();
+	for ($i = 1; $i <= 4; $i++) {
+		$source = GETPOST('DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY_'.$i, 'alphanohtml');
+		if ($source !== '' && in_array($source, $allowed, true) && !in_array($source, $priority, true)) {
+			$priority[] = $source;
+		}
+	}
+
+	if (empty($priority)) {
+		$priority = array('dynamicprices', 'dolibarr_default', 'pmp', 'native_cost_price');
+	}
+
+	return implode(',', $priority);
+}
+
+/**
+ * Print commercial line cost source priority setting.
+ *
+ * @return void
+ */
+function dynamicspricesPrintLineSourcePrioritySetting()
+{
+	global $db, $form, $langs;
+
+	$service = new DynamicPricesCostService($db);
+	$priority = $service->getCommercialLineCostSourcePriority();
+	$options = array('' => $langs->trans('DynamicPricesCostLineSourceIgnore')) + dynamicspricesGetLineSourcePriorityOptions();
+
+	print '<tr class="oddeven">';
+	print '<td colspan="3"><span class="opacitymedium">'.$langs->trans('DynamicPricesCostLineSourcePriorityIntro').'</span></td>';
+	print '</tr>';
+	print '<tr>';
+	print '<td>';
+	print $form->textwithtooltip($langs->trans('DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY'), $langs->trans('DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY_HELP'), 2, 1, img_help(1, ''));
+	print '</td>';
+	print '<td align="center" width="20">&nbsp;</td>';
+	print '<td align="right">';
+	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="hidden" name="action" value="set_DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY">';
+	for ($i = 1; $i <= 4; $i++) {
+		$inputName = 'DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY_'.$i;
+		$selected = isset($priority[$i - 1]) ? $priority[$i - 1] : '';
+		print '<span class="nowrap">';
+		print $langs->trans('DynamicPricesCostLineSourcePriorityRank', $i).' ';
+		print $form->selectarray($inputName, $options, $selected, 0, 0, 0, '', 0, 0, 0, '', 'minwidth200');
+		print '</span> ';
+		print ajax_combobox($inputName);
+	}
+	print '<input type="submit" class="button" value="'.$langs->trans('Modify').'">';
+	print '</form>';
+	print '</td>';
+	print '</tr>';
+}
+
+/**
  * Print a read-only information row.
  *
  * @param string $labelkey Label translation key
@@ -315,6 +401,8 @@ dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_FALLBACK', array(
 	'zero' => $langs->trans('DynamicPricesCostFallbackZero'),
 	'block' => $langs->trans('DynamicPricesCostFallbackBlock'),
 ));
+setup_print_title($langs->trans('DynamicPricesCostLineSourcePriorityTitle'));
+dynamicspricesPrintLineSourcePrioritySetting();
 dynamicspricesPrintInfoSetting('DynamicPricesCostCalculationFormula', 'DynamicPricesCostCalculationFormulaHelp');
 setup_print_on_off('DYNAMICPRICES_COST_INCLUDE_SERVICES');
 setup_print_on_off('DYNAMICPRICES_COST_RECALC_KITS');

@@ -62,6 +62,7 @@ Réglages principaux du prix de revient DynamicPrices :
 - `DYNAMICPRICES_COST_ENABLE` : active la lecture et le calcul du coût DynamicPrices.
 - `DYNAMICPRICES_COST_USE_FOR_SALES` : autorise l'application aux lignes commerciales. Désactivé par défaut.
 - `DYNAMICPRICES_COST_LINE_STRATEGY` : stratégie d'application aux lignes.
+- `DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY` : ordre automatique des sources à appliquer aux lignes commerciales (`dynamicprices`, valeur par défaut Dolibarr, PMP, coût Dolibarr).
 - `DYNAMICPRICES_COST_FALLBACK` : comportement si aucun coût DynamicPrices n'est disponible.
 - Formule de calcul : moyenne des prix d'achat unitaires fournisseurs x coefficient de prix de revient de la catégorie commerciale.
 - `DYNAMICPRICES_COST_INCLUDE_SERVICES` : inclut les services dans le calcul.

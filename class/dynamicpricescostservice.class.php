@@ -110,14 +110,54 @@ class DynamicPricesCostService
 		}
 
 		$entity = !empty($context['entity']) ? (int) $context['entity'] : 0;
-		if (getDolGlobalInt('DYNAMICPRICES_COST_ENABLE', 1)) {
-			$cost = $this->getDynamicCostPrice($productId, $entity);
-			if ($cost !== null) {
-				return $cost;
-			}
+		$lineCurrentCost = array_key_exists('line_current_cost', $context) ? $context['line_current_cost'] : null;
+		$resolution = $this->resolveCommercialLineCostFromPriority($productId, $product, $entity, $lineCurrentCost);
+		if ($resolution['cost'] !== null) {
+			return $resolution['cost'];
 		}
 
 		return $this->getFallbackCostPrice($productId, $product, (string) getDolGlobalString('DYNAMICPRICES_COST_FALLBACK', 'keep_dolibarr'), $entity);
+	}
+
+	/**
+	 * Return available commercial line cost source codes and translation keys.
+	 *
+	 * @return array<string,string>
+	 */
+	public function getCommercialLineCostSourceOptions()
+	{
+		return array(
+			'dynamicprices' => 'DynamicPricesCostLineSourceDynamicPrices',
+			'dolibarr_default' => 'DynamicPricesCostLineSourceDolibarrDefault',
+			'pmp' => 'DynamicPricesCostLineSourcePmp',
+			'native_cost_price' => 'DynamicPricesCostLineSourceNativeCostPrice',
+		);
+	}
+
+	/**
+	 * Return configured priority for commercial line cost sources.
+	 *
+	 * @param string|null $configured Configured comma-separated value
+	 * @return array<int,string>
+	 */
+	public function getCommercialLineCostSourcePriority($configured = null)
+	{
+		$defaultPriority = array('dynamicprices', 'dolibarr_default', 'pmp', 'native_cost_price');
+		$configuredValue = $configured !== null ? (string) $configured : (string) getDolGlobalString('DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY', implode(',', $defaultPriority));
+		if ($configuredValue === '') {
+			return $defaultPriority;
+		}
+
+		$allowed = array_keys($this->getCommercialLineCostSourceOptions());
+		$priority = array();
+		foreach (explode(',', $configuredValue) as $source) {
+			$source = trim((string) $source);
+			if ($source !== '' && in_array($source, $allowed, true) && !in_array($source, $priority, true)) {
+				$priority[] = $source;
+			}
+		}
+
+		return !empty($priority) ? $priority : $defaultPriority;
 	}
 
 	/**
@@ -413,15 +453,23 @@ class DynamicPricesCostService
 		}
 
 		$entity = $this->getObjectIntProperty($object, array('entity'));
-		$cost = $this->getDynamicCostPrice($productId, $entity);
+		$before = $this->getObjectFloatProperty($line, array('pa_ht'));
+		if (!empty($context['cost_source_mode']) && (string) $context['cost_source_mode'] === 'manual' && $user->hasRight('margins', 'creer')) {
+			return 0;
+		}
+
+		$resolution = $this->resolveCommercialLineCostFromPriority($productId, $product, $entity, $before);
+		$cost = $resolution['cost'];
+		$sourceType = $resolution['source_type'];
 		if ($cost === null) {
-			$cost = $this->getFallbackCostPrice($productId, $product, (string) getDolGlobalString('DYNAMICPRICES_COST_FALLBACK', 'keep_dolibarr'), $entity);
+			$fallback = (string) getDolGlobalString('DYNAMICPRICES_COST_FALLBACK', 'keep_dolibarr');
+			$cost = $this->getFallbackCostPrice($productId, $product, $fallback, $entity);
+			$sourceType = $cost !== null ? 'fallback_'.$fallback : '';
 		}
 		if ($cost === null) {
 			return 0;
 		}
 
-		$before = $this->getObjectFloatProperty($line, array('pa_ht'));
 		$lineId = $this->getObjectIntProperty($line, array('id', 'rowid'));
 		$line->pa_ht = price2num($cost, 'MU');
 
@@ -440,7 +488,7 @@ class DynamicPricesCostService
 				'dynamic_cost_price' => $cost,
 				'native_pa_ht_before' => $before,
 				'native_pa_ht_after' => $cost,
-				'source_type' => 'dynamicprices',
+				'source_type' => $sourceType,
 				'status' => 1,
 			);
 			$this->createLineCostSnapshot($element_type, $lineId, $snapshotData, $user);
@@ -718,6 +766,47 @@ class DynamicPricesCostService
 		}
 
 		return null;
+	}
+
+	/**
+	 * Resolve commercial line cost using the configured source priority.
+	 *
+	 * @param int $productId Product id
+	 * @param Product|stdClass $product Product object
+	 * @param int $entity Entity
+	 * @param mixed $lineCurrentCost Current native line cost
+	 * @return array{cost:float|null,source_type:string}
+	 */
+	private function resolveCommercialLineCostFromPriority($productId, $product, $entity, $lineCurrentCost = null)
+	{
+		$nativeValues = null;
+		foreach ($this->getCommercialLineCostSourcePriority() as $source) {
+			$cost = null;
+			if ($source === 'dynamicprices') {
+				if (getDolGlobalInt('DYNAMICPRICES_COST_ENABLE', 1)) {
+					$cost = $this->getDynamicCostPrice($productId, $entity);
+				}
+			} elseif ($source === 'dolibarr_default') {
+				$cost = ($lineCurrentCost !== null && $lineCurrentCost !== '') ? (float) $lineCurrentCost : null;
+			} elseif ($source === 'pmp' || $source === 'native_cost_price') {
+				if ($nativeValues === null) {
+					$nativeValues = $this->getProductNativeCostValues($productId, $entity);
+				}
+				$cost = $source === 'pmp' ? $nativeValues['pmp'] : $nativeValues['cost_price'];
+			}
+
+			if ($cost !== null) {
+				return array(
+					'cost' => (float) $cost,
+					'source_type' => $source,
+				);
+			}
+		}
+
+		return array(
+			'cost' => null,
+			'source_type' => '',
+		);
 	}
 
 	/**

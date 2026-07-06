@@ -59,48 +59,122 @@ header('Content-Type: application/javascript; charset=UTF-8');
 	var optionValue = 'dynamicsprices_cost';
 	var endpoint = '<?php echo dol_buildpath('/dynamicsprices/ajax/commercial_line_cost.php', 1); ?>';
 	var currentProductId = '';
-	var autoAppliedProductId = '';
 	var userTouchedCostSelect = false;
-	var isApplyingDynamicCost = false;
+	var isApplyingAutomaticCost = false;
 	var pendingTimer = null;
+	var defaultPriority = ['dynamicprices', 'dolibarr_default', 'pmp', 'native_cost_price'];
 
-	function getAddLineForm() {
+	function getCommercialLineForm() {
 		var form = document.querySelector('form[name="addproduct"]');
 		if (form) {
 			return form;
 		}
 
 		var actionInput = document.querySelector('form input[name="action"][value="addline"]');
+		if (actionInput && actionInput.form) {
+			return actionInput.form;
+		}
+
+		actionInput = document.querySelector('form input[name="action"][value="updateline"]');
 		return actionInput && actionInput.form ? actionInput.form : null;
 	}
 
-	function getProductSelect(form) {
-		return form ? form.querySelector('select[name="idprod"]') : null;
+	function getProductId(form) {
+		if (!form) {
+			return '';
+		}
+
+		var productSelect = form.querySelector('select[name="idprod"]');
+		if (productSelect && productSelect.value && productSelect.value !== '-1') {
+			return productSelect.value;
+		}
+
+		var productInput = form.querySelector('input[name="productid"], input[name="idprod"]');
+		return productInput && productInput.value ? productInput.value : '';
 	}
 
 	function getCostSelect(form) {
-		return form ? form.querySelector('select[name="fournprice_predef"]') : null;
+		return form ? form.querySelector('select[name="fournprice_predef"], select[name="fournprice"]') : null;
 	}
 
 	function getBuyingPriceInput(form) {
 		return form ? form.querySelector('input[name="buying_price"]') : null;
 	}
 
+	function getHiddenInput(form, name) {
+		var input = form.querySelector('input[name="' + name + '"]');
+		if (!input) {
+			input = document.createElement('input');
+			input.type = 'hidden';
+			input.name = name;
+			form.appendChild(input);
+		}
+
+		return input;
+	}
+
+	function setCostSourceMode(form, mode, source) {
+		if (!form) {
+			return;
+		}
+
+		getHiddenInput(form, 'dynamicsprices_cost_source_mode').value = mode || 'auto';
+		getHiddenInput(form, 'dynamicsprices_cost_source').value = source || '';
+	}
+
+	function findOptionByValue(select, value) {
+		if (!select) {
+			return null;
+		}
+
+		for (var i = 0; i < select.options.length; i++) {
+			if (select.options[i].value === value) {
+				return select.options[i];
+			}
+		}
+
+		return null;
+	}
+
 	function removeDynamicOption(select) {
 		if (!select) {
 			return;
 		}
-		var oldOption = select.querySelector('option[value="' + optionValue + '"]');
+		var oldOption = findOptionByValue(select, optionValue);
 		if (oldOption) {
 			oldOption.remove();
 		}
+	}
+
+	function ensureDynamicOption(select, payload) {
+		if (!payload || !payload.success || !payload.available || payload.price === null || typeof payload.price === 'undefined') {
+			removeDynamicOption(select);
+			return null;
+		}
+
+		var selectedValue = select.value;
+		var option = findOptionByValue(select, optionValue);
+		if (!option) {
+			option = document.createElement('option');
+			option.value = optionValue;
+			select.insertBefore(option, select.firstChild);
+		}
+
+		option.setAttribute('price', payload.price);
+		option.textContent = payload.label || ('DynamicPrices: ' + payload.price);
+
+		if (selectedValue && findOptionByValue(select, selectedValue)) {
+			select.value = selectedValue;
+		}
+
+		return option;
 	}
 
 	function scheduleApply(delay) {
 		if (pendingTimer !== null) {
 			window.clearTimeout(pendingTimer);
 		}
-		pendingTimer = window.setTimeout(applyDynamicCostDefault, delay || 150);
+		pendingTimer = window.setTimeout(applyConfiguredCostDefault, delay || 150);
 	}
 
 	function fetchDynamicCost(productId) {
@@ -120,94 +194,137 @@ header('Content-Type: application/javascript; charset=UTF-8');
 		});
 	}
 
-	function applyCostToSelect(select, buyingPriceInput, productId, payload) {
-		if (!payload || !payload.success || !payload.available || payload.price === null || typeof payload.price === 'undefined') {
-			removeDynamicOption(select);
-			return;
-		}
-		if (userTouchedCostSelect) {
-			return;
-		}
-
-		var option = select.querySelector('option[value="' + optionValue + '"]');
+	function getOptionPrice(option, buyingPriceInput) {
 		if (!option) {
-			option = document.createElement('option');
-			option.value = optionValue;
-			select.insertBefore(option, select.firstChild);
+			return null;
 		}
 
-		option.setAttribute('price', payload.price);
-		option.textContent = payload.label || ('DynamicPrices: ' + payload.price);
-
-		isApplyingDynamicCost = true;
-		select.value = optionValue;
-		if (buyingPriceInput) {
-			buyingPriceInput.value = payload.price;
+		var price = option.getAttribute('price');
+		if ((price === null || typeof price === 'undefined' || price === '') && buyingPriceInput && buyingPriceInput.value !== '') {
+			price = buyingPriceInput.value;
 		}
+
+		return (price === null || typeof price === 'undefined' || price === '') ? null : price;
+	}
+
+	function getCandidateForSource(select, buyingPriceInput, source, payload) {
+		var option = null;
+		if (source === 'dynamicprices') {
+			option = ensureDynamicOption(select, payload);
+		} else if (source === 'dolibarr_default') {
+			option = select.options[select.selectedIndex] || null;
+			if (option && option.value === optionValue) {
+				option = null;
+			}
+		} else if (source === 'pmp') {
+			option = findOptionByValue(select, 'pmpprice');
+		} else if (source === 'native_cost_price') {
+			option = findOptionByValue(select, 'costprice');
+		}
+
+		var price = getOptionPrice(option, buyingPriceInput);
+		if (!option || price === null) {
+			return null;
+		}
+
+		return {
+			source: source,
+			value: option.value,
+			price: price
+		};
+	}
+
+	function triggerNativeCostChange(select) {
 		if (window.jQuery) {
 			window.jQuery(select).trigger('change');
 		} else {
 			select.dispatchEvent(new Event('change', { bubbles: true }));
 		}
-		if (buyingPriceInput) {
-			buyingPriceInput.value = payload.price;
-		}
-		isApplyingDynamicCost = false;
-		autoAppliedProductId = productId;
 	}
 
-	function applyDynamicCostDefault() {
-		pendingTimer = null;
-		var form = getAddLineForm();
-		var productSelect = getProductSelect(form);
-		var costSelect = getCostSelect(form);
-		var buyingPriceInput = getBuyingPriceInput(form);
-		if (!form || !productSelect || !costSelect) {
+	function applyCandidate(form, select, buyingPriceInput, candidate) {
+		if (!candidate) {
 			return;
 		}
 
-		var productId = productSelect.value || '';
-		if (!productId || productId === '-1') {
+		isApplyingAutomaticCost = true;
+		select.value = candidate.value;
+		if (buyingPriceInput) {
+			buyingPriceInput.value = candidate.price;
+		}
+		triggerNativeCostChange(select);
+		if (buyingPriceInput) {
+			buyingPriceInput.value = candidate.price;
+		}
+		setCostSourceMode(form, 'auto', candidate.source);
+		isApplyingAutomaticCost = false;
+	}
+
+	function applyConfiguredCostDefault() {
+		pendingTimer = null;
+		var form = getCommercialLineForm();
+		var costSelect = getCostSelect(form);
+		var buyingPriceInput = getBuyingPriceInput(form);
+		if (!form || !costSelect) {
+			return;
+		}
+
+		var productId = getProductId(form);
+		if (!productId) {
 			removeDynamicOption(costSelect);
 			currentProductId = '';
-			autoAppliedProductId = '';
+			setCostSourceMode(form, 'auto', '');
 			return;
 		}
 
 		if (productId !== currentProductId) {
 			currentProductId = productId;
-			autoAppliedProductId = '';
 			userTouchedCostSelect = false;
-		}
-		if (userTouchedCostSelect) {
-			return;
+			setCostSourceMode(form, 'auto', '');
 		}
 
 		fetchDynamicCost(productId).then(function(payload) {
-			var latestForm = getAddLineForm();
-			var latestProductSelect = getProductSelect(latestForm);
+			var latestForm = getCommercialLineForm();
 			var latestCostSelect = getCostSelect(latestForm);
-			if (!latestProductSelect || !latestCostSelect || latestProductSelect.value !== productId) {
+			if (!latestCostSelect || getProductId(latestForm) !== productId || !payload || !payload.success) {
 				return;
 			}
-			applyCostToSelect(latestCostSelect, getBuyingPriceInput(latestForm), productId, payload);
+
+			ensureDynamicOption(latestCostSelect, payload);
+			if (userTouchedCostSelect) {
+				return;
+			}
+
+			var priority = Array.isArray(payload.priority) && payload.priority.length ? payload.priority : defaultPriority;
+			var latestBuyingPriceInput = getBuyingPriceInput(latestForm);
+			for (var i = 0; i < priority.length; i++) {
+				var candidate = getCandidateForSource(latestCostSelect, latestBuyingPriceInput, priority[i], payload);
+				if (candidate) {
+					applyCandidate(latestForm, latestCostSelect, latestBuyingPriceInput, candidate);
+					return;
+				}
+			}
+
+			setCostSourceMode(latestForm, 'auto', '');
 		});
 	}
 
-	function bindDynamicCostDefault() {
-		var form = getAddLineForm();
-		var productSelect = getProductSelect(form);
+	function bindConfiguredCostDefault() {
+		var form = getCommercialLineForm();
 		var costSelect = getCostSelect(form);
-		if (!form || !productSelect || !costSelect) {
+		var buyingPriceInput = getBuyingPriceInput(form);
+		if (!form || !costSelect) {
 			return;
 		}
 
-		if (productSelect.dataset.dynamicpricesCostBound !== '1') {
+		setCostSourceMode(form, 'auto', '');
+		var productSelect = form.querySelector('select[name="idprod"]');
+		if (productSelect && productSelect.dataset.dynamicpricesCostBound !== '1') {
 			productSelect.dataset.dynamicpricesCostBound = '1';
 			productSelect.addEventListener('change', function() {
-				currentProductId = productSelect.value || '';
-				autoAppliedProductId = '';
+				currentProductId = getProductId(form);
 				userTouchedCostSelect = false;
+				setCostSourceMode(form, 'auto', '');
 				scheduleApply(250);
 			});
 		}
@@ -215,25 +332,36 @@ header('Content-Type: application/javascript; charset=UTF-8');
 		if (costSelect.dataset.dynamicpricesCostBound !== '1') {
 			costSelect.dataset.dynamicpricesCostBound = '1';
 			costSelect.addEventListener('change', function() {
-				if (!isApplyingDynamicCost) {
+				if (!isApplyingAutomaticCost) {
 					userTouchedCostSelect = true;
+					setCostSourceMode(form, 'manual', costSelect.value || '');
 				}
 			});
 
 			var observer = new MutationObserver(function() {
-				if (!isApplyingDynamicCost && !userTouchedCostSelect) {
+				if (!isApplyingAutomaticCost && !userTouchedCostSelect) {
 					scheduleApply(100);
 				}
 			});
 			observer.observe(costSelect, { childList: true, subtree: false });
 		}
 
+		if (buyingPriceInput && buyingPriceInput.dataset.dynamicpricesCostBound !== '1') {
+			buyingPriceInput.dataset.dynamicpricesCostBound = '1';
+			buyingPriceInput.addEventListener('input', function() {
+				if (!isApplyingAutomaticCost) {
+					userTouchedCostSelect = true;
+					setCostSourceMode(form, 'manual', 'inputprice');
+				}
+			});
+		}
+
 		scheduleApply(250);
 	}
 
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', bindDynamicCostDefault);
+		document.addEventListener('DOMContentLoaded', bindConfiguredCostDefault);
 	} else {
-		bindDynamicCostDefault();
+		bindConfiguredCostDefault();
 	}
 })();

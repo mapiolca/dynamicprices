@@ -408,6 +408,8 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 			'line_action' => (string) $conf['line_action'],
 			'line_table' => (string) $conf['table'],
 			'calculation_context' => 'commercial_line_trigger',
+			'cost_source_mode' => GETPOST('dynamicsprices_cost_source_mode', 'alpha'),
+			'cost_source' => GETPOST('dynamicsprices_cost_source', 'alphanohtml'),
 		));
 		if ($result < 0) {
 			dol_syslog(__METHOD__.' '.$service->error, LOG_ERR);

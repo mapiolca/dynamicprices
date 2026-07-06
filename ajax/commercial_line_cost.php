@@ -81,29 +81,43 @@ $langs->load('dynamicsprices@dynamicsprices');
 if (!isModEnabled('dynamicsprices')) {
 	dynamicsprices_ajax_response(array('success' => false, 'error' => 'ModuleDisabled'), 403);
 }
-if (!getDolGlobalInt('DYNAMICPRICES_COST_USE_FOR_SALES', 0)) {
-	dynamicsprices_ajax_response(array('success' => true, 'available' => false));
-}
-if (empty($user->admin) && !$user->hasRight('dynamicsprices', 'cost', 'read')) {
+
+$userCanChooseCost = $user->hasRight('margins', 'creer');
+$userCanReadDynamicCost = $user->hasRight('dynamicsprices', 'cost', 'read');
+if (empty($user->admin) && !$userCanChooseCost && !$userCanReadDynamicCost) {
 	dynamicsprices_ajax_response(array('success' => false, 'error' => 'Forbidden'), 403);
+}
+
+$service = new DynamicPricesCostService($db);
+$sourceLabels = array();
+foreach ($service->getCommercialLineCostSourceOptions() as $sourceCode => $translationKey) {
+	$sourceLabels[$sourceCode] = $langs->trans($translationKey);
+}
+$basePayload = array(
+	'success' => true,
+	'available' => false,
+	'priority' => $service->getCommercialLineCostSourcePriority(),
+	'source_labels' => $sourceLabels,
+);
+
+if (!getDolGlobalInt('DYNAMICPRICES_COST_USE_FOR_SALES', 0)) {
+	dynamicsprices_ajax_response($basePayload);
 }
 
 $productId = GETPOSTINT('product_id');
 if ($productId <= 0) {
-	dynamicsprices_ajax_response(array('success' => true, 'available' => false));
+	dynamicsprices_ajax_response($basePayload);
 }
 
-$service = new DynamicPricesCostService($db);
 $cost = $service->getDynamicCostPrice($productId, (int) $conf->entity);
 if ($cost === null) {
-	dynamicsprices_ajax_response(array('success' => true, 'available' => false));
+	dynamicsprices_ajax_response($basePayload);
 }
 
 $costForInput = price2num($cost, 'MU');
-dynamicsprices_ajax_response(array(
-	'success' => true,
+dynamicsprices_ajax_response(array_merge($basePayload, array(
 	'available' => true,
 	'product_id' => $productId,
 	'price' => $costForInput,
 	'label' => $langs->trans('DynamicPricesCostCommercialLineOption', price($cost)),
-));
+)));
