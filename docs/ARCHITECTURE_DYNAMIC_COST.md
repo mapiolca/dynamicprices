@@ -72,21 +72,14 @@ Implémentation initiale : `class/dynamicpricescostservice.class.php`.
 
 1. Le service charge le produit.
 2. Il vérifie l'entité cible.
-3. Il sélectionne une source selon `DYNAMICPRICES_COST_SOURCE_PRIORITY`.
-4. Il applique le coefficient DynamicPrices disponible.
+3. Il calcule la moyenne des prix d'achat unitaires fournisseurs accessibles dans l'entité courante.
+4. Il applique le coefficient de prix de revient de la catégorie commerciale du produit.
 5. Il normalise le montant avec les helpers Dolibarr.
 6. Il sauvegarde dans `llx_dynamicprices_product_cost`.
 7. Il écrit un log selon `DYNAMICPRICES_COST_LOG_MODE`.
 8. Il laisse `llx_product.cost_price` inchangé sauf option legacy.
 
-Sources prévues :
-
-- PMP ;
-- moyenne des prix fournisseurs ;
-- meilleur prix fournisseur ;
-- prix fournisseur principal ;
-- coût natif Dolibarr ;
-- valeur manuelle DynamicPrices.
+La source du calcul est donc toujours `supplier_average`. Les fallbacks configurables ne servent qu'à l'exploitation d'un coût absent, pas au recalcul du prix de revient DynamicPrices.
 
 ## Flux d'application aux lignes commerciales
 

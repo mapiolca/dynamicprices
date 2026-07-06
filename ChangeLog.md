@@ -8,6 +8,8 @@
 - Ajout de l'API REST et de l'export natif Dolibarr pour les coûts DynamicPrices. / Added REST API and native Dolibarr export for DynamicPrices costs.
 - Ajout d'un onglet interne de compatibilité indiquant les versions détectées et la disponibilité des fonctionnalités. / Added an internal compatibility tab showing detected versions and feature availability.
 - Ajout des traductions espagnoles, allemandes et italiennes pour la nouvelle fonctionnalité de coût. / Added Spanish, German and Italian translations for the new cost feature.
+- Correction du recalcul du prix de revient DynamicPrices pour appliquer strictement la moyenne des prix d'achat unitaires fournisseurs multipliée par le coefficient de la catégorie commerciale, et pour relire l'entité courante dans l'onglet prix d'achat. / Fixed DynamicPrices cost recalculation to strictly apply average supplier unit purchase prices multiplied by the commercial category coefficient, and to reload the current entity in the supplier prices tab.
+- Présentation du bloc prix de revient de l'onglet prix d'achat sous forme de tableau horizontal à en-têtes et ligne de données. / Displayed the supplier prices tab cost block as a horizontal table with headers and one data row.
 - Correction de la conservation des constantes du module lors de la désactivation/réactivation. / Fixed preservation of module constants during disable/reactivate cycles.
 
 ## 2.1.0

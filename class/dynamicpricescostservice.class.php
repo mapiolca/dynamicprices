@@ -158,12 +158,18 @@ class DynamicPricesCostService
 		$result['dolibarr_cost_price_snapshot'] = $productNativeValues['cost_price'];
 		$result['pmp_snapshot'] = $productNativeValues['pmp'];
 
-		$source = $this->resolveSourceValue($productId, $product, $entity);
-		if ($source['value'] === null) {
+		$supplierAveragePrice = $this->getSupplierAveragePrice($productId);
+		$sourceDetails = array(
+			array(
+				'source_type' => 'supplier_average',
+				'value' => $supplierAveragePrice,
+			),
+		);
+		if ($supplierAveragePrice === null) {
 			$result['calculation_status'] = -1;
 			$result['calculation_message'] = 'DynamicPricesCostNoSource';
-			$result['source_type'] = $source['type'];
-			$result['source_details'] = $this->encodeJson(array('sources' => $source['details']));
+			$result['source_type'] = 'supplier_average';
+			$result['source_details'] = $this->encodeJson(array('sources' => $sourceDetails));
 			$result['calculation_hash'] = $this->buildCalculationHash($result);
 			return $result;
 		}
@@ -171,13 +177,13 @@ class DynamicPricesCostService
 		$commercialCategory = $this->getProductCommercialCategory($productId);
 		$marginPercent = $this->getMarginOnCostPercent($commercialCategory);
 		$coefficient = 1 + (((float) $marginPercent) / 100);
-		$rawCost = ((float) $source['value']) * $coefficient;
+		$rawCost = ((float) $supplierAveragePrice) * $coefficient;
 		$roundedCost = $this->roundCost($rawCost);
 
 		$result['dynamic_cost_price'] = $roundedCost;
-		$result['source_type'] = $source['type'];
-		$result['source_value'] = (float) $source['value'];
-		$result['source_details'] = $this->encodeJson(array('sources' => $source['details'], 'commercial_category' => $commercialCategory));
+		$result['source_type'] = 'supplier_average';
+		$result['source_value'] = (float) $supplierAveragePrice;
+		$result['source_details'] = $this->encodeJson(array('sources' => $sourceDetails, 'commercial_category' => $commercialCategory));
 		$result['rule_code'] = $commercialCategory;
 		$result['coefficient'] = $coefficient;
 		$result['rounding_rule'] = (string) getDolGlobalString('DYNAMICPRICES_COST_ROUNDING_MODE', 'dolibarr');
@@ -553,54 +559,6 @@ class DynamicPricesCostService
 	}
 
 	/**
-	 * Resolve the source value according to configured priority.
-	 *
-	 * @param int $productId Product id
-	 * @param Product $product Product
-	 * @param int $entity Entity
-	 * @return array{type:string,value:float|null,details:array<int,array<string,mixed>>}
-	 */
-	private function resolveSourceValue($productId, $product, $entity)
-	{
-		$priorities = explode(',', (string) getDolGlobalString('DYNAMICPRICES_COST_SOURCE_PRIORITY', 'pmp,supplier_average,supplier_best,cost_price'));
-		$details = array();
-
-		foreach ($priorities as $sourceType) {
-			$sourceType = trim($sourceType);
-			if ($sourceType === '') {
-				continue;
-			}
-
-			$value = null;
-			if ($sourceType === 'pmp') {
-				$values = $this->getProductNativeCostValues($productId, $entity);
-				$value = $values['pmp'];
-			} elseif ($sourceType === 'supplier_average') {
-				$value = $this->getSupplierAveragePrice($productId);
-			} elseif ($sourceType === 'supplier_best') {
-				$value = $this->getSupplierBestPrice($productId);
-			} elseif ($sourceType === 'supplier_principal') {
-				$value = $this->getSupplierPrincipalPrice($productId);
-			} elseif ($sourceType === 'cost_price' || $sourceType === 'native_cost_price') {
-				$values = $this->getProductNativeCostValues($productId, $entity);
-				$value = $values['cost_price'];
-			} elseif ($sourceType === 'manual') {
-				$record = $this->getDynamicCostRecord($productId, $entity);
-				if (is_object($record) && $record->source_type === 'manual' && $record->dynamic_cost_price !== null) {
-					$value = (float) $record->dynamic_cost_price;
-				}
-			}
-
-			$details[] = array('source_type' => $sourceType, 'value' => $value);
-			if ($value !== null) {
-				return array('type' => $sourceType, 'value' => (float) $value, 'details' => $details);
-			}
-		}
-
-		return array('type' => '', 'value' => null, 'details' => $details);
-	}
-
-	/**
 	 * Read native product cost values.
 	 *
 	 * @param int $productId Product id
@@ -657,52 +615,6 @@ class DynamicPricesCostService
 		}
 
 		return $count > 0 ? ($total / $count) : null;
-	}
-
-	/**
-	 * Return best supplier unit price.
-	 *
-	 * @param int $productId Product id
-	 * @return float|null
-	 */
-	private function getSupplierBestPrice($productId)
-	{
-		$sql = "SELECT MIN(unitprice) as unitprice";
-		$sql .= " FROM ".MAIN_DB_PREFIX."product_fournisseur_price";
-		$sql .= " WHERE fk_product = ".((int) $productId);
-		$sql .= " AND entity IN (".getEntity('product_fournisseur_price').")";
-
-		$resql = $this->db->query($sql);
-		if (!$resql) {
-			return null;
-		}
-
-		$obj = $this->db->fetch_object($resql);
-		return (is_object($obj) && $obj->unitprice !== null) ? (float) $obj->unitprice : null;
-	}
-
-	/**
-	 * Return principal supplier unit price approximation for V1.
-	 *
-	 * @param int $productId Product id
-	 * @return float|null
-	 */
-	private function getSupplierPrincipalPrice($productId)
-	{
-		$sql = "SELECT unitprice";
-		$sql .= " FROM ".MAIN_DB_PREFIX."product_fournisseur_price";
-		$sql .= " WHERE fk_product = ".((int) $productId);
-		$sql .= " AND entity IN (".getEntity('product_fournisseur_price').")";
-		$sql .= " ORDER BY rowid ASC";
-		$sql .= " LIMIT 1";
-
-		$resql = $this->db->query($sql);
-		if (!$resql) {
-			return null;
-		}
-
-		$obj = $this->db->fetch_object($resql);
-		return (is_object($obj) && $obj->unitprice !== null) ? (float) $obj->unitprice : null;
 	}
 
 	/**

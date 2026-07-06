@@ -184,7 +184,7 @@ class modDynamicsPrices extends DolibarrModules
 			7=> array('DYNAMICPRICES_COST_USE_FOR_SALES', 'yesno', 0, 'DynamicPricesCostUseForSales', 1, 'current', 0),
 			8=> array('DYNAMICPRICES_COST_LINE_STRATEGY', 'chaine', 'on_create_only', 'DynamicPricesCostLineStrategy', 1, 'current', 0),
 			9=> array('DYNAMICPRICES_COST_FALLBACK', 'chaine', 'keep_dolibarr', 'DynamicPricesCostFallback', 1, 'current', 0),
-			10=> array('DYNAMICPRICES_COST_SOURCE_PRIORITY', 'chaine', 'pmp,supplier_average,supplier_best,cost_price', 'DynamicPricesCostSourcePriority', 1, 'current', 0),
+			10=> array('DYNAMICPRICES_COST_SOURCE_PRIORITY', 'chaine', 'supplier_average', 'DynamicPricesCostSourcePriority', 0, 'current', 0),
 			11=> array('DYNAMICPRICES_COST_INCLUDE_SERVICES', 'yesno', 0, 'DynamicPricesCostIncludeServices', 1, 'current', 0),
 			12=> array('DYNAMICPRICES_COST_RECALC_KITS', 'yesno', 1, 'DynamicPricesCostRecalcKits', 1, 'current', 0),
 			13=> array('DYNAMICPRICES_COST_ROUNDING_MODE', 'chaine', 'dolibarr', 'DynamicPricesCostRoundingMode', 1, 'current', 0),

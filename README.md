@@ -10,7 +10,7 @@ Depuis la version 2.2.0, le module dispose d'un prix de revient propre par produ
 
 - Calcul des prix de revient DynamicPrices par couple `entity + product`.
 - Historique des recalculs et des valeurs appliquées.
-- Sources configurables : PMP, moyenne fournisseur, meilleur prix fournisseur, fournisseur principal, coût natif Dolibarr, valeur manuelle.
+- Calcul métier basé sur la moyenne des prix d'achat unitaires fournisseurs multipliée par le coefficient de prix de revient de la catégorie commerciale.
 - Fallback configurable lorsque le coût DynamicPrices est absent.
 - Recalcul unitaire depuis l'onglet **Prix d'achat** du produit.
 - Prévisualisation sans écriture.
@@ -63,7 +63,7 @@ Réglages principaux du prix de revient DynamicPrices :
 - `DYNAMICPRICES_COST_USE_FOR_SALES` : autorise l'application aux lignes commerciales. Désactivé par défaut.
 - `DYNAMICPRICES_COST_LINE_STRATEGY` : stratégie d'application aux lignes.
 - `DYNAMICPRICES_COST_FALLBACK` : comportement si aucun coût DynamicPrices n'est disponible.
-- `DYNAMICPRICES_COST_SOURCE_PRIORITY` : ordre des sources de calcul.
+- Formule de calcul : moyenne des prix d'achat unitaires fournisseurs x coefficient de prix de revient de la catégorie commerciale.
 - `DYNAMICPRICES_COST_INCLUDE_SERVICES` : inclut les services dans le calcul.
 - `DYNAMICPRICES_COST_LOG_MODE` : historisation des changements uniquement ou de tous les recalculs.
 - `DYNAMICPRICES_COST_ALLOW_MANUAL_OVERRIDE` : autorise l'override manuel via API.

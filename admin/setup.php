@@ -99,7 +99,6 @@ if (preg_match('/^set_(DYNAMICPRICES_COST_[A-Z0-9_]+)$/', $action, $matches)) {
 	$allowedConstants = array(
 		'DYNAMICPRICES_COST_LINE_STRATEGY',
 		'DYNAMICPRICES_COST_FALLBACK',
-		'DYNAMICPRICES_COST_SOURCE_PRIORITY',
 		'DYNAMICPRICES_COST_ROUNDING_MODE',
 		'DYNAMICPRICES_COST_LOG_MODE',
 	);
@@ -231,6 +230,24 @@ function dynamicspricesPrintSelectSetting($confkey, array $options, $help = '')
 	print '</tr>';
 }
 
+/**
+ * Print a read-only information row.
+ *
+ * @param string $labelkey Label translation key
+ * @param string $valuekey Value translation key
+ * @return void
+ */
+function dynamicspricesPrintInfoSetting($labelkey, $valuekey)
+{
+	global $langs;
+
+	print '<tr class="oddeven">';
+	print '<td>'.$langs->trans($labelkey).'</td>';
+	print '<td align="center" width="20">&nbsp;</td>';
+	print '<td align="right"><span class="opacitymedium">'.$langs->trans($valuekey).'</span></td>';
+	print '</tr>';
+}
+
 
 // Set this to 1 to use the factory to manage constants. Warning, the generated module will be compatible with version v15+ only
 $useFormSetup = 1;
@@ -298,7 +315,7 @@ dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_FALLBACK', array(
 	'zero' => $langs->trans('DynamicPricesCostFallbackZero'),
 	'block' => $langs->trans('DynamicPricesCostFallbackBlock'),
 ));
-setup_print_input_form_part('DYNAMICPRICES_COST_SOURCE_PRIORITY', false, 'DYNAMICPRICES_COST_SOURCE_PRIORITY_HELP');
+dynamicspricesPrintInfoSetting('DynamicPricesCostCalculationFormula', 'DynamicPricesCostCalculationFormulaHelp');
 setup_print_on_off('DYNAMICPRICES_COST_INCLUDE_SERVICES');
 setup_print_on_off('DYNAMICPRICES_COST_RECALC_KITS');
 dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_ROUNDING_MODE', array(

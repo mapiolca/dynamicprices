@@ -189,7 +189,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			return 0;
 		}
 
-		global $langs, $user;
+		global $conf, $langs, $user;
 		$langs->load('dynamicsprices@dynamicsprices');
 
 		if (!$this->canUseCost($user, 'read')) {
@@ -202,8 +202,9 @@ class ActionsDynamicsPrices extends CommonHookActions
 		}
 
 		$service = new DynamicPricesCostService($this->db);
-		$record = $service->getDynamicCostRecord($productId, !empty($object->entity) ? (int) $object->entity : 0);
-		$this->resprints .= $this->renderProductCostBlock($object, $record, true);
+		$record = $service->getDynamicCostRecord($productId, (int) $conf->entity);
+		$product = $this->fetchProductForCostDisplay($productId);
+		$this->resprints .= $this->renderProductCostBlock(is_object($product) ? $product : $object, $record, true);
 
 		return 0;
 	}
@@ -226,7 +227,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			return 0;
 		}
 
-		global $langs, $user;
+		global $conf, $langs, $user;
 		$langs->load('dynamicsprices@dynamicsprices');
 
 		if (!$this->canUseCost($user, 'read')) {
@@ -239,9 +240,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 		}
 
 		$service = new DynamicPricesCostService($this->db);
-		$record = $service->getDynamicCostRecord($productId, !empty($object->entity) ? (int) $object->entity : 0);
+		$record = $service->getDynamicCostRecord($productId, (int) $conf->entity);
+		$product = $this->fetchProductForCostDisplay($productId);
 
-		print $this->renderProductCostBlock($object, $record, false);
+		print $this->renderProductCostBlock(is_object($product) ? $product : $object, $record, false);
 
 		return 0;
 	}
@@ -257,7 +259,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	private function doProductCostActions($parameters, &$object, &$action, $hookmanager)
 	{
-		global $langs, $user;
+		global $conf, $langs, $user;
 
 		if (!in_array($action, array('dynamicsprices_recalculate_cost', 'dynamicsprices_preview_cost'), true)) {
 			return 0;
@@ -270,7 +272,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		}
 
 		$service = new DynamicPricesCostService($this->db);
-		$entity = !empty($object->entity) ? (int) $object->entity : 0;
+		$entity = (int) $conf->entity;
 
 		if ($action === 'dynamicsprices_preview_cost') {
 			if (!$this->canUseCost($user, 'read')) {
@@ -1011,6 +1013,29 @@ class ActionsDynamicsPrices extends CommonHookActions
 	}
 
 	/**
+	 * Load the canonical product object used for native cost display.
+	 *
+	 * @param int $productId Product id
+	 * @return Product|null
+	 */
+	private function fetchProductForCostDisplay($productId)
+	{
+		$productId = (int) $productId;
+		if ($productId <= 0) {
+			return null;
+		}
+
+		dol_include_once('/product/class/product.class.php');
+		$product = new Product($this->db);
+		$result = $product->fetch($productId);
+		if ($result <= 0) {
+			return null;
+		}
+
+		return $product;
+	}
+
+	/**
 	 * Render product DynamicPrices cost block.
 	 *
 	 * @param Product|stdClass $product Product object
@@ -1044,25 +1069,38 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<td colspan="4">';
 		}
 		$html .= '<div class="div-table-responsive-no-min dynamicsprices-cost-block">';
+		$html .= '<div class="liste_titre">'.$langs->trans('DynamicPricesCostBlockTitle').'</div>';
 		$html .= '<table class="noborder centpercent">';
-		$html .= '<tr class="liste_titre"><td colspan="2">'.$langs->trans('DynamicPricesCostBlockTitle').'</td></tr>';
-		$html .= '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DynamicPricesNativeCostPrice').'</td><td class="right">'.$nativeCost.'</td></tr>';
-		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesPmp').'</td><td class="right">'.$pmp.'</td></tr>';
-		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesDynamicCostPrice').'</td><td class="right">'.$dynamicCost.'</td></tr>';
-		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesCostSource').'</td><td>'.$sourceType.'</td></tr>';
-		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesCostCoefficient').'</td><td class="right">'.$coefficient.'</td></tr>';
-		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesCostRule').'</td><td>'.$ruleCode.'</td></tr>';
-		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesCostLastCalculation').'</td><td>'.$dateCalculation.'</td></tr>';
-		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesCostStatus').'</td><td>'.$status.'</td></tr>';
-		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesCostLastMessage').'</td><td>'.dol_escape_htmltag($message).'</td></tr>';
-		$html .= '<tr class="oddeven"><td colspan="2" class="right">';
+		$html .= '<tr class="liste_titre">';
+		$html .= '<th>'.$langs->trans('DynamicPricesNativeCostPrice').'</th>';
+		$html .= '<th>'.$langs->trans('DynamicPricesPmp').'</th>';
+		$html .= '<th>'.$langs->trans('DynamicPricesDynamicCostPrice').'</th>';
+		$html .= '<th>'.$langs->trans('DynamicPricesCostSource').'</th>';
+		$html .= '<th>'.$langs->trans('DynamicPricesCostCoefficient').'</th>';
+		$html .= '<th>'.$langs->trans('DynamicPricesCostRule').'</th>';
+		$html .= '<th>'.$langs->trans('DynamicPricesCostLastCalculation').'</th>';
+		$html .= '<th>'.$langs->trans('DynamicPricesCostStatus').'</th>';
+		$html .= '<th>'.$langs->trans('DynamicPricesCostLastMessage').'</th>';
+		$html .= '</tr>';
+		$html .= '<tr class="oddeven">';
+		$html .= '<td class="right">'.$nativeCost.'</td>';
+		$html .= '<td class="right">'.$pmp.'</td>';
+		$html .= '<td class="right">'.$dynamicCost.'</td>';
+		$html .= '<td>'.$sourceType.'</td>';
+		$html .= '<td class="right">'.$coefficient.'</td>';
+		$html .= '<td>'.$ruleCode.'</td>';
+		$html .= '<td>'.$dateCalculation.'</td>';
+		$html .= '<td>'.$status.'</td>';
+		$html .= '<td>'.dol_escape_htmltag($message).'</td>';
+		$html .= '</tr>';
+		$html .= '</table>';
+		$html .= '<div class="tabsAction right">';
 		$html .= '<a class="button button-small" href="'.$historyUrl.'">'.$langs->trans('DynamicPricesCostHistory').'</a>';
 		$html .= ' <a class="button button-small" href="'.$previewUrl.'">'.$langs->trans('DynamicPricesCostPreview').'</a>';
 		if ($this->canUseCost($user, 'write')) {
 			$html .= ' <a class="button button-small" href="'.$recalculateUrl.'">'.$langs->trans('DynamicPricesCostRecalculate').'</a>';
 		}
-		$html .= '</td></tr>';
-		$html .= '</table>';
+		$html .= '</div>';
 		$html .= '</div>';
 		if ($asTableRow) {
 			$html .= '</td>';
