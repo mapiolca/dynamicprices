@@ -19,6 +19,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
 require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.commande.class.php';
 require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.product.class.php';
 require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+require_once __DIR__.'/dynamicpricescostservice.class.php';
 
 /**
  * Hooks for DynamicsPrices module.
@@ -52,7 +53,11 @@ class ActionsDynamicsPrices extends CommonHookActions
 		dol_syslog(__METHOD__.' - Start doActions with action='.$action, LOG_DEBUG);
 		dol_syslog(__METHOD__.' - WARNING trace: entering doActions', LOG_WARNING);
 
-		if (empty($parameters['context']) || strpos($parameters['context'], 'ordersuppliercard') === false) {
+		if ($this->isHookContext($parameters, 'productcard')) {
+			return $this->doProductCostActions($parameters, $object, $action, $hookmanager);
+		}
+
+		if (!$this->isHookContext($parameters, 'ordersuppliercard')) {
 			dol_syslog(__METHOD__.' - Skip: unsupported context', LOG_DEBUG);
 			return 0;
 		}
@@ -170,6 +175,100 @@ class ActionsDynamicsPrices extends CommonHookActions
 	}
 
 	/**
+	 * Display DynamicPrices cost block on product card.
+	 *
+	 * @param array<string,mixed> $parameters Hook parameters
+	 * @param CommonObject $object Current object
+	 * @param string $action Current action
+	 * @param HookManager $hookmanager Hook manager
+	 * @return int
+	 */
+	public function formObjectOptions($parameters, &$object, &$action, $hookmanager)
+	{
+		if (!$this->isHookContext($parameters, 'productcard')) {
+			return 0;
+		}
+
+		global $langs, $user;
+		$langs->load('dynamicsprices@dynamicsprices');
+
+		if (!$this->canUseCost($user, 'read')) {
+			return 0;
+		}
+
+		$productId = $this->getProductIdFromObject($object);
+		if ($productId <= 0) {
+			return 0;
+		}
+
+		$service = new DynamicPricesCostService($this->db);
+		$record = $service->getDynamicCostRecord($productId, !empty($object->entity) ? (int) $object->entity : 0);
+		$this->resprints .= $this->renderProductCostBlock($object, $record);
+
+		return 0;
+	}
+
+	/**
+	 * Execute product cost actions.
+	 *
+	 * @param array<string,mixed> $parameters Hook parameters
+	 * @param CommonObject $object Current object
+	 * @param string $action Current action
+	 * @param HookManager $hookmanager Hook manager
+	 * @return int
+	 */
+	private function doProductCostActions($parameters, &$object, &$action, $hookmanager)
+	{
+		global $langs, $user;
+
+		if (!in_array($action, array('dynamicsprices_recalculate_cost', 'dynamicsprices_preview_cost'), true)) {
+			return 0;
+		}
+
+		$langs->load('dynamicsprices@dynamicsprices');
+		$productId = $this->getProductIdFromObject($object);
+		if ($productId <= 0) {
+			return 0;
+		}
+
+		$service = new DynamicPricesCostService($this->db);
+		$entity = !empty($object->entity) ? (int) $object->entity : 0;
+
+		if ($action === 'dynamicsprices_preview_cost') {
+			if (!$this->canUseCost($user, 'read')) {
+				accessforbidden();
+			}
+			$calculation = $service->calculateProductCost($productId, array('entity' => $entity, 'calculation_context' => 'productcard_preview'));
+			if (array_key_exists('dynamic_cost_price', $calculation) && $calculation['dynamic_cost_price'] !== null) {
+				setEventMessages($langs->trans('DynamicPricesCostPreviewResult', price($calculation['dynamic_cost_price'])), null, 'mesgs');
+			} else {
+				$message = !empty($calculation['calculation_message']) ? $langs->trans($calculation['calculation_message']) : $langs->trans('DynamicPricesCostNoSource');
+				setEventMessages($message, null, 'warnings');
+			}
+
+			return 0;
+		}
+
+		if (!$this->canUseCost($user, 'write')) {
+			accessforbidden();
+		}
+		if (GETPOST('token', 'alphanohtml') === '') {
+			accessforbidden($langs->trans('ErrorBadToken'));
+		}
+
+		$result = $service->recalculateProductCost($productId, $user, array('entity' => $entity, 'calculation_context' => 'productcard'));
+		if ($result < 0) {
+			setEventMessages($service->error, $service->errors, 'errors');
+			return -1;
+		}
+
+		setEventMessages($langs->trans('DynamicPricesCostRecalculated'), null, 'mesgs');
+		$url = $_SERVER['PHP_SELF'].'?id='.$productId;
+		header('Location: '.$url);
+		exit;
+	}
+
+	/**
 	 * Build a confirmation modal with supplier prices to add/update.
 	 *
 	 * @param array<string,mixed> $parameters Hook parameters
@@ -222,7 +321,6 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$comment = GETPOST('comment', 'alphanohtml');
 		$csrfToken = newToken();
 		$url .= '&token='.$csrfToken;
-				$url .= '&token='.$csrfToken;
 
 		$initialSelectedLines = implode(',', array_map('intval', array_keys($displayDifferences)));
 
@@ -808,6 +906,135 @@ class ActionsDynamicsPrices extends CommonHookActions
 		}
 
 		return $diff;
+	}
+
+	/**
+	 * Check hook context.
+	 *
+	 * @param array<string,mixed> $parameters Hook parameters
+	 * @param string $contextName Expected context
+	 * @return bool
+	 */
+	private function isHookContext($parameters, $contextName)
+	{
+		$context = !empty($parameters['context']) ? (string) $parameters['context'] : '';
+		return in_array($contextName, explode(':', $context), true);
+	}
+
+	/**
+	 * Check DynamicPrices cost permission with admin elevation.
+	 *
+	 * @param User $user User
+	 * @param string $action Permission action
+	 * @return bool
+	 */
+	private function canUseCost($user, $action)
+	{
+		if (!is_object($user)) {
+			return false;
+		}
+		if (!empty($user->admin)) {
+			return true;
+		}
+
+		return $user->hasRight('dynamicsprices', 'cost', $action);
+	}
+
+	/**
+	 * Resolve product id from hook object.
+	 *
+	 * @param CommonObject|stdClass $object Current object
+	 * @return int
+	 */
+	private function getProductIdFromObject($object)
+	{
+		if (!is_object($object)) {
+			return 0;
+		}
+		if (!empty($object->id)) {
+			return (int) $object->id;
+		}
+		if (!empty($object->rowid)) {
+			return (int) $object->rowid;
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Render product DynamicPrices cost block.
+	 *
+	 * @param Product|stdClass $product Product object
+	 * @param stdClass|null $record Current DynamicPrices cost record
+	 * @return string
+	 */
+	private function renderProductCostBlock($product, $record)
+	{
+		global $langs, $user;
+
+		$productId = $this->getProductIdFromObject($product);
+		$nativeCost = isset($product->cost_price) && $product->cost_price !== null ? price($product->cost_price) : $langs->trans('NotAvailable');
+		$pmp = isset($product->pmp) && $product->pmp !== null ? price($product->pmp) : $langs->trans('NotAvailable');
+		$dynamicCost = is_object($record) && $record->dynamic_cost_price !== null ? price($record->dynamic_cost_price) : $langs->trans('NotAvailable');
+		$sourceType = is_object($record) && !empty($record->source_type) ? $langs->trans('DynamicPricesCostSource_'.$record->source_type) : $langs->trans('NotAvailable');
+		$coefficient = is_object($record) && $record->coefficient !== null ? price($record->coefficient) : $langs->trans('NotAvailable');
+		$ruleCode = is_object($record) && !empty($record->rule_code) ? dol_escape_htmltag($record->rule_code) : $langs->trans('NotAvailable');
+		$dateCalculation = is_object($record) && !empty($record->date_calculation) ? dol_print_date($this->db->jdate($record->date_calculation), 'dayhour') : $langs->trans('NotAvailable');
+		$status = is_object($record) ? $this->getCalculationStatusLabel((int) $record->calculation_status) : $langs->trans('NotAvailable');
+		$message = is_object($record) && !empty($record->calculation_message) ? $langs->trans($record->calculation_message) : $langs->trans('NotAvailable');
+
+		$baseUrl = $_SERVER['PHP_SELF'].'?id='.$productId;
+		$historyUrl = dol_buildpath('/dynamicsprices/product_cost_history.php', 1).'?id='.$productId;
+		$previewUrl = $baseUrl.'&action=dynamicsprices_preview_cost&token='.newToken();
+		$recalculateUrl = $baseUrl.'&action=dynamicsprices_recalculate_cost&token='.newToken();
+
+		$html = '<tr class="oddeven">';
+		$html .= '<td colspan="4">';
+		$html .= '<div class="div-table-responsive-no-min">';
+		$html .= '<table class="noborder centpercent">';
+		$html .= '<tr class="liste_titre"><td colspan="2">'.$langs->trans('DynamicPricesCostBlockTitle').'</td></tr>';
+		$html .= '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DynamicPricesNativeCostPrice').'</td><td class="right">'.$nativeCost.'</td></tr>';
+		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesPmp').'</td><td class="right">'.$pmp.'</td></tr>';
+		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesDynamicCostPrice').'</td><td class="right">'.$dynamicCost.'</td></tr>';
+		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesCostSource').'</td><td>'.$sourceType.'</td></tr>';
+		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesCostCoefficient').'</td><td class="right">'.$coefficient.'</td></tr>';
+		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesCostRule').'</td><td>'.$ruleCode.'</td></tr>';
+		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesCostLastCalculation').'</td><td>'.$dateCalculation.'</td></tr>';
+		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesCostStatus').'</td><td>'.$status.'</td></tr>';
+		$html .= '<tr class="oddeven"><td>'.$langs->trans('DynamicPricesCostLastMessage').'</td><td>'.dol_escape_htmltag($message).'</td></tr>';
+		$html .= '<tr class="oddeven"><td colspan="2" class="right">';
+		$html .= '<a class="button button-small" href="'.$historyUrl.'">'.$langs->trans('DynamicPricesCostHistory').'</a>';
+		$html .= ' <a class="button button-small" href="'.$previewUrl.'">'.$langs->trans('DynamicPricesCostPreview').'</a>';
+		if ($this->canUseCost($user, 'write')) {
+			$html .= ' <a class="button button-small" href="'.$recalculateUrl.'">'.$langs->trans('DynamicPricesCostRecalculate').'</a>';
+		}
+		$html .= '</td></tr>';
+		$html .= '</table>';
+		$html .= '</div>';
+		$html .= '</td>';
+		$html .= '</tr>';
+
+		return $html;
+	}
+
+	/**
+	 * Return calculation status label.
+	 *
+	 * @param int $status Status
+	 * @return string
+	 */
+	private function getCalculationStatusLabel($status)
+	{
+		global $langs;
+
+		if ($status > 0) {
+			return '<span class="badge badge-status4">'.$langs->trans('DynamicPricesCostStatusOk').'</span>';
+		}
+		if ($status < 0) {
+			return '<span class="badge badge-status8">'.$langs->trans('DynamicPricesCostStatusError').'</span>';
+		}
+
+		return '<span class="badge badge-status0">'.$langs->trans('DynamicPricesCostStatusDisabled').'</span>';
 	}
 
 	/**

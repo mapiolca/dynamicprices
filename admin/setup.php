@@ -94,6 +94,32 @@ if (!$user->admin) {
 	accessforbidden();
 }
 
+if (preg_match('/^set_(DYNAMICPRICES_COST_[A-Z0-9_]+)$/', $action, $matches)) {
+	$constName = $matches[1];
+	$allowedConstants = array(
+		'DYNAMICPRICES_COST_LINE_STRATEGY',
+		'DYNAMICPRICES_COST_FALLBACK',
+		'DYNAMICPRICES_COST_SOURCE_PRIORITY',
+		'DYNAMICPRICES_COST_ROUNDING_MODE',
+		'DYNAMICPRICES_COST_LOG_MODE',
+	);
+	if (!in_array($constName, $allowedConstants, true)) {
+		accessforbidden();
+	}
+	if (GETPOST('token', 'alphanohtml') === '') {
+		accessforbidden($langs->trans('ErrorBadToken'));
+	}
+	$constValue = GETPOST($constName, 'alphanohtml');
+	$result = dolibarr_set_const($db, $constName, $constValue, 'chaine', 0, '', (int) $conf->entity);
+	if ($result < 0) {
+		setEventMessages($db->lasterror(), null, 'errors');
+	} else {
+		setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
+	}
+	header('Location: '.$_SERVER['PHP_SELF']);
+	exit;
+}
+
 // Actions on module constants
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
@@ -119,7 +145,7 @@ include DOL_DOCUMENT_ROOT.'/core/actions_dictionnaire.inc.php';
  * Build options list for commercial category select.
  *
  * @param DoliDB $db Database handler
- * @return array<int,string>
+ * @return array<string,string>
  */
 function dynamicspricesGetCommercialCategoryOptions($db)
 {
@@ -135,7 +161,7 @@ function dynamicspricesGetCommercialCategoryOptions($db)
 		return $options;
 	}
 
-	while ($obj = $db->fetch_object($resql)) {
+	while (is_object($obj = $db->fetch_object($resql))) {
 		$options[$obj->code] = $obj->label.' ('.$obj->code.')';
 	}
 
@@ -147,7 +173,7 @@ function dynamicspricesGetCommercialCategoryOptions($db)
  *
  * @param string $html Dictionary HTML output
  * @param Form   $form Form helper
- * @param array<int,string> $options Select options
+ * @param array<string,string> $options Select options
  * @return string
  */
 function dynamicspricesInjectCommercialCategorySelect($html, $form, $options)
@@ -170,6 +196,39 @@ function dynamicspricesInjectCommercialCategorySelect($html, $form, $options)
 		},
 		$html
 	);
+}
+
+/**
+ * Print a select setting row.
+ *
+ * @param string $confkey Constant name
+ * @param array<string,string> $options Select options
+ * @param string $help Translation key for help
+ * @return void
+ */
+function dynamicspricesPrintSelectSetting($confkey, array $options, $help = '')
+{
+	global $conf, $form, $langs;
+
+	$value = getDolGlobalString($confkey);
+	print '<tr>';
+	print '<td>';
+	if ($help !== '') {
+		print $form->textwithtooltip($langs->trans($confkey), $langs->trans($help), 2, 1, img_help(1, ''));
+	} else {
+		print $langs->trans($confkey);
+	}
+	print '</td>';
+	print '<td align="center" width="20">&nbsp;</td>';
+	print '<td align="right">';
+	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="hidden" name="action" value="set_'.$confkey.'">';
+	print $form->selectarray($confkey, $options, $value, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
+	print ' <input type="submit" class="button" value="'.$langs->trans('Modify').'">';
+	print '</form>';
+	print '</td>';
+	print '</tr>';
 }
 
 
@@ -221,6 +280,38 @@ setup_print_on_off('LMDB_COST_PRICE_ONLY');
 setup_print_on_off('LMDB_SUPPLIER_BUYPRICE_ALTERED');
 setup_print_on_off('LMDB_ADD_UPDATE_SUPPLIER_PRICE_ON_SUBMIT');
 setup_print_on_off('LMDB_KIT_PRICE_FROM_COMPONENTS');
+
+setup_print_title($langs->trans("DynamicPricesCostOptions"));
+setup_print_on_off('DYNAMICPRICES_COST_ENABLE');
+setup_print_on_off('DYNAMICPRICES_COST_USE_FOR_SALES');
+dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_LINE_STRATEGY', array(
+	'on_create_only' => $langs->trans('DynamicPricesCostLineStrategyOnCreateOnly'),
+	'on_create_and_update' => $langs->trans('DynamicPricesCostLineStrategyOnCreateAndUpdate'),
+	'manual_button' => $langs->trans('DynamicPricesCostLineStrategyManualButton'),
+	'preserve_origin' => $langs->trans('DynamicPricesCostLineStrategyPreserveOrigin'),
+	'never' => $langs->trans('DynamicPricesCostLineStrategyNever'),
+));
+dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_FALLBACK', array(
+	'keep_dolibarr' => $langs->trans('DynamicPricesCostFallbackKeepDolibarr'),
+	'native_cost_price' => $langs->trans('DynamicPricesCostFallbackNativeCostPrice'),
+	'pmp' => $langs->trans('DynamicPricesCostFallbackPmp'),
+	'zero' => $langs->trans('DynamicPricesCostFallbackZero'),
+	'block' => $langs->trans('DynamicPricesCostFallbackBlock'),
+));
+setup_print_input_form_part('DYNAMICPRICES_COST_SOURCE_PRIORITY', false, 'DYNAMICPRICES_COST_SOURCE_PRIORITY_HELP');
+setup_print_on_off('DYNAMICPRICES_COST_INCLUDE_SERVICES');
+setup_print_on_off('DYNAMICPRICES_COST_RECALC_KITS');
+dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_ROUNDING_MODE', array(
+	'dolibarr' => $langs->trans('DynamicPricesCostRoundingDolibarr'),
+	'none' => $langs->trans('DynamicPricesCostRoundingNone'),
+));
+dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_LOG_MODE', array(
+	'changes_only' => $langs->trans('DynamicPricesCostLogChangesOnly'),
+	'all' => $langs->trans('DynamicPricesCostLogAll'),
+));
+setup_print_on_off('DYNAMICPRICES_COST_ALLOW_MANUAL_OVERRIDE');
+setup_print_on_off('DYNAMICPRICES_COST_ALLOW_NATIVE_WRITE', false, 'DYNAMICPRICES_COST_ALLOW_NATIVE_WRITE_WARNING');
+setup_print_on_off('DYNAMICPRICES_COST_DEBUG_LOG');
 
 print '</table>';
 

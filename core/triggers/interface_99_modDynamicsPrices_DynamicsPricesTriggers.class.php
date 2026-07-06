@@ -74,6 +74,7 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		global $db;
 
 		require_once __DIR__.'/../../lib/dynamicsprices.lib.php';
+		require_once __DIR__.'/../../class/dynamicpricescostservice.class.php';
 		$updateFunction = getDolGlobalString('LMDB_COST_PRICE_ONLY') ? 'update_customer_prices_from_cost_price' : 'update_customer_prices_from_suppliers';
 		$affectedActions = array('SUPPLIER_PRODUCT_BUYPRICE_CREATE', 'SUPPLIER_PRODUCT_BUYPRICE_MODIFY', 'SUPPLIER_PRODUCT_BUYPRICE_DELETE', 'PRODUCT_MODIFY', 'PRODUCT_CREATE', 'PRODUCT_CLONE', 'PRODUCT_PRICE_CREATE', 'PRODUCT_PRICE_MODIFY', 'PRODUCT_PRICE_DELETE', 'PRODUCT_BUYPRICE_CREATE', 'PRODUCT_BUYPRICE_MODIFY', 'PRODUCT_BUYPRICE_DELETE', 'PRODUCT_SUBPRODUCT_ADD', 'PRODUCT_SUBPRODUCT_UPDATE', 'PRODUCT_SUBPRODUCT_DELETE');
 		if (getDolGlobalString('LMDB_SUPPLIER_BUYPRICE_ALTERED') && in_array($action, $affectedActions, true)) {
@@ -92,6 +93,11 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 					call_user_func($updateFunction, $db, $user, $langs, $conf, $kitId);
 				}
 			}
+		}
+
+		$lineCostResult = $this->applyDynamicCostToCommercialLine($db, $action, $object, $user);
+		if ($lineCostResult < 0) {
+			return -1;
 		}
 
 		// You can isolate code for each action in a separate method: this method should be named like the trigger in camelCase.
@@ -332,6 +338,77 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		}
 
 		return 0;
+	}
+
+	/**
+	 * Apply DynamicPrices cost to supported commercial line triggers.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param string $action Trigger action
+	 * @param CommonObject $object Trigger object
+	 * @param User $user User
+	 * @return int
+	 */
+	private function applyDynamicCostToCommercialLine($db, $action, $object, User $user)
+	{
+		$mapping = array(
+			'LINEPROPAL_INSERT' => array('table' => 'propaldet', 'parent_table' => 'propal', 'parent_field' => 'fk_propal', 'element_type' => 'propaldet', 'line_action' => 'create'),
+			'LINEPROPAL_MODIFY' => array('table' => 'propaldet', 'parent_table' => 'propal', 'parent_field' => 'fk_propal', 'element_type' => 'propaldet', 'line_action' => 'update'),
+			'LINEORDER_INSERT' => array('table' => 'commandedet', 'parent_table' => 'commande', 'parent_field' => 'fk_commande', 'element_type' => 'commandedet', 'line_action' => 'create'),
+			'LINEORDER_MODIFY' => array('table' => 'commandedet', 'parent_table' => 'commande', 'parent_field' => 'fk_commande', 'element_type' => 'commandedet', 'line_action' => 'update'),
+			'LINEBILL_INSERT' => array('table' => 'facturedet', 'parent_table' => 'facture', 'parent_field' => 'fk_facture', 'element_type' => 'facturedet', 'line_action' => 'create'),
+			'LINEBILL_MODIFY' => array('table' => 'facturedet', 'parent_table' => 'facture', 'parent_field' => 'fk_facture', 'element_type' => 'facturedet', 'line_action' => 'update'),
+		);
+		if (empty($mapping[$action])) {
+			return 0;
+		}
+
+		$lineId = !empty($object->id) ? (int) $object->id : (!empty($object->rowid) ? (int) $object->rowid : 0);
+		if ($lineId <= 0) {
+			return 0;
+		}
+
+		$conf = $mapping[$action];
+		$sql = "SELECT l.rowid, l.fk_product, l.pa_ht, l.".$conf['parent_field']." as fk_parent, p.entity";
+		$sql .= " FROM ".MAIN_DB_PREFIX.$conf['table']." AS l";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX.$conf['parent_table']." AS p ON p.rowid = l.".$conf['parent_field'];
+		$sql .= " WHERE l.rowid = ".$lineId;
+		$sql .= " LIMIT 1";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$db->lasterror(), LOG_ERR);
+			return -1;
+		}
+
+		$obj = $db->fetch_object($resql);
+		if (!is_object($obj) || empty($obj->fk_product)) {
+			return 0;
+		}
+
+		$line = new stdClass();
+		$line->id = (int) $obj->rowid;
+		$line->rowid = (int) $obj->rowid;
+		$line->fk_product = (int) $obj->fk_product;
+		$line->pa_ht = $obj->pa_ht !== null ? (float) $obj->pa_ht : null;
+
+		$parent = new stdClass();
+		$parent->id = (int) $obj->fk_parent;
+		$parent->entity = (int) $obj->entity;
+
+		$service = new DynamicPricesCostService($db);
+		$result = $service->applyCostToCommercialLine((string) $conf['element_type'], $line, $parent, $user, array(
+			'entity' => (int) $obj->entity,
+			'line_action' => (string) $conf['line_action'],
+			'line_table' => (string) $conf['table'],
+			'calculation_context' => 'commercial_line_trigger',
+		));
+		if ($result < 0) {
+			dol_syslog(__METHOD__.' '.$service->error, LOG_ERR);
+			return -1;
+		}
+
+		return $result;
 	}
 
 	/**

@@ -44,6 +44,16 @@ function dynamicspricesAdminPrepareHead()
 	$head[$h][2] = 'settings';
 	$h++;
 
+	$head[$h][0] = dol_buildpath("/dynamicsprices/admin/compatibility.php", 1);
+	$head[$h][1] = $langs->trans("DynamicPricesCompatibility");
+	$head[$h][2] = 'compatibility';
+	$h++;
+
+	$head[$h][0] = dol_buildpath("/dynamicsprices/admin/migrate_dynamic_cost.php", 1);
+	$head[$h][1] = $langs->trans("DynamicPricesMigration");
+	$head[$h][2] = 'migration';
+	$h++;
+
 	/*
 	$head[$h][0] = dol_buildpath("/dynamicsprices/admin/myobject_extrafields.php", 1);
 	$head[$h][1] = $langs->trans("ExtraFields");
@@ -232,15 +242,58 @@ function dynamicsprices_get_price_rules($db, $commercialCategoryId)
 	return $rules;
 }
 
-// Save cost price on product table
-function dynamicsprices_save_cost_price($db, $productId, $costPrice)
+// Save DynamicPrices cost price without changing the native product cost by default.
+function dynamicsprices_save_cost_price($db, $productId, $costPrice, $context = array())
 {
-	$sql = "UPDATE ".MAIN_DB_PREFIX."product";
-	$sql .= " SET cost_price = ".price2num($costPrice, 'MU');
-	$sql .= " WHERE rowid = ".((int) $productId);
-	$sql .= " AND entity IN (".getEntity('product').")";
+	global $conf, $user;
 
-	return $db->query($sql);
+	require_once __DIR__.'/../class/dynamicpricescostservice.class.php';
+
+	if (!is_object($user)) {
+		dol_syslog(__METHOD__.' no user object available to save DynamicPrices cost for product='.(int) $productId, LOG_ERR);
+		return false;
+	}
+
+	$service = new DynamicPricesCostService($db);
+	$entity = !empty($context['entity']) ? (int) $context['entity'] : (int) $conf->entity;
+	$sourceType = !empty($context['source_type']) ? (string) $context['source_type'] : 'dynamicprices_engine';
+	$sourceValue = array_key_exists('source_value', $context) ? $context['source_value'] : $costPrice;
+	$coefficient = array_key_exists('coefficient', $context) ? $context['coefficient'] : null;
+
+	$calculation = array(
+		'entity' => $entity,
+		'fk_product' => (int) $productId,
+		'dynamic_cost_price' => $costPrice === null ? null : (float) price2num($costPrice, 'MU'),
+		'price_base_type' => 'HT',
+		'source_type' => $sourceType,
+		'source_value' => $sourceValue === null ? null : (float) price2num($sourceValue, 'MU'),
+		'source_details' => !empty($context['source_details']) ? (string) $context['source_details'] : '',
+		'rule_code' => !empty($context['rule_code']) ? (string) $context['rule_code'] : '',
+		'coefficient' => $coefficient === null ? null : (float) $coefficient,
+		'rounding_rule' => (string) getDolGlobalString('DYNAMICPRICES_COST_ROUNDING_MODE', 'dolibarr'),
+		'calculation_status' => 1,
+		'calculation_message' => 'DynamicPricesCostCalculated',
+		'status' => 1,
+	);
+	$calculation['calculation_hash'] = hash('sha256', json_encode(array(
+		'dynamic_cost_price' => $calculation['dynamic_cost_price'],
+		'source_type' => $calculation['source_type'],
+		'source_value' => $calculation['source_value'],
+		'rule_code' => $calculation['rule_code'],
+		'coefficient' => $calculation['coefficient'],
+	)));
+
+	$result = $service->saveProductCost((int) $productId, $calculation, $user, array(
+		'entity' => $entity,
+		'calculation_context' => !empty($context['calculation_context']) ? (string) $context['calculation_context'] : 'engine',
+	));
+
+	if ($result < 0) {
+		dol_syslog(__METHOD__.' '.$service->error, LOG_ERR);
+		return false;
+	}
+
+	return true;
 }
 
 // Get commercial category code selected on product/service extrafield
@@ -281,7 +334,7 @@ function dynamicsprices_update_kit_cost_price($db, $productId)
 		$totalCost += $avg * (float) $component['qty'];
 	}
 
-	dynamicsprices_save_cost_price($db, $productId, $totalCost);
+	dynamicsprices_save_cost_price($db, $productId, $totalCost, array('source_type' => 'kit_components'));
 
 	return $totalCost;
 }
@@ -457,7 +510,13 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 	
 		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId);
 		$costPrice = $avgPrice * (1 + ($marginPercent / 100));
-		dynamicsprices_save_cost_price($db, $prodid, $costPrice);
+		dynamicsprices_save_cost_price($db, $prodid, $costPrice, array(
+			'entity' => $entity,
+			'source_type' => 'supplier_average',
+			'source_value' => $avgPrice,
+			'rule_code' => (string) $commercialCategoryId,
+			'coefficient' => 1 + (((float) $marginPercent) / 100),
+		));
 
 		$rules = dynamicsprices_get_price_rules($db, $commercialCategoryId);
 		$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $avgPrice, $rules, $tva_tx, $entity);
@@ -549,7 +608,21 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		if ($avgPrice !== null) {
 		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId);
 		$currentCost = $avgPrice * (1 + ($marginPercent / 100));
-		dynamicsprices_save_cost_price($db, $prodid, $currentCost);
+		dynamicsprices_save_cost_price($db, $prodid, $currentCost, array(
+			'entity' => $entity,
+			'source_type' => 'supplier_average',
+			'source_value' => $avgPrice,
+			'rule_code' => (string) $commercialCategoryId,
+			'coefficient' => 1 + (((float) $marginPercent) / 100),
+		));
+		} else {
+		dynamicsprices_save_cost_price($db, $prodid, $currentCost, array(
+			'entity' => $entity,
+			'source_type' => 'cost_price',
+			'source_value' => $currentCost,
+			'rule_code' => (string) $commercialCategoryId,
+			'coefficient' => 1,
+		));
 		}
 
 		$rules = dynamicsprices_get_price_rules($db, $commercialCategoryId);

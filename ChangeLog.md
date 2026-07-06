@@ -1,5 +1,15 @@
 # Changelog DynamicsPrices
 
+## 2.2.0
+- Ajout d'un prix de revient DynamicPrices par produit et par entité Multicompany, stocké dans des tables dédiées et historisé sans écriture automatique dans `llx_product.cost_price`. / Added a DynamicPrices cost price per product and Multicompany entity, stored in dedicated tables and logged without automatically writing to `llx_product.cost_price`.
+- Ajout du service central `DynamicPricesCostService` pour calculer, lire, sauvegarder, historiser et appliquer les coûts aux lignes commerciales. / Added the central `DynamicPricesCostService` to calculate, read, save, log and apply costs to commercial lines.
+- Ajout des écrans de fiche produit, historique produit, recalcul de masse avec prévisualisation/export CSV et assistant de migration non destructive. / Added product-card display, product history, mass recalculation with preview/CSV export and non-destructive migration assistant.
+- Ajout de l'application optionnelle des coûts DynamicPrices sur les lignes de devis, commandes et factures avec snapshots. / Added optional application of DynamicPrices costs to proposal, order and invoice lines with snapshots.
+- Ajout de l'API REST et de l'export natif Dolibarr pour les coûts DynamicPrices. / Added REST API and native Dolibarr export for DynamicPrices costs.
+- Ajout d'un onglet interne de compatibilité indiquant les versions détectées et la disponibilité des fonctionnalités. / Added an internal compatibility tab showing detected versions and feature availability.
+- Ajout des traductions espagnoles, allemandes et italiennes pour la nouvelle fonctionnalité de coût. / Added Spanish, German and Italian translations for the new cost feature.
+- Correction de la conservation des constantes du module lors de la désactivation/réactivation. / Fixed preservation of module constants during disable/reactivate cycles.
+
 ## 2.1.0
 - Refonte de la gestion des dictionnaires avec l'ajout du dictionnaire "Catégories commerciales" pour remplacer l'usage du dictionnaire "Nature de produit" dans les calculs métier. / Refactored dictionary management by adding the "Commercial categories" dictionary to replace the "Product nature" dictionary in business calculations.
 - Ajout de l'extrafield "Catégorie commerciale" sur les produits et services afin de piloter les règles tarifaires depuis une donnée dédiée. / Added the "Commercial category" extrafield on products and services to drive pricing rules from a dedicated field.

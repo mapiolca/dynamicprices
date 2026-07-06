@@ -53,9 +53,9 @@ class Cron_DynamicsPrices
 
             require_once __DIR__.'/../lib/dynamicsprices.lib.php';
             if (getDolGlobalString('LMDB_COST_PRICE_ONLY')) {
-                $results = update_customer_prices_from_cost_price($db, $user, $conf, $langs);
+                $results = update_customer_prices_from_cost_price($db, $user, $langs, $conf);
             } else {
-                $results = update_customer_prices_from_suppliers($db, $user, $conf, $langs);
+                $results = update_customer_prices_from_suppliers($db, $user, $langs, $conf);
             }
             
             //var_dump('$nb_line10 = '.$results.'<br>');
