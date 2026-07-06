@@ -95,7 +95,7 @@ if (!$user->admin) {
 	accessforbidden();
 }
 
-if (preg_match('/^set_(DYNAMICPRICES_COST_[A-Z0-9_]+)$/', $action, $matches)) {
+if (preg_match('/^set_(DYNAMICPRICES_(?:COST_[A-Z0-9_]+|SHARED_SELL_PRICE_SOURCE_ENTITY))$/', $action, $matches)) {
 	$constName = $matches[1];
 	$allowedConstants = array(
 		'DYNAMICPRICES_COST_LINE_STRATEGY',
@@ -103,6 +103,7 @@ if (preg_match('/^set_(DYNAMICPRICES_COST_[A-Z0-9_]+)$/', $action, $matches)) {
 		'DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY',
 		'DYNAMICPRICES_COST_ROUNDING_MODE',
 		'DYNAMICPRICES_COST_LOG_MODE',
+		'DYNAMICPRICES_SHARED_SELL_PRICE_SOURCE_ENTITY',
 	);
 	if (!in_array($constName, $allowedConstants, true)) {
 		accessforbidden();
@@ -219,6 +220,9 @@ function dynamicspricesPrintSelectSetting($confkey, array $options, $help = '')
 	global $conf, $form, $langs;
 
 	$value = getDolGlobalString($confkey);
+	if ($value === '' && isset($options['0'])) {
+		$value = '0';
+	}
 	if ($confkey === 'DYNAMICPRICES_COST_LINE_STRATEGY' && $value === 'on_create_and_update') {
 		$value = 'on_create_only';
 	}
@@ -236,10 +240,47 @@ function dynamicspricesPrintSelectSetting($confkey, array $options, $help = '')
 	print '<input type="hidden" name="token" value="'.newToken().'">';
 	print '<input type="hidden" name="action" value="set_'.$confkey.'">';
 	print $form->selectarray($confkey, $options, $value, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
+	print ajax_combobox($confkey);
 	print ' <input type="submit" class="button" value="'.$langs->trans('Modify').'">';
 	print '</form>';
 	print '</td>';
 	print '</tr>';
+}
+
+/**
+ * Return available source entities for shared selling price recalculation.
+ *
+ * @return array<string,string>
+ */
+function dynamicspricesGetSharedSellPriceSourceEntityOptions()
+{
+	global $conf, $db, $langs;
+
+	$options = array(
+		'0' => $langs->trans('DynamicPricesSharedSellPriceSourceNone'),
+	);
+
+	if (isModEnabled('multicompany')) {
+		$sql = "SELECT rowid, label";
+		$sql .= " FROM ".MAIN_DB_PREFIX."entity";
+		$sql .= " WHERE active = 1";
+		$sql .= " ORDER BY rowid ASC";
+
+		$resql = $db->query($sql);
+		if ($resql !== false) {
+			while (is_object($obj = $db->fetch_object($resql))) {
+				$entityId = (int) $obj->rowid;
+				$label = trim((string) $obj->label);
+				$options[(string) $entityId] = ($label !== '' ? $label : $langs->trans('Entity').' '.$entityId).' (#'.$entityId.')';
+			}
+		}
+	}
+
+	if (!empty($conf->entity) && !isset($options[(string) $conf->entity])) {
+		$options[(string) $conf->entity] = $langs->trans('Entity').' '.((int) $conf->entity);
+	}
+
+	return $options;
 }
 
 /**
@@ -393,6 +434,7 @@ setup_print_on_off('LMDB_KIT_PRICE_FROM_COMPONENTS');
 setup_print_title($langs->trans("DynamicPricesCostOptions"));
 setup_print_on_off('DYNAMICPRICES_COST_ENABLE');
 setup_print_on_off('DYNAMICPRICES_COST_USE_FOR_SALES');
+dynamicspricesPrintSelectSetting('DYNAMICPRICES_SHARED_SELL_PRICE_SOURCE_ENTITY', dynamicspricesGetSharedSellPriceSourceEntityOptions(), 'DynamicPricesSharedSellPriceSourceEntityHelp');
 dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_LINE_STRATEGY', array(
 	'on_create_only' => $langs->trans('DynamicPricesCostLineStrategyOnCreateOnly'),
 	'manual_button' => $langs->trans('DynamicPricesCostLineStrategyManualButton'),

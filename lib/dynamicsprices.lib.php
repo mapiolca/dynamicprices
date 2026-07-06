@@ -112,6 +112,103 @@ function dynamicsprices_table_column_exists($db, $tableName, $columnName)
 }
 
 /**
+ * Return entity ids visible for a Dolibarr sharing element.
+ *
+ * @param string $element Dolibarr element key for getEntity()
+ * @return array<int,int>
+ */
+function dynamicsprices_get_entity_ids_for_element($element)
+{
+	global $conf;
+
+	$entityIds = array();
+	$rawEntityList = (string) getEntity($element);
+	$rawEntities = explode(',', $rawEntityList);
+
+	foreach ($rawEntities as $rawEntity) {
+		$entityId = (int) trim($rawEntity);
+		if ($entityId > 0) {
+			$entityIds[$entityId] = $entityId;
+		}
+	}
+
+	if (empty($entityIds) && !empty($conf->entity)) {
+		$entityIds[(int) $conf->entity] = (int) $conf->entity;
+	}
+
+	sort($entityIds);
+
+	return array_values($entityIds);
+}
+
+/**
+ * Check if automatic selling price writes are allowed in the current Multicompany scope.
+ *
+ * Shared selling prices based on local supplier prices are unsafe: two entities can write
+ * different prices into the same shared sales catalogue. When supplier prices are not shared
+ * over the same scope, only the configured source entity may write shared selling prices.
+ *
+ * @param string $context Diagnostic context
+ * @return bool
+ */
+function dynamicsprices_can_update_shared_selling_prices($context = '')
+{
+	global $conf;
+
+	static $canUpdate = null;
+	static $logged = false;
+
+	if ($canUpdate !== null) {
+		return $canUpdate;
+	}
+
+	$sellingPriceEntities = dynamicsprices_get_entity_ids_for_element('productprice');
+	if (count($sellingPriceEntities) <= 1) {
+		$canUpdate = true;
+		return true;
+	}
+
+	$supplierPriceEntities = dynamicsprices_get_entity_ids_for_element('product_fournisseur_price');
+	$supplierScopeCoversSellingScope = count($supplierPriceEntities) > 1 && count(array_diff($sellingPriceEntities, $supplierPriceEntities)) === 0;
+	if ($supplierScopeCoversSellingScope) {
+		$canUpdate = true;
+		return true;
+	}
+
+	$sourceEntity = getDolGlobalInt('DYNAMICPRICES_SHARED_SELL_PRICE_SOURCE_ENTITY', 0);
+	if ($sourceEntity > 0) {
+		$canUpdate = ((int) $conf->entity === $sourceEntity) && in_array($sourceEntity, $sellingPriceEntities, true);
+		if (!$canUpdate && !$logged) {
+			dol_syslog(
+				__METHOD__.' skip shared selling price update: current_entity='.(int) $conf->entity
+				.', source_entity='.$sourceEntity
+				.', selling_scope='.implode(',', $sellingPriceEntities)
+				.', supplier_price_scope='.implode(',', $supplierPriceEntities)
+				.($context !== '' ? ', context='.$context : ''),
+				LOG_WARNING
+			);
+			$logged = true;
+		}
+
+		return $canUpdate;
+	}
+
+	$canUpdate = false;
+	if (!$logged) {
+		dol_syslog(
+			__METHOD__.' skip shared selling price update: product prices are shared but supplier purchase prices are not shared over the same scope'
+			.', selling_scope='.implode(',', $sellingPriceEntities)
+			.', supplier_price_scope='.implode(',', $supplierPriceEntities)
+			.($context !== '' ? ', context='.$context : ''),
+			LOG_WARNING
+		);
+		$logged = true;
+	}
+
+	return false;
+}
+
+/**
  * Build a scalar SQL expression resolving the commercial category code for a product.
  *
  * The commercial category dictionary follows product Multicompany sharing because the
@@ -392,6 +489,10 @@ function dynamicsprices_update_kit_cost_price($db, $productId)
 // Update selling prices from a base cost and rules
 function dynamicsprices_update_prices_from_base($db, $user, $product, $basePrice, $rules, $tvaTx, $entity)
 {
+	if (!dynamicsprices_can_update_shared_selling_prices('update_prices_from_base')) {
+		return 0;
+	}
+
 	$nb_line = 0;
 	$now = $db->idate(dol_now());
 
@@ -508,6 +609,10 @@ function dynamicsprices_get_latest_price_for_level($db, $productId, $level)
 // Update Kit prices by summing component prices
 function dynamicsprices_update_kit_prices_from_components($db, $user, $product, $components, $tvaTx, $entity)
 {
+	if (!dynamicsprices_can_update_shared_selling_prices('update_kit_prices_from_components')) {
+		return 0;
+	}
+
 	$levelTotals = array();
 	$nb_line = 0;
 	$now = $db->idate(dol_now());

@@ -193,6 +193,7 @@ class modDynamicsPrices extends DolibarrModules
 			16=> array('DYNAMICPRICES_COST_ALLOW_NATIVE_WRITE', 'yesno', 0, 'DynamicPricesCostAllowNativeWrite', 1, 'current', 0),
 			17=> array('DYNAMICPRICES_COST_DEBUG_LOG', 'yesno', 0, 'DynamicPricesCostDebugLog', 1, 'current', 0),
 			18=> array('DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY', 'chaine', 'dynamicprices,dolibarr_default,pmp,native_cost_price', 'DynamicPricesCostLineSourcePriority', 1, 'current', 0),
+			19=> array('DYNAMICPRICES_SHARED_SELL_PRICE_SOURCE_ENTITY', 'chaine', '0', 'DynamicPricesSharedSellPriceSourceEntity', 1, 'current', 0),
 		);
 
 		// Some keys to add into the overwriting translation tables
