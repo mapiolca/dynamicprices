@@ -652,8 +652,7 @@ class modDynamicsPrices extends DolibarrModules
 			}
 		}
 
-		// Permissions
-		$this->remove($options);
+		$this->skipExistingCronjobsAcrossEntities();
 
 		$sql = array();
 
@@ -737,6 +736,73 @@ class modDynamicsPrices extends DolibarrModules
 		}
 
 		return 1;
+	}
+
+	/**
+	 * Keep already configured cron jobs when the module is activated from another entity.
+	 *
+	 * Dolibarr core checks existing cron jobs with the current entity only. DynamicPrices
+	 * has a single functional scheduled job, so a job already present in any entity must
+	 * be reused instead of creating another copy during a Multicompany activation.
+	 *
+	 * @return void
+	 */
+	private function skipExistingCronjobsAcrossEntities()
+	{
+		if (empty($this->cronjobs) || !is_array($this->cronjobs)) {
+			return;
+		}
+
+		$moduleName = empty($this->rights_class) ? strtolower($this->name) : $this->rights_class;
+		foreach ($this->cronjobs as $key => $cronjob) {
+			if (!is_array($cronjob) || !$this->doesCronjobAlreadyExistAcrossEntities($cronjob, $moduleName)) {
+				continue;
+			}
+
+			unset($this->cronjobs[$key]);
+		}
+	}
+
+	/**
+	 * Check if a cron job already exists, without restricting the lookup to current entity.
+	 *
+	 * @param array<string,mixed> $cronjob Cron job descriptor
+	 * @param string $moduleName Module name stored in llx_cronjob
+	 * @return bool
+	 */
+	private function doesCronjobAlreadyExistAcrossEntities(array $cronjob, $moduleName)
+	{
+		$jobtype = !empty($cronjob['jobtype']) ? (string) $cronjob['jobtype'] : '';
+		$classesname = !empty($cronjob['class']) ? (string) $cronjob['class'] : '';
+		$objectname = !empty($cronjob['objectname']) ? (string) $cronjob['objectname'] : '';
+		$methodename = !empty($cronjob['method']) ? (string) $cronjob['method'] : '';
+		$command = !empty($cronjob['command']) ? (string) $cronjob['command'] : '';
+		$params = array_key_exists('parameters', $cronjob) ? (string) $cronjob['parameters'] : '';
+		$label = !empty($cronjob['label']) ? (string) $cronjob['label'] : '';
+
+		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."cronjob";
+		$sql .= " WHERE module_name = '".$this->db->escape($moduleName)."'";
+		$sql .= " AND jobtype = '".$this->db->escape($jobtype)."'";
+		if ($jobtype === 'method') {
+			$sql .= " AND classesname = '".$this->db->escape($classesname)."'";
+			$sql .= " AND objectname = '".$this->db->escape($objectname)."'";
+			$sql .= " AND methodename = '".$this->db->escape($methodename)."'";
+			$sql .= " AND params = '".$this->db->escape($params)."'";
+		} elseif ($jobtype === 'command') {
+			$sql .= " AND command = '".$this->db->escape($command)."'";
+			$sql .= " AND params = '".$this->db->escape($params)."'";
+		} else {
+			$sql .= " AND label = '".$this->db->escape($label)."'";
+		}
+		$sql .= " LIMIT 1";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return false;
+		}
+
+		return is_object($this->db->fetch_object($resql));
 	}
 
 	/**

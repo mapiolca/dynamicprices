@@ -369,7 +369,14 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		}
 
 		$conf = $mapping[$action];
-		$sql = "SELECT l.rowid, l.fk_product, l.pa_ht, l.".$conf['parent_field']." as fk_parent, p.entity";
+		$service = new DynamicPricesCostService($db);
+		$costColumn = $service->resolveCommercialLineCostColumn((string) $conf['table']);
+		if ($costColumn === '') {
+			dol_syslog(__METHOD__.' no purchase cost column found for table '.MAIN_DB_PREFIX.$conf['table'], LOG_WARNING);
+			return 0;
+		}
+
+		$sql = "SELECT l.rowid, l.fk_product, l.".$costColumn." AS pa_ht, l.".$conf['parent_field']." as fk_parent, p.entity";
 		$sql .= " FROM ".MAIN_DB_PREFIX.$conf['table']." AS l";
 		$sql .= " INNER JOIN ".MAIN_DB_PREFIX.$conf['parent_table']." AS p ON p.rowid = l.".$conf['parent_field'];
 		$sql .= " WHERE l.rowid = ".$lineId;
@@ -396,7 +403,6 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		$parent->id = (int) $obj->fk_parent;
 		$parent->entity = (int) $obj->entity;
 
-		$service = new DynamicPricesCostService($db);
 		$result = $service->applyCostToCommercialLine((string) $conf['element_type'], $line, $parent, $user, array(
 			'entity' => (int) $obj->entity,
 			'line_action' => (string) $conf['line_action'],

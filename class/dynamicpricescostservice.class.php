@@ -843,6 +843,32 @@ class DynamicPricesCostService
 	}
 
 	/**
+	 * Resolve the native purchase cost column for supported commercial line tables.
+	 *
+	 * @param string $tableElement Line table element without prefix
+	 * @return string
+	 */
+	public function resolveCommercialLineCostColumn($tableElement)
+	{
+		$columnsByTable = array(
+			'propaldet' => array('buy_price_ht', 'pa_ht'),
+			'commandedet' => array('buy_price_ht', 'pa_ht'),
+			'facturedet' => array('buy_price_ht', 'pa_ht'),
+		);
+		if (empty($columnsByTable[$tableElement])) {
+			return '';
+		}
+
+		foreach ($columnsByTable[$tableElement] as $columnName) {
+			if ($this->tableColumnExists(MAIN_DB_PREFIX.$tableElement, $columnName)) {
+				return $columnName;
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * Update native line purchase cost on supported commercial line tables.
 	 *
 	 * @param string $tableElement Line table element without prefix
@@ -858,12 +884,14 @@ class DynamicPricesCostService
 			$this->errors[] = $this->error;
 			return -1;
 		}
-		if (!$this->tableColumnExists(MAIN_DB_PREFIX.$tableElement, 'pa_ht')) {
+		$costColumn = $this->resolveCommercialLineCostColumn($tableElement);
+		if ($costColumn === '') {
+			dol_syslog(__METHOD__.' no purchase cost column found for table '.MAIN_DB_PREFIX.$tableElement, LOG_WARNING);
 			return 0;
 		}
 
 		$sql = "UPDATE ".MAIN_DB_PREFIX.$tableElement;
-		$sql .= " SET pa_ht = ".price2num($cost, 'MU');
+		$sql .= " SET ".$costColumn." = ".price2num($cost, 'MU');
 		$sql .= " WHERE rowid = ".((int) $lineId);
 
 		$resql = $this->db->query($sql);
