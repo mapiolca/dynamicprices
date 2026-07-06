@@ -19,6 +19,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
 require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.commande.class.php';
 require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.product.class.php';
 require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+require_once __DIR__.'/../lib/dynamicsprices.lib.php';
 require_once __DIR__.'/dynamicpricescostservice.class.php';
 
 /**
@@ -299,6 +300,11 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$result = $service->recalculateProductCost($productId, $user, array('entity' => $entity, 'calculation_context' => 'pricesuppliercard'));
 		if ($result < 0) {
 			setEventMessages($service->error, $service->errors, 'errors');
+			return -1;
+		}
+		$priceUpdateResult = dynamicsprices_update_sales_prices_from_dynamic_cost($this->db, $user, $productId, $entity);
+		if ($priceUpdateResult < 0) {
+			setEventMessages($langs->trans('Error'), null, 'errors');
 			return -1;
 		}
 

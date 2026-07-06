@@ -364,6 +364,52 @@ $sqlp .= " ON DUPLICATE KEY UPDATE price = VALUES(price), price_ttc = VALUES(pri
 	return $nb_line;
 }
 
+/**
+ * Update selling prices from the current DynamicPrices cost price.
+ *
+ * @param DoliDB $db Database handler
+ * @param User   $user User authoring the price change
+ * @param int    $productId Product id
+ * @param int    $entity Entity id
+ * @return int Number of price rows updated, -1 on error
+ */
+function dynamicsprices_update_sales_prices_from_dynamic_cost($db, $user, $productId, $entity = 0)
+{
+	global $conf;
+
+	$productId = (int) $productId;
+	if ($productId <= 0) {
+		return -1;
+	}
+
+	dol_include_once('/product/class/product.class.php');
+	require_once __DIR__.'/../class/dynamicpricescostservice.class.php';
+
+	$product = new Product($db);
+	if ($product->fetch($productId) <= 0) {
+		return -1;
+	}
+	if (!in_array((int) $product->type, array(Product::TYPE_PRODUCT, Product::TYPE_SERVICE), true)) {
+		return 0;
+	}
+
+	$entity = $entity > 0 ? (int) $entity : (int) $conf->entity;
+	$service = new DynamicPricesCostService($db);
+	$costPrice = $service->getDynamicCostPrice($productId, $entity);
+	if ($costPrice === null) {
+		return 0;
+	}
+
+	$commercialCategoryId = dynamicsprices_get_product_commercial_category($db, $productId);
+	$rules = dynamicsprices_get_price_rules($db, $commercialCategoryId);
+	if (empty($rules)) {
+		dol_syslog(__METHOD__.' no selling price rule found for product='.(int) $productId.' category='.$commercialCategoryId, LOG_WARNING);
+		return 0;
+	}
+
+	return dynamicsprices_update_prices_from_base($db, $user, $product, (float) $costPrice, $rules, (float) $product->tva_tx, $entity);
+}
+
 // Fetch latest component prices per level
 function dynamicsprices_get_component_prices_by_level($db, $productId)
 {
@@ -486,11 +532,11 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 			while ($obj = $db->fetch_object($resql)) {
 				$products[] = array('id' => $obj->rowid, 'commercial_category' => $obj->code_commercial_category);
 			}
-		}
+	}
 	
 		foreach ($products as $prod) {
 		$prodid = is_array($prod) ? $prod['id'] : $prod;
-		$commercialCategoryId = is_array($prod) ? ((int) $prod['commercial_category']) : dynamicsprices_get_product_commercial_category($db, $prodid);
+		$commercialCategoryId = is_array($prod) ? (string) $prod['commercial_category'] : dynamicsprices_get_product_commercial_category($db, $prodid);
 		$product = new Product($db);
 		$product->fetch($prodid);
 		if (!in_array((int) $product->type, array(Product::TYPE_PRODUCT, Product::TYPE_SERVICE), true)) {
@@ -586,11 +632,11 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 			while ($obj = $db->fetch_object($resql)) {
 				$products[] = array('id' => $obj->rowid, 'commercial_category' => $obj->code_commercial_category, 'cost_price' => $obj->cost_price);
 			}
-		}
+	}
 	
 		foreach ($products as $prod) {
 		$prodid = is_array($prod) ? $prod['id'] : $prod;
-		$commercialCategoryId = is_array($prod) ? ((int) $prod['commercial_category']) : dynamicsprices_get_product_commercial_category($db, $prodid);
+		$commercialCategoryId = is_array($prod) ? (string) $prod['commercial_category'] : dynamicsprices_get_product_commercial_category($db, $prodid);
 		$currentCost = is_array($prod) ? $prod['cost_price'] : 0;
 		$product = new Product($db);
 		$product->fetch($prodid);
