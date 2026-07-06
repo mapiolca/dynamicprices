@@ -93,3 +93,6 @@ LMDB_AboutDocumentationLink = Open README
 LMDB_AboutSupport = Support
 LMDB_AboutSupportValue = Contact the maintainer for support.
 LMDB_AboutContact = Contact
+LMDB_KitCostFallbackToCostPriceWarning = Component %s has no supplier purchase price. Cost price is used for kit %s cost computation.
+LMDB_KitCostFallbackToPmpWarning = Component %s has no supplier purchase price and no cost price. PMP is used for kit %s cost computation.
+LMDB_KitCostMissingAllPricesError = Component %s has no supplier purchase price, no cost price and no PMP. Kit %s cost computation is aborted.
