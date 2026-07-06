@@ -60,6 +60,7 @@ require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once '../lib/dynamicsprices.lib.php';
 //require_once "../class/myclass.class.php";
 require_once __DIR__.'/../core/modules/modDynamicsPrices.class.php';
+require_once __DIR__.'/../class/dynamicpricescostservice.class.php';
 
 /**
 * @var Conf $conf
@@ -94,6 +95,37 @@ if (!$user->admin) {
 	accessforbidden();
 }
 
+if (preg_match('/^set_(DYNAMICPRICES_(?:COST_[A-Z0-9_]+|SHARED_SELL_PRICE_SOURCE_ENTITY))$/', $action, $matches)) {
+	$constName = $matches[1];
+	$allowedConstants = array(
+		'DYNAMICPRICES_COST_LINE_STRATEGY',
+		'DYNAMICPRICES_COST_FALLBACK',
+		'DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY',
+		'DYNAMICPRICES_COST_ROUNDING_MODE',
+		'DYNAMICPRICES_COST_LOG_MODE',
+		'DYNAMICPRICES_SHARED_SELL_PRICE_SOURCE_ENTITY',
+	);
+	if (!in_array($constName, $allowedConstants, true)) {
+		accessforbidden();
+	}
+	if (GETPOST('token', 'alphanohtml') === '') {
+		accessforbidden($langs->trans('ErrorBadToken'));
+	}
+	if ($constName === 'DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY') {
+		$constValue = dynamicspricesGetPostedLineSourcePriority();
+	} else {
+		$constValue = GETPOST($constName, 'alphanohtml');
+	}
+	$result = dolibarr_set_const($db, $constName, $constValue, 'chaine', 0, '', (int) $conf->entity);
+	if ($result < 0) {
+		setEventMessages($db->lasterror(), null, 'errors');
+	} else {
+		setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
+	}
+	header('Location: '.$_SERVER['PHP_SELF']);
+	exit;
+}
+
 // Actions on module constants
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
@@ -112,14 +144,19 @@ $tabcond = empty($module->dictionaries['tabcond']) ? array() : $module->dictiona
 $tabhelp = empty($module->dictionaries['tabhelp']) ? array() : $module->dictionaries['tabhelp'];
 $tabsave = empty($module->dictionaries['tabsave']) ? array() : $module->dictionaries['tabsave'];
 $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
+$dictionaryActionsFile = DOL_DOCUMENT_ROOT.'/core/actions_dictionnaire.inc.php';
+$dictionaryTemplateFile = DOL_DOCUMENT_ROOT.'/core/tpl/admin/dict.tpl.php';
+$canRenderEmbeddedDictionaries = is_readable($dictionaryActionsFile) && is_readable($dictionaryTemplateFile);
 
-include DOL_DOCUMENT_ROOT.'/core/actions_dictionnaire.inc.php';
+if ($canRenderEmbeddedDictionaries) {
+	include $dictionaryActionsFile;
+}
 
 /**
  * Build options list for commercial category select.
  *
  * @param DoliDB $db Database handler
- * @return array<int,string>
+ * @return array<string,string>
  */
 function dynamicspricesGetCommercialCategoryOptions($db)
 {
@@ -128,6 +165,9 @@ function dynamicspricesGetCommercialCategoryOptions($db)
 	$sql = "SELECT rowid, code, label";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_commercial_category";
 	$sql .= " WHERE active = 1";
+	if (function_exists('dynamicsprices_table_column_exists') && dynamicsprices_table_column_exists($db, MAIN_DB_PREFIX."c_commercial_category", 'entity')) {
+		$sql .= " AND entity IN (".getEntity('product').")";
+	}
 	$sql .= " ORDER BY label ASC, code ASC";
 
 	$resql = $db->query($sql);
@@ -135,7 +175,7 @@ function dynamicspricesGetCommercialCategoryOptions($db)
 		return $options;
 	}
 
-	while ($obj = $db->fetch_object($resql)) {
+	while (is_object($obj = $db->fetch_object($resql))) {
 		$options[$obj->code] = $obj->label.' ('.$obj->code.')';
 	}
 
@@ -147,7 +187,7 @@ function dynamicspricesGetCommercialCategoryOptions($db)
  *
  * @param string $html Dictionary HTML output
  * @param Form   $form Form helper
- * @param array<int,string> $options Select options
+ * @param array<string,string> $options Select options
  * @return string
  */
 function dynamicspricesInjectCommercialCategorySelect($html, $form, $options)
@@ -170,6 +210,216 @@ function dynamicspricesInjectCommercialCategorySelect($html, $form, $options)
 		},
 		$html
 	);
+}
+
+/**
+ * Print fallback links to native dictionary administration when old embedded core tpl/actions are unavailable.
+ *
+ * @param array<int|string,string> $tablib Dictionary label keys
+ * @param array<int|string,string> $tabname Dictionary table names
+ * @return void
+ */
+function dynamicspricesPrintNativeDictionaryFallback(array $tablib, array $tabname)
+{
+	global $langs;
+
+	print '<table class="noborder centpercent">';
+	print '<tr class="liste_titre">';
+	print '<td>'.$langs->trans('DynamicPricesDictionaries').'</td>';
+	print '<td class="right">'.$langs->trans('Action').'</td>';
+	print '</tr>';
+	print '<tr class="oddeven">';
+	print '<td colspan="2"><span class="opacitymedium">'.$langs->trans('DynamicPricesNativeDictionaryAdminHelp').'</span></td>';
+	print '</tr>';
+
+	foreach ($tabname as $key => $tableName) {
+		$labelKey = isset($tablib[$key]) ? (string) $tablib[$key] : (string) $tableName;
+		print '<tr class="oddeven">';
+		print '<td>';
+		print dol_escape_htmltag($langs->trans($labelKey));
+		print '<br><span class="opacitymedium">'.dol_escape_htmltag((string) $tableName).'</span>';
+		print '</td>';
+		print '<td class="right">';
+		print '<a class="button" href="'.DOL_URL_ROOT.'/admin/dict.php">'.$langs->trans('DynamicPricesOpenNativeDictionaries').'</a>';
+		print '</td>';
+		print '</tr>';
+	}
+
+	print '</table>';
+}
+
+/**
+ * Print a select setting row.
+ *
+ * @param string $confkey Constant name
+ * @param array<string,string> $options Select options
+ * @param string $help Translation key for help
+ * @return void
+ */
+function dynamicspricesPrintSelectSetting($confkey, array $options, $help = '')
+{
+	global $conf, $form, $langs;
+
+	$value = getDolGlobalString($confkey);
+	if ($value === '' && isset($options['0'])) {
+		$value = '0';
+	}
+	if ($confkey === 'DYNAMICPRICES_COST_LINE_STRATEGY' && $value === 'on_create_and_update') {
+		$value = 'on_create_only';
+	}
+	print '<tr>';
+	print '<td>';
+	if ($help !== '') {
+		print $form->textwithtooltip($langs->trans($confkey), $langs->trans($help), 2, 1, img_help(1, ''));
+	} else {
+		print $langs->trans($confkey);
+	}
+	print '</td>';
+	print '<td align="center" width="20">&nbsp;</td>';
+	print '<td align="right">';
+	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="hidden" name="action" value="set_'.$confkey.'">';
+	print $form->selectarray($confkey, $options, $value, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
+	print ajax_combobox($confkey);
+	print ' <input type="submit" class="button" value="'.$langs->trans('Modify').'">';
+	print '</form>';
+	print '</td>';
+	print '</tr>';
+}
+
+/**
+ * Return available source entities for shared selling price recalculation.
+ *
+ * @return array<string,string>
+ */
+function dynamicspricesGetSharedSellPriceSourceEntityOptions()
+{
+	global $conf, $db, $langs;
+
+	$options = array(
+		'0' => $langs->trans('DynamicPricesSharedSellPriceSourceNone'),
+	);
+
+	if (isModEnabled('multicompany')) {
+		$sql = "SELECT rowid, label";
+		$sql .= " FROM ".MAIN_DB_PREFIX."entity";
+		$sql .= " WHERE active = 1";
+		$sql .= " ORDER BY rowid ASC";
+
+		$resql = $db->query($sql);
+		if ($resql !== false) {
+			while (is_object($obj = $db->fetch_object($resql))) {
+				$entityId = (int) $obj->rowid;
+				$label = trim((string) $obj->label);
+				$options[(string) $entityId] = ($label !== '' ? $label : $langs->trans('Entity').' '.$entityId).' (#'.$entityId.')';
+			}
+		}
+	}
+
+	if (!empty($conf->entity) && !isset($options[(string) $conf->entity])) {
+		$options[(string) $conf->entity] = $langs->trans('Entity').' '.((int) $conf->entity);
+	}
+
+	return $options;
+}
+
+/**
+ * Return source options for commercial line automatic cost priority.
+ *
+ * @return array<string,string>
+ */
+function dynamicspricesGetLineSourcePriorityOptions()
+{
+	global $langs;
+
+	return array(
+		'dynamicprices' => $langs->trans('DynamicPricesCostLineSourceDynamicPrices'),
+		'dolibarr_default' => $langs->trans('DynamicPricesCostLineSourceDolibarrDefault'),
+		'pmp' => $langs->trans('DynamicPricesCostLineSourcePmp'),
+		'native_cost_price' => $langs->trans('DynamicPricesCostLineSourceNativeCostPrice'),
+	);
+}
+
+/**
+ * Normalize posted commercial line cost source priority.
+ *
+ * @return string
+ */
+function dynamicspricesGetPostedLineSourcePriority()
+{
+	$allowed = array_keys(dynamicspricesGetLineSourcePriorityOptions());
+	$priority = array();
+	for ($i = 1; $i <= 4; $i++) {
+		$source = GETPOST('DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY_'.$i, 'alphanohtml');
+		if ($source !== '' && in_array($source, $allowed, true) && !in_array($source, $priority, true)) {
+			$priority[] = $source;
+		}
+	}
+
+	if (empty($priority)) {
+		$priority = array('dynamicprices', 'dolibarr_default', 'pmp', 'native_cost_price');
+	}
+
+	return implode(',', $priority);
+}
+
+/**
+ * Print commercial line cost source priority setting.
+ *
+ * @return void
+ */
+function dynamicspricesPrintLineSourcePrioritySetting()
+{
+	global $db, $form, $langs;
+
+	$service = new DynamicPricesCostService($db);
+	$priority = $service->getCommercialLineCostSourcePriority();
+	$options = array('' => $langs->trans('DynamicPricesCostLineSourceIgnore')) + dynamicspricesGetLineSourcePriorityOptions();
+
+	print '<tr class="oddeven">';
+	print '<td colspan="3"><span class="opacitymedium">'.$langs->trans('DynamicPricesCostLineSourcePriorityIntro').'</span></td>';
+	print '</tr>';
+	print '<tr>';
+	print '<td>';
+	print $form->textwithtooltip($langs->trans('DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY'), $langs->trans('DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY_HELP'), 2, 1, img_help(1, ''));
+	print '</td>';
+	print '<td align="center" width="20">&nbsp;</td>';
+	print '<td align="right">';
+	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="hidden" name="action" value="set_DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY">';
+	for ($i = 1; $i <= 4; $i++) {
+		$inputName = 'DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY_'.$i;
+		$selected = isset($priority[$i - 1]) ? $priority[$i - 1] : '';
+		print '<span class="nowrap">';
+		print $langs->trans('DynamicPricesCostLineSourcePriorityRank', $i).' ';
+		print $form->selectarray($inputName, $options, $selected, 0, 0, 0, '', 0, 0, 0, '', 'minwidth200');
+		print '</span> ';
+		print ajax_combobox($inputName);
+	}
+	print '<input type="submit" class="button" value="'.$langs->trans('Modify').'">';
+	print '</form>';
+	print '</td>';
+	print '</tr>';
+}
+
+/**
+ * Print a read-only information row.
+ *
+ * @param string $labelkey Label translation key
+ * @param string $valuekey Value translation key
+ * @return void
+ */
+function dynamicspricesPrintInfoSetting($labelkey, $valuekey)
+{
+	global $langs;
+
+	print '<tr class="oddeven">';
+	print '<td>'.$langs->trans($labelkey).'</td>';
+	print '<td align="center" width="20">&nbsp;</td>';
+	print '<td align="right"><span class="opacitymedium">'.$langs->trans($valuekey).'</span></td>';
+	print '</tr>';
 }
 
 
@@ -222,16 +472,54 @@ setup_print_on_off('LMDB_SUPPLIER_BUYPRICE_ALTERED');
 setup_print_on_off('LMDB_ADD_UPDATE_SUPPLIER_PRICE_ON_SUBMIT');
 setup_print_on_off('LMDB_KIT_PRICE_FROM_COMPONENTS');
 
+setup_print_title($langs->trans("DynamicPricesCostOptions"));
+setup_print_on_off('DYNAMICPRICES_COST_ENABLE');
+setup_print_on_off('DYNAMICPRICES_COST_USE_FOR_SALES');
+dynamicspricesPrintSelectSetting('DYNAMICPRICES_SHARED_SELL_PRICE_SOURCE_ENTITY', dynamicspricesGetSharedSellPriceSourceEntityOptions(), 'DynamicPricesSharedSellPriceSourceEntityHelp');
+dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_LINE_STRATEGY', array(
+	'on_create_only' => $langs->trans('DynamicPricesCostLineStrategyOnCreateOnly'),
+	'manual_button' => $langs->trans('DynamicPricesCostLineStrategyManualButton'),
+	'preserve_origin' => $langs->trans('DynamicPricesCostLineStrategyPreserveOrigin'),
+	'never' => $langs->trans('DynamicPricesCostLineStrategyNever'),
+));
+dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_FALLBACK', array(
+	'keep_dolibarr' => $langs->trans('DynamicPricesCostFallbackKeepDolibarr'),
+	'native_cost_price' => $langs->trans('DynamicPricesCostFallbackNativeCostPrice'),
+	'pmp' => $langs->trans('DynamicPricesCostFallbackPmp'),
+	'zero' => $langs->trans('DynamicPricesCostFallbackZero'),
+	'block' => $langs->trans('DynamicPricesCostFallbackBlock'),
+));
+setup_print_title($langs->trans('DynamicPricesCostLineSourcePriorityTitle'));
+dynamicspricesPrintLineSourcePrioritySetting();
+dynamicspricesPrintInfoSetting('DynamicPricesCostCalculationFormula', 'DynamicPricesCostCalculationFormulaHelp');
+setup_print_on_off('DYNAMICPRICES_COST_INCLUDE_SERVICES');
+setup_print_on_off('DYNAMICPRICES_COST_RECALC_KITS');
+dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_ROUNDING_MODE', array(
+	'dolibarr' => $langs->trans('DynamicPricesCostRoundingDolibarr'),
+	'none' => $langs->trans('DynamicPricesCostRoundingNone'),
+));
+dynamicspricesPrintSelectSetting('DYNAMICPRICES_COST_LOG_MODE', array(
+	'changes_only' => $langs->trans('DynamicPricesCostLogChangesOnly'),
+	'all' => $langs->trans('DynamicPricesCostLogAll'),
+));
+setup_print_on_off('DYNAMICPRICES_COST_ALLOW_MANUAL_OVERRIDE');
+setup_print_on_off('DYNAMICPRICES_COST_ALLOW_NATIVE_WRITE', false, 'DYNAMICPRICES_COST_ALLOW_NATIVE_WRITE_WARNING');
+setup_print_on_off('DYNAMICPRICES_COST_DEBUG_LOG');
+
 print '</table>';
 
 print '<br>';
 
 // Dictionary management
-$commercialCategoryOptions = dynamicspricesGetCommercialCategoryOptions($db);
-ob_start();
-include DOL_DOCUMENT_ROOT.'/core/tpl/admin/dict.tpl.php';
-$dictionaryHtml = ob_get_clean();
-echo dynamicspricesInjectCommercialCategorySelect($dictionaryHtml, $form, $commercialCategoryOptions);
+if ($canRenderEmbeddedDictionaries) {
+	$commercialCategoryOptions = dynamicspricesGetCommercialCategoryOptions($db);
+	ob_start();
+	include $dictionaryTemplateFile;
+	$dictionaryHtml = ob_get_clean();
+	echo dynamicspricesInjectCommercialCategorySelect($dictionaryHtml, $form, $commercialCategoryOptions);
+} else {
+	dynamicspricesPrintNativeDictionaryFallback($tablib, $tabname);
+}
 
 if (empty($setupnotempty)) {
 print '<br>'.$langs->trans("NothingToSetup");

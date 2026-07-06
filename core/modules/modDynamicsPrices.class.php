@@ -76,7 +76,7 @@ class modDynamicsPrices extends DolibarrModules
 		$this->editor_squarred_logo = 'logo.png@dynamicsprices';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@dynamicsprices'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '2.2';
+		$this->version = '3.0';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -107,6 +107,7 @@ class modDynamicsPrices extends DolibarrModules
 			'models' => 0,
 			// Set this to 1 if module has its own printing directory (core/modules/printing)
 			'printing' => 0,
+			'api' => 1,
 			// Set this to 1 if module has its own theme directory (theme)
 			'theme' => 0,
 			// Set this to relative path of css file if module has its own css file
@@ -115,13 +116,14 @@ class modDynamicsPrices extends DolibarrModules
 			),
 			// Set this to relative path of js file if module must load a js on all pages
 			'js' => array(
-				//   '/dynamicsprices/js/dynamicsprices.js.php',
+				'/dynamicsprices/js/dynamicsprices_commercial_line_cost.js.php',
 			),
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
 			'hooks' => array(
 				'data' => array(
 					'ordersuppliercard',
+					'pricesuppliercard',
 				),
 				'entity' => '0',
 			),
@@ -155,9 +157,9 @@ class modDynamicsPrices extends DolibarrModules
 		$this->langfiles = array("dynamicsprices@dynamicsprices");
 
 		// Prerequisites
-		$this->phpmin = array(7, 1); // Minimum version of PHP required by module
+		$this->phpmin = array(8, 0); // Minimum version of PHP required by module
 		// $this->phpmax = array(8, 0); // Maximum version of PHP required by module
-		$this->need_dolibarr_version = array(19, -3); // Minimum version of Dolibarr required by module
+		$this->need_dolibarr_version = array(20, 0); // Minimum version of Dolibarr required by module
 		// $this->max_dolibarr_version = array(19, -3); // Maximum version of Dolibarr required by module
 		$this->need_javascript_ajax = 0;
 
@@ -173,11 +175,25 @@ class modDynamicsPrices extends DolibarrModules
 		//                             2 => array('DYNAMICSPRICES_MYNEWCONST2', 'chaine', 'myvalue', 'This is another constant to add', 0, 'current', 1)
 		// );
 		$this->const = array(
-			1=> array('PRODUCT_PRICE_UNIQ','chaine', 0, "PriceCatalogue", 1, 'current', 1),
-			2=> array('PRODUIT_MULTIPRICES','chaine', 1, "MultiPricesAbility", 1, 'current', 1),
-			3=> array('PRODUIT_CUSTOMER_PRICES','chaine', 0, "MultiPricesAbility", 1, 'current', 1),
-			4=> array('PRODUIT_CUSTOMER_PRICES_AND_MULTIPRICES', 'chaine', 0, 'PriceByCustomeAndMultiPricesAbility', 1, 'current', 1),
-			5=> array('PRODUIT_MULTIPRICES_LIMIT', 'chaine', 1, 'MultiPricesNumPrices', 1, 'current', 1),
+			1=> array('PRODUCT_PRICE_UNIQ','chaine', 0, "PriceCatalogue", 1, 'current', 0),
+			2=> array('PRODUIT_MULTIPRICES','chaine', 1, "MultiPricesAbility", 1, 'current', 0),
+			3=> array('PRODUIT_CUSTOMER_PRICES','chaine', 0, "MultiPricesAbility", 1, 'current', 0),
+			4=> array('PRODUIT_CUSTOMER_PRICES_AND_MULTIPRICES', 'chaine', 0, 'PriceByCustomeAndMultiPricesAbility', 1, 'current', 0),
+			5=> array('PRODUIT_MULTIPRICES_LIMIT', 'chaine', 1, 'MultiPricesNumPrices', 1, 'current', 0),
+			6=> array('DYNAMICPRICES_COST_ENABLE', 'yesno', 1, 'DynamicPricesCostEnable', 1, 'current', 0),
+			7=> array('DYNAMICPRICES_COST_USE_FOR_SALES', 'yesno', 0, 'DynamicPricesCostUseForSales', 1, 'current', 0),
+			8=> array('DYNAMICPRICES_COST_LINE_STRATEGY', 'chaine', 'on_create_only', 'DynamicPricesCostLineStrategy', 1, 'current', 0),
+			9=> array('DYNAMICPRICES_COST_FALLBACK', 'chaine', 'keep_dolibarr', 'DynamicPricesCostFallback', 1, 'current', 0),
+			10=> array('DYNAMICPRICES_COST_SOURCE_PRIORITY', 'chaine', 'supplier_average', 'DynamicPricesCostSourcePriority', 0, 'current', 0),
+			11=> array('DYNAMICPRICES_COST_INCLUDE_SERVICES', 'yesno', 0, 'DynamicPricesCostIncludeServices', 1, 'current', 0),
+			12=> array('DYNAMICPRICES_COST_RECALC_KITS', 'yesno', 1, 'DynamicPricesCostRecalcKits', 1, 'current', 0),
+			13=> array('DYNAMICPRICES_COST_ROUNDING_MODE', 'chaine', 'dolibarr', 'DynamicPricesCostRoundingMode', 1, 'current', 0),
+			14=> array('DYNAMICPRICES_COST_LOG_MODE', 'chaine', 'changes_only', 'DynamicPricesCostLogMode', 1, 'current', 0),
+			15=> array('DYNAMICPRICES_COST_ALLOW_MANUAL_OVERRIDE', 'yesno', 1, 'DynamicPricesCostAllowManualOverride', 1, 'current', 0),
+			16=> array('DYNAMICPRICES_COST_ALLOW_NATIVE_WRITE', 'yesno', 0, 'DynamicPricesCostAllowNativeWrite', 1, 'current', 0),
+			17=> array('DYNAMICPRICES_COST_DEBUG_LOG', 'yesno', 0, 'DynamicPricesCostDebugLog', 1, 'current', 0),
+			18=> array('DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY', 'chaine', 'dynamicprices,dolibarr_default,pmp,native_cost_price', 'DynamicPricesCostLineSourcePriority', 1, 'current', 0),
+			19=> array('DYNAMICPRICES_SHARED_SELL_PRICE_SOURCE_ENTITY', 'chaine', '0', 'DynamicPricesSharedSellPriceSourceEntity', 1, 'current', 0),
 		);
 
 		// Some keys to add into the overwriting translation tables
@@ -253,58 +269,93 @@ class modDynamicsPrices extends DolibarrModules
 		 );
 		 */
 /* BEGIN MODULEBUILDER DICTIONARIES */
+		$coefPriceDictionaryKey = 0;
+		$marginOnCostDictionaryKey = 1;
+		$commercialCategoryDictionaryKey = 2;
 		$commercialCategoryHasEntity = $this->columnExists(MAIN_DB_PREFIX."c_commercial_category", 'entity');
+		$coefPriceEntityList = getEntity('c_coefprice');
+		$marginOnCostEntityList = getEntity('c_margin_on_cost');
+		$commercialCategoryEntityList = getEntity('product');
 		$commercialCategorySelectSql = $commercialCategoryHasEntity
-			? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity = '.((int) $conf->entity)
+			? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity IN ('.$commercialCategoryEntityList.')'
 			: 'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t';
 		$commercialCategoryFieldValue = $commercialCategoryHasEntity ? "code,entity,label" : "code,label";
+		$commercialCategoryLabelSql = $commercialCategoryHasEntity
+			? '(SELECT cc.label FROM '.MAIN_DB_PREFIX.'c_commercial_category AS cc WHERE cc.code = t.code_commercial_category AND cc.entity IN ('.$commercialCategoryEntityList.') ORDER BY CASE WHEN cc.entity = t.entity THEN 0 WHEN cc.entity = '.((int) $conf->entity).' THEN 1 ELSE 2 END, cc.rowid ASC LIMIT 1)'
+			: '(SELECT cc.label FROM '.MAIN_DB_PREFIX.'c_commercial_category AS cc WHERE cc.code = t.code_commercial_category ORDER BY cc.rowid ASC LIMIT 1)';
 
 		$this->dictionaries = array(
 			'langs' => 'dynamicsprices@dynamicsprices',
-			'tabname' => array(MAIN_DB_PREFIX."c_coefprice", MAIN_DB_PREFIX."c_margin_on_cost", MAIN_DB_PREFIX."c_commercial_category"),
-			'tablib' => array("LMDB_coefprice", "LMDB_marginoncost", "LMDB_commercialcategories"),
+			'tabname' => array(
+				$coefPriceDictionaryKey => "c_coefprice",
+				$marginOnCostDictionaryKey => "c_margin_on_cost",
+				$commercialCategoryDictionaryKey => "c_commercial_category",
+			),
+			'tablib' => array(
+				$coefPriceDictionaryKey => "LMDB_coefprice",
+				$marginOnCostDictionaryKey => "LMDB_marginoncost",
+				$commercialCategoryDictionaryKey => "LMDB_commercialcategories",
+			),
 			'tabsql' => array(
-				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, cc.label as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.code = t.code_commercial_category WHERE t.entity = '.((int) $conf->entity),
-				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, cc.label as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.code = t.code_commercial_category WHERE t.entity = '.((int) $conf->entity),
-				$commercialCategorySelectSql,
+				$coefPriceDictionaryKey => 'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, '.$commercialCategoryLabelSql.' as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity IN ('.$coefPriceEntityList.')',
+				$marginOnCostDictionaryKey => 'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, '.$commercialCategoryLabelSql.' as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t WHERE t.entity IN ('.$marginOnCostEntityList.')',
+				$commercialCategoryDictionaryKey => $commercialCategorySelectSql,
 			),
 			'tabsqlsort' => array(
-				"code ASC",
-				"code ASC",
-				"label ASC",
+				$coefPriceDictionaryKey => "code ASC",
+				$marginOnCostDictionaryKey => "code ASC",
+				$commercialCategoryDictionaryKey => "label ASC",
 			),
 			'tabfield' => array(
-				"code,code_commercial_category,pricelevel,targetrate,minrate",
-				"code,code_commercial_category,margin_on_cost_percent",
-				"code,label",
+				$coefPriceDictionaryKey => "code,code_commercial_category,pricelevel,targetrate,minrate",
+				$marginOnCostDictionaryKey => "code,code_commercial_category,margin_on_cost_percent",
+				$commercialCategoryDictionaryKey => "code,label",
 			),
 			'tabfieldvalue' => array(
-				"code,entity,code_commercial_category,pricelevel,targetrate,minrate",
-				"code,entity,code_commercial_category,margin_on_cost_percent",
-				$commercialCategoryFieldValue,
+				$coefPriceDictionaryKey => "code,entity,code_commercial_category,pricelevel,targetrate,minrate",
+				$marginOnCostDictionaryKey => "code,entity,code_commercial_category,margin_on_cost_percent",
+				$commercialCategoryDictionaryKey => $commercialCategoryFieldValue,
 			),
 			'tabfieldinsert' => array(
-				"code,entity,code_commercial_category,pricelevel,targetrate,minrate",
-				"code,entity,code_commercial_category,margin_on_cost_percent",
-				$commercialCategoryFieldValue,
+				$coefPriceDictionaryKey => "code,entity,code_commercial_category,pricelevel,targetrate,minrate",
+				$marginOnCostDictionaryKey => "code,entity,code_commercial_category,margin_on_cost_percent",
+				$commercialCategoryDictionaryKey => $commercialCategoryFieldValue,
 			),
-			'tabrowid' => array('rowid', 'rowid', 'rowid'),
+			'tabrowid' => array(
+				$coefPriceDictionaryKey => 'rowid',
+				$marginOnCostDictionaryKey => 'rowid',
+				$commercialCategoryDictionaryKey => 'rowid',
+			),
 			'tabcond' => array(
-				isModEnabled('dynamicsprices'),
-				isModEnabled('dynamicsprices'),
-				isModEnabled('dynamicsprices'),
+				$coefPriceDictionaryKey => isModEnabled('dynamicsprices'),
+				$marginOnCostDictionaryKey => isModEnabled('dynamicsprices'),
+				$commercialCategoryDictionaryKey => isModEnabled('dynamicsprices'),
 			),
 			'tabhelp' => array(
-				'code' => $langs->trans('LMDB_CodeTooltipHelp'),
-				'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
-				'code_commercial_category' => $langs->trans('LMDB_CodeCommercialCategoryTooltipHelp'),
-				'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
-				'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
-				'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
-				'commercial_category_label' => $langs->trans('LMDB_CommercialCategoryLabelTooltipHelp'),
-				'margin_on_cost_percent' => $langs->trans('LMDB_MarginOnCostTooltipHelp'),
-				'label' => $langs->trans('LMDB_LabelTooltipHelp'),
-				'active' => $langs->trans('LMDB_ActiveTooltipHelp'),
+				$coefPriceDictionaryKey => array(
+					'code' => $langs->trans('LMDB_CodeTooltipHelp'),
+					'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
+					'code_commercial_category' => $langs->trans('LMDB_CodeCommercialCategoryTooltipHelp'),
+					'commercial_category_label' => $langs->trans('LMDB_CommercialCategoryLabelTooltipHelp'),
+					'pricelevel' => $langs->trans('LMDB_PriceLevelTooltipHelp'),
+					'targetrate' => $langs->trans('LMDB_TargetRateTooltipHelp'),
+					'minrate' => $langs->trans('LMDB_MinRateTooltipHelp'),
+					'active' => $langs->trans('LMDB_ActiveTooltipHelp'),
+				),
+				$marginOnCostDictionaryKey => array(
+					'code' => $langs->trans('LMDB_CodeTooltipHelp'),
+					'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
+					'code_commercial_category' => $langs->trans('LMDB_CodeCommercialCategoryTooltipHelp'),
+					'commercial_category_label' => $langs->trans('LMDB_CommercialCategoryLabelTooltipHelp'),
+					'margin_on_cost_percent' => $langs->trans('LMDB_MarginOnCostTooltipHelp'),
+					'active' => $langs->trans('LMDB_ActiveTooltipHelp'),
+				),
+				$commercialCategoryDictionaryKey => array(
+					'code' => $langs->trans('LMDB_CodeTooltipHelp'),
+					'entity' => $langs->trans('LMDB_ENtityTooltipHelp'),
+					'label' => $langs->trans('LMDB_LabelTooltipHelp'),
+					'active' => $langs->trans('LMDB_ActiveTooltipHelp'),
+				),
 			),
 		);
 /* END MODULEBUILDER DICTIONARIES */
@@ -367,24 +418,41 @@ class modDynamicsPrices extends DolibarrModules
 		$r = 0;
 		// Add here entries to declare new permissions
 		/* BEGIN MODULEBUILDER PERMISSIONS */
-		/*
-		$o = 1;
-		$this->rights[$r][0] = $this->numero . sprintf("%02d", ($o * 10) + 1); // Permission id (must not be already used)
-		$this->rights[$r][1] = 'Read objects of DynamicsPrices'; // Permission label
-		$this->rights[$r][4] = 'myobject';
-		$this->rights[$r][5] = 'read'; // In php code, permission will be checked by test if ($user->hasRight('dynamicsprices', 'myobject', 'read'))
 		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf("%02d", ($o * 10) + 2); // Permission id (must not be already used)
-		$this->rights[$r][1] = 'Create/Update objects of DynamicsPrices'; // Permission label
-		$this->rights[$r][4] = 'myobject';
-		$this->rights[$r][5] = 'write'; // In php code, permission will be checked by test if ($user->hasRight('dynamicsprices', 'myobject', 'write'))
+		$this->rights[$r][0] = $this->numero * 100 + $r;
+		$this->rights[$r][1] = 'DynamicPricesCostRead';
+		$this->rights[$r][4] = 'cost';
+		$this->rights[$r][5] = 'read';
+
 		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf("%02d", ($o * 10) + 3); // Permission id (must not be already used)
-		$this->rights[$r][1] = 'Delete objects of DynamicsPrices'; // Permission label
-		$this->rights[$r][4] = 'myobject';
-		$this->rights[$r][5] = 'delete'; // In php code, permission will be checked by test if ($user->hasRight('dynamicsprices', 'myobject', 'delete'))
+		$this->rights[$r][0] = $this->numero * 100 + $r;
+		$this->rights[$r][1] = 'DynamicPricesCostWrite';
+		$this->rights[$r][4] = 'cost';
+		$this->rights[$r][5] = 'write';
+
 		$r++;
-		*/
+		$this->rights[$r][0] = $this->numero * 100 + $r;
+		$this->rights[$r][1] = 'DynamicPricesCostMassUpdateRight';
+		$this->rights[$r][4] = 'cost';
+		$this->rights[$r][5] = 'massupdate';
+
+		$r++;
+		$this->rights[$r][0] = $this->numero * 100 + $r;
+		$this->rights[$r][1] = 'DynamicPricesCostAdmin';
+		$this->rights[$r][4] = 'cost';
+		$this->rights[$r][5] = 'admin';
+
+		$r++;
+		$this->rights[$r][0] = $this->numero * 100 + $r;
+		$this->rights[$r][1] = 'DynamicPricesCostHistoryRight';
+		$this->rights[$r][4] = 'cost';
+		$this->rights[$r][5] = 'history';
+
+		$r++;
+		$this->rights[$r][0] = $this->numero * 100 + $r;
+		$this->rights[$r][1] = 'DynamicPricesCostOverride';
+		$this->rights[$r][4] = 'cost';
+		$this->rights[$r][5] = 'override';
 		/* END MODULEBUILDER PERMISSIONS */
 
 
@@ -467,32 +535,67 @@ class modDynamicsPrices extends DolibarrModules
 		// Exports profiles provided by this module
 		$r = 0;
 		/* BEGIN MODULEBUILDER EXPORT MYOBJECT */
-		/*
 		$langs->load("dynamicsprices@dynamicsprices");
-		$this->export_code[$r] = $this->rights_class.'_'.$r;
-		$this->export_label[$r] = 'MyObjectLines';	// Translation key (used only if key ExportDataset_xxx_z not found)
+		$this->export_code[$r] = $this->rights_class.'_dynamic_cost';
+		$this->export_label[$r] = 'DynamicPricesCostExport';
 		$this->export_icon[$r] = $this->picto;
-		// Define $this->export_fields_array, $this->export_TypeFields_array and $this->export_entities_array
-		$keyforclass = 'MyObject'; $keyforclassfile='/dynamicsprices/class/myobject.class.php'; $keyforelement='myobject@dynamicsprices';
-		include DOL_DOCUMENT_ROOT.'/core/commonfieldsinexport.inc.php';
-		//$this->export_fields_array[$r]['t.fieldtoadd']='FieldToAdd'; $this->export_TypeFields_array[$r]['t.fieldtoadd']='Text';
-		//unset($this->export_fields_array[$r]['t.fieldtoremove']);
-		//$keyforclass = 'MyObjectLine'; $keyforclassfile='/dynamicsprices/class/myobject.class.php'; $keyforelement='myobjectline@dynamicsprices'; $keyforalias='tl';
-		//include DOL_DOCUMENT_ROOT.'/core/commonfieldsinexport.inc.php';
-		$keyforselect='myobject'; $keyforaliasextra='extra'; $keyforelement='myobject@dynamicsprices';
-		include DOL_DOCUMENT_ROOT.'/core/extrafieldsinexport.inc.php';
-		//$keyforselect='myobjectline'; $keyforaliasextra='extraline'; $keyforelement='myobjectline@dynamicsprices';
-		//include DOL_DOCUMENT_ROOT.'/core/extrafieldsinexport.inc.php';
-		//$this->export_dependencies_array[$r] = array('myobjectline' => array('tl.rowid','tl.ref')); // To force to activate one or several fields if we select some fields that need same (like to select a unique key if we ask a field of a child to avoid the DISTINCT to discard them, or for computed field than need several other fields)
-		//$this->export_special_array[$r] = array('t.field' => '...');
-		//$this->export_examplevalues_array[$r] = array('t.field' => 'Example');
-		//$this->export_help_array[$r] = array('t.field' => 'FieldDescHelp');
+		$this->export_fields_array[$r] = array(
+			'c.entity' => 'Entity',
+			'c.fk_product' => 'ProductId',
+			'p.ref' => 'ProductRef',
+			'p.label' => 'ProductLabel',
+			'p.fk_product_type' => 'Type',
+			'p.cost_price' => 'DynamicPricesNativeCostPrice',
+			'p.pmp' => 'DynamicPricesPmp',
+			'c.dynamic_cost_price' => 'DynamicPricesDynamicCostPrice',
+			'c.source_type' => 'DynamicPricesCostSource',
+			'c.source_value' => 'DynamicPricesCostSourceValue',
+			'c.rule_code' => 'DynamicPricesCostRule',
+			'c.coefficient' => 'DynamicPricesCostCoefficient',
+			'c.date_calculation' => 'DynamicPricesCostLastCalculation',
+			'c.calculation_status' => 'DynamicPricesCostStatus',
+			'c.calculation_message' => 'DynamicPricesCostLastMessage',
+		);
+		$this->export_TypeFields_array[$r] = array(
+			'c.entity' => 'Numeric',
+			'c.fk_product' => 'Numeric',
+			'p.ref' => 'Text',
+			'p.label' => 'Text',
+			'p.fk_product_type' => 'Numeric',
+			'p.cost_price' => 'Numeric',
+			'p.pmp' => 'Numeric',
+			'c.dynamic_cost_price' => 'Numeric',
+			'c.source_type' => 'Text',
+			'c.source_value' => 'Numeric',
+			'c.rule_code' => 'Text',
+			'c.coefficient' => 'Numeric',
+			'c.date_calculation' => 'Date',
+			'c.calculation_status' => 'Numeric',
+			'c.calculation_message' => 'Text',
+		);
+		$this->export_entities_array[$r] = array(
+			'c.entity' => 'product',
+			'c.fk_product' => 'product',
+			'p.ref' => 'product',
+			'p.label' => 'product',
+			'p.fk_product_type' => 'product',
+			'p.cost_price' => 'product',
+			'p.pmp' => 'product',
+			'c.dynamic_cost_price' => 'product',
+			'c.source_type' => 'product',
+			'c.source_value' => 'product',
+			'c.rule_code' => 'product',
+			'c.coefficient' => 'product',
+			'c.date_calculation' => 'product',
+			'c.calculation_status' => 'product',
+			'c.calculation_message' => 'product',
+		);
 		$this->export_sql_start[$r]='SELECT DISTINCT ';
-		$this->export_sql_end[$r]  =' FROM '.$this->db->prefix().'dynamicsprices_myobject as t';
-		//$this->export_sql_end[$r]  .=' LEFT JOIN '.$this->db->prefix().'dynamicsprices_myobject_line as tl ON tl.fk_myobject = t.rowid';
+		$this->export_sql_end[$r]  =' FROM '.$this->db->prefix().'dynamicprices_product_cost AS c';
+		$this->export_sql_end[$r] .=' LEFT JOIN '.$this->db->prefix().'product AS p ON p.rowid = c.fk_product';
 		$this->export_sql_end[$r] .=' WHERE 1 = 1';
-		$this->export_sql_end[$r] .=' AND t.entity IN ('.getEntity('myobject').')';
-		$r++; */
+		$this->export_sql_end[$r] .=' AND c.entity = '.((int) $conf->entity);
+		$r++;
 		/* END MODULEBUILDER EXPORT MYOBJECT */
 
 		// Imports profiles provided by this module
@@ -586,8 +689,7 @@ class modDynamicsPrices extends DolibarrModules
 			}
 		}
 
-		// Permissions
-		$this->remove($options);
+		$this->skipExistingCronjobsAcrossEntities();
 
 		$sql = array();
 
@@ -671,6 +773,73 @@ class modDynamicsPrices extends DolibarrModules
 		}
 
 		return 1;
+	}
+
+	/**
+	 * Keep already configured cron jobs when the module is activated from another entity.
+	 *
+	 * Dolibarr core checks existing cron jobs with the current entity only. DynamicPrices
+	 * has a single functional scheduled job, so a job already present in any entity must
+	 * be reused instead of creating another copy during a Multicompany activation.
+	 *
+	 * @return void
+	 */
+	private function skipExistingCronjobsAcrossEntities()
+	{
+		if (empty($this->cronjobs) || !is_array($this->cronjobs)) {
+			return;
+		}
+
+		$moduleName = empty($this->rights_class) ? strtolower($this->name) : $this->rights_class;
+		foreach ($this->cronjobs as $key => $cronjob) {
+			if (!is_array($cronjob) || !$this->doesCronjobAlreadyExistAcrossEntities($cronjob, $moduleName)) {
+				continue;
+			}
+
+			unset($this->cronjobs[$key]);
+		}
+	}
+
+	/**
+	 * Check if a cron job already exists, without restricting the lookup to current entity.
+	 *
+	 * @param array<string,mixed> $cronjob Cron job descriptor
+	 * @param string $moduleName Module name stored in llx_cronjob
+	 * @return bool
+	 */
+	private function doesCronjobAlreadyExistAcrossEntities(array $cronjob, $moduleName)
+	{
+		$jobtype = !empty($cronjob['jobtype']) ? (string) $cronjob['jobtype'] : '';
+		$classesname = !empty($cronjob['class']) ? (string) $cronjob['class'] : '';
+		$objectname = !empty($cronjob['objectname']) ? (string) $cronjob['objectname'] : '';
+		$methodename = !empty($cronjob['method']) ? (string) $cronjob['method'] : '';
+		$command = !empty($cronjob['command']) ? (string) $cronjob['command'] : '';
+		$params = array_key_exists('parameters', $cronjob) ? (string) $cronjob['parameters'] : '';
+		$label = !empty($cronjob['label']) ? (string) $cronjob['label'] : '';
+
+		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."cronjob";
+		$sql .= " WHERE module_name = '".$this->db->escape($moduleName)."'";
+		$sql .= " AND jobtype = '".$this->db->escape($jobtype)."'";
+		if ($jobtype === 'method') {
+			$sql .= " AND classesname = '".$this->db->escape($classesname)."'";
+			$sql .= " AND objectname = '".$this->db->escape($objectname)."'";
+			$sql .= " AND methodename = '".$this->db->escape($methodename)."'";
+			$sql .= " AND params = '".$this->db->escape($params)."'";
+		} elseif ($jobtype === 'command') {
+			$sql .= " AND command = '".$this->db->escape($command)."'";
+			$sql .= " AND params = '".$this->db->escape($params)."'";
+		} else {
+			$sql .= " AND label = '".$this->db->escape($label)."'";
+		}
+		$sql .= " LIMIT 1";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return false;
+		}
+
+		return is_object($this->db->fetch_object($resql));
 	}
 
 	/**

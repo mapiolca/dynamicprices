@@ -44,6 +44,16 @@ function dynamicspricesAdminPrepareHead()
 	$head[$h][2] = 'settings';
 	$h++;
 
+	$head[$h][0] = dol_buildpath("/dynamicsprices/admin/compatibility.php", 1);
+	$head[$h][1] = $langs->trans("DynamicPricesCompatibility");
+	$head[$h][2] = 'compatibility';
+	$h++;
+
+	$head[$h][0] = dol_buildpath("/dynamicsprices/admin/migrate_dynamic_cost.php", 1);
+	$head[$h][1] = $langs->trans("DynamicPricesMigration");
+	$head[$h][2] = 'migration';
+	$h++;
+
 	/*
 	$head[$h][0] = dol_buildpath("/dynamicsprices/admin/myobject_extrafields.php", 1);
 	$head[$h][1] = $langs->trans("ExtraFields");
@@ -83,6 +93,149 @@ function dynamicspricesAdminPrepareHead()
 	complete_head_from_modules($conf, $langs, null, $head, $h, 'dynamicsprices@dynamicsprices', 'remove');
 
 	return $head;
+}
+
+/**
+ * Check if a column exists on a table.
+ *
+ * @param DoliDB $db Database handler
+ * @param string $tableName Table name
+ * @param string $columnName Column name
+ * @return bool
+ */
+function dynamicsprices_table_column_exists($db, $tableName, $columnName)
+{
+	$sql = "SHOW COLUMNS FROM ".$tableName." LIKE '".$db->escape($columnName)."'";
+	$resql = $db->query($sql);
+
+	return ($resql && $db->num_rows($resql) > 0);
+}
+
+/**
+ * Return entity ids visible for a Dolibarr sharing element.
+ *
+ * @param string $element Dolibarr element key for getEntity()
+ * @return array<int,int>
+ */
+function dynamicsprices_get_entity_ids_for_element($element)
+{
+	global $conf;
+
+	$entityIds = array();
+	$rawEntityList = (string) getEntity($element);
+	$rawEntities = explode(',', $rawEntityList);
+
+	foreach ($rawEntities as $rawEntity) {
+		$entityId = (int) trim($rawEntity);
+		if ($entityId > 0) {
+			$entityIds[$entityId] = $entityId;
+		}
+	}
+
+	if (empty($entityIds) && !empty($conf->entity)) {
+		$entityIds[(int) $conf->entity] = (int) $conf->entity;
+	}
+
+	sort($entityIds);
+
+	return array_values($entityIds);
+}
+
+/**
+ * Check if automatic selling price writes are allowed in the current Multicompany scope.
+ *
+ * Shared selling prices based on local supplier prices are unsafe: two entities can write
+ * different prices into the same shared sales catalogue. When supplier prices are not shared
+ * over the same scope, only the configured source entity may write shared selling prices.
+ *
+ * @param string $context Diagnostic context
+ * @return bool
+ */
+function dynamicsprices_can_update_shared_selling_prices($context = '')
+{
+	global $conf;
+
+	static $canUpdate = null;
+	static $logged = false;
+
+	if ($canUpdate !== null) {
+		return $canUpdate;
+	}
+
+	$sellingPriceEntities = dynamicsprices_get_entity_ids_for_element('productprice');
+	if (count($sellingPriceEntities) <= 1) {
+		$canUpdate = true;
+		return true;
+	}
+
+	$supplierPriceEntities = dynamicsprices_get_entity_ids_for_element('product_fournisseur_price');
+	$supplierScopeCoversSellingScope = count($supplierPriceEntities) > 1 && count(array_diff($sellingPriceEntities, $supplierPriceEntities)) === 0;
+	if ($supplierScopeCoversSellingScope) {
+		$canUpdate = true;
+		return true;
+	}
+
+	$sourceEntity = getDolGlobalInt('DYNAMICPRICES_SHARED_SELL_PRICE_SOURCE_ENTITY', 0);
+	if ($sourceEntity > 0) {
+		$canUpdate = ((int) $conf->entity === $sourceEntity) && in_array($sourceEntity, $sellingPriceEntities, true);
+		if (!$canUpdate && !$logged) {
+			dol_syslog(
+				__METHOD__.' skip shared selling price update: current_entity='.(int) $conf->entity
+				.', source_entity='.$sourceEntity
+				.', selling_scope='.implode(',', $sellingPriceEntities)
+				.', supplier_price_scope='.implode(',', $supplierPriceEntities)
+				.($context !== '' ? ', context='.$context : ''),
+				LOG_WARNING
+			);
+			$logged = true;
+		}
+
+		return $canUpdate;
+	}
+
+	$canUpdate = false;
+	if (!$logged) {
+		dol_syslog(
+			__METHOD__.' skip shared selling price update: product prices are shared but supplier purchase prices are not shared over the same scope'
+			.', selling_scope='.implode(',', $sellingPriceEntities)
+			.', supplier_price_scope='.implode(',', $supplierPriceEntities)
+			.($context !== '' ? ', context='.$context : ''),
+			LOG_WARNING
+		);
+		$logged = true;
+	}
+
+	return false;
+}
+
+/**
+ * Build a scalar SQL expression resolving the commercial category code for a product.
+ *
+ * The commercial category dictionary follows product Multicompany sharing because the
+ * category is carried by the product extrafield and must remain usable with shared products.
+ *
+ * @param DoliDB $db Database handler
+ * @param string $rawCategoryExpression SQL expression containing the extrafield value
+ * @param string $preferredEntityExpression SQL expression containing the product entity
+ * @return string
+ */
+function dynamicsprices_get_commercial_category_code_sql($db, $rawCategoryExpression, $preferredEntityExpression = '')
+{
+	$hasEntity = dynamicsprices_table_column_exists($db, MAIN_DB_PREFIX."c_commercial_category", 'entity');
+	$sql = "(SELECT cc.code";
+	$sql .= " FROM ".MAIN_DB_PREFIX."c_commercial_category AS cc";
+	$sql .= " WHERE (cc.rowid = ".$rawCategoryExpression." OR BINARY cc.code = BINARY ".$rawCategoryExpression.")";
+	if ($hasEntity) {
+		$sql .= " AND cc.entity IN (".getEntity('product').")";
+	}
+	$sql .= " ORDER BY ";
+	if ($preferredEntityExpression !== '' && $hasEntity) {
+		$sql .= "CASE WHEN cc.entity = ".$preferredEntityExpression." THEN 0 ELSE 1 END, ";
+	}
+	$sql .= "cc.rowid ASC";
+	$sql .= " LIMIT 1)";
+
+	return $sql;
 }
 
 // Check if a product is a Kit using product associations
@@ -194,7 +347,7 @@ function dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId)
 	$sql = "SELECT margin_on_cost_percent";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_margin_on_cost";
 	$sql .= " WHERE ".$categoryColumn." = '".$db->escape((string) $commercialCategoryId)."'";
-	$sql .= " AND entity IN (".getEntity('entity').")";
+	$sql .= " AND entity IN (".getEntity('c_margin_on_cost').")";
 	$sql .= " AND active = 1";
 	$sql .= " ORDER BY rowid DESC";
 	$sql .= " LIMIT 1";
@@ -217,7 +370,7 @@ function dynamicsprices_get_price_rules($db, $commercialCategoryId)
 	$sql = "SELECT pricelevel, minrate, targetrate";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_coefprice";
 	$sql .= " WHERE ".$categoryColumn." = '".$db->escape((string) $commercialCategoryId)."'";
-	$sql .= " AND entity IN (".getEntity('entity').")";
+	$sql .= " AND entity IN (".getEntity('c_coefprice').")";
 	$sql .= " AND active = 1";
 
 	$resql = $db->query($sql);
@@ -232,15 +385,58 @@ function dynamicsprices_get_price_rules($db, $commercialCategoryId)
 	return $rules;
 }
 
-// Save cost price on product table
-function dynamicsprices_save_cost_price($db, $productId, $costPrice)
+// Save DynamicPrices cost price without changing the native product cost by default.
+function dynamicsprices_save_cost_price($db, $productId, $costPrice, $context = array())
 {
-	$sql = "UPDATE ".MAIN_DB_PREFIX."product";
-	$sql .= " SET cost_price = ".price2num($costPrice, 'MU');
-	$sql .= " WHERE rowid = ".((int) $productId);
-	$sql .= " AND entity IN (".getEntity('product').")";
+	global $conf, $user;
 
-	return $db->query($sql);
+	require_once __DIR__.'/../class/dynamicpricescostservice.class.php';
+
+	if (!is_object($user)) {
+		dol_syslog(__METHOD__.' no user object available to save DynamicPrices cost for product='.(int) $productId, LOG_ERR);
+		return false;
+	}
+
+	$service = new DynamicPricesCostService($db);
+	$entity = !empty($context['entity']) ? (int) $context['entity'] : (int) $conf->entity;
+	$sourceType = !empty($context['source_type']) ? (string) $context['source_type'] : 'dynamicprices_engine';
+	$sourceValue = array_key_exists('source_value', $context) ? $context['source_value'] : $costPrice;
+	$coefficient = array_key_exists('coefficient', $context) ? $context['coefficient'] : null;
+
+	$calculation = array(
+		'entity' => $entity,
+		'fk_product' => (int) $productId,
+		'dynamic_cost_price' => $costPrice === null ? null : (float) price2num($costPrice, 'MU'),
+		'price_base_type' => 'HT',
+		'source_type' => $sourceType,
+		'source_value' => $sourceValue === null ? null : (float) price2num($sourceValue, 'MU'),
+		'source_details' => !empty($context['source_details']) ? (string) $context['source_details'] : '',
+		'rule_code' => !empty($context['rule_code']) ? (string) $context['rule_code'] : '',
+		'coefficient' => $coefficient === null ? null : (float) $coefficient,
+		'rounding_rule' => (string) getDolGlobalString('DYNAMICPRICES_COST_ROUNDING_MODE', 'dolibarr'),
+		'calculation_status' => 1,
+		'calculation_message' => 'DynamicPricesCostCalculated',
+		'status' => 1,
+	);
+	$calculation['calculation_hash'] = hash('sha256', json_encode(array(
+		'dynamic_cost_price' => $calculation['dynamic_cost_price'],
+		'source_type' => $calculation['source_type'],
+		'source_value' => $calculation['source_value'],
+		'rule_code' => $calculation['rule_code'],
+		'coefficient' => $calculation['coefficient'],
+	)));
+
+	$result = $service->saveProductCost((int) $productId, $calculation, $user, array(
+		'entity' => $entity,
+		'calculation_context' => !empty($context['calculation_context']) ? (string) $context['calculation_context'] : 'engine',
+	));
+
+	if ($result < 0) {
+		dol_syslog(__METHOD__.' '.$service->error, LOG_ERR);
+		return false;
+	}
+
+	return true;
 }
 
 // Get commercial category code selected on product/service extrafield
@@ -261,6 +457,10 @@ function dynamicsprices_get_product_commercial_category($db, $productId)
 		return $rawValue;
 	}
 	$sql = "SELECT code FROM ".MAIN_DB_PREFIX."c_commercial_category WHERE rowid = ".((int) $rawValue);
+	if (dynamicsprices_table_column_exists($db, MAIN_DB_PREFIX."c_commercial_category", 'entity')) {
+		$sql .= " AND entity IN (".getEntity('product').")";
+	}
+	$sql .= " LIMIT 1";
 	$resql = $db->query($sql);
 	if ($resql === false) {
 		return '';
@@ -291,7 +491,7 @@ function dynamicsprices_update_kit_cost_price($db, $productId)
 		$totalCost += $componentUnitCost * (float) $component['qty'];
 	}
 
-	dynamicsprices_save_cost_price($db, $productId, $totalCost);
+	dynamicsprices_save_cost_price($db, $productId, $totalCost, array('source_type' => 'kit_components'));
 
 	return $totalCost;
 }
@@ -355,6 +555,10 @@ function dynamicsprices_get_product_ref_link($productId, $productRef)
 // Update selling prices from a base cost and rules
 function dynamicsprices_update_prices_from_base($db, $user, $product, $basePrice, $rules, $tvaTx, $entity)
 {
+	if (!dynamicsprices_can_update_shared_selling_prices('update_prices_from_base')) {
+		return 0;
+	}
+
 	$nb_line = 0;
 	$now = $db->idate(dol_now());
 
@@ -375,6 +579,52 @@ $sqlp .= " ON DUPLICATE KEY UPDATE price = VALUES(price), price_ttc = VALUES(pri
 	}
 
 	return $nb_line;
+}
+
+/**
+ * Update selling prices from the current DynamicPrices cost price.
+ *
+ * @param DoliDB $db Database handler
+ * @param User   $user User authoring the price change
+ * @param int    $productId Product id
+ * @param int    $entity Entity id
+ * @return int Number of price rows updated, -1 on error
+ */
+function dynamicsprices_update_sales_prices_from_dynamic_cost($db, $user, $productId, $entity = 0)
+{
+	global $conf;
+
+	$productId = (int) $productId;
+	if ($productId <= 0) {
+		return -1;
+	}
+
+	dol_include_once('/product/class/product.class.php');
+	require_once __DIR__.'/../class/dynamicpricescostservice.class.php';
+
+	$product = new Product($db);
+	if ($product->fetch($productId) <= 0) {
+		return -1;
+	}
+	if (!in_array((int) $product->type, array(Product::TYPE_PRODUCT, Product::TYPE_SERVICE), true)) {
+		return 0;
+	}
+
+	$entity = $entity > 0 ? (int) $entity : (int) $conf->entity;
+	$service = new DynamicPricesCostService($db);
+	$costPrice = $service->getDynamicCostPrice($productId, $entity);
+	if ($costPrice === null) {
+		return 0;
+	}
+
+	$commercialCategoryId = dynamicsprices_get_product_commercial_category($db, $productId);
+	$rules = dynamicsprices_get_price_rules($db, $commercialCategoryId);
+	if (empty($rules)) {
+		dol_syslog(__METHOD__.' no selling price rule found for product='.(int) $productId.' category='.$commercialCategoryId, LOG_WARNING);
+		return 0;
+	}
+
+	return dynamicsprices_update_prices_from_base($db, $user, $product, (float) $costPrice, $rules, (float) $product->tva_tx, $entity);
 }
 
 // Fetch latest component prices per level
@@ -425,6 +675,10 @@ function dynamicsprices_get_latest_price_for_level($db, $productId, $level)
 // Update Kit prices by summing component prices
 function dynamicsprices_update_kit_prices_from_components($db, $user, $product, $components, $tvaTx, $entity)
 {
+	if (!dynamicsprices_can_update_shared_selling_prices('update_kit_prices_from_components')) {
+		return 0;
+	}
+
 	$levelTotals = array();
 	$nb_line = 0;
 	$now = $db->idate(dol_now());
@@ -481,11 +735,10 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 			}
 			$products[] = $productid;
 		} else {
-			$sql = "SELECT p.rowid, cc.code as code_commercial_category";
+			$sql = "SELECT p.rowid, ".dynamicsprices_get_commercial_category_code_sql($db, 'ef.lmdb_commercial_category', 'p.entity')." as code_commercial_category";
 			$sql .= " FROM ".MAIN_DB_PREFIX."product";
 			$sql .= " as p";
 			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
-			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON (cc.rowid = ef.lmdb_commercial_category OR BINARY cc.code = BINARY ef.lmdb_commercial_category)";
 			$sql .= " WHERE p.tosell = 1";
 			$sql .= " AND p.fk_product_type IN (0,1)";
 			$sql .= " AND p.entity IN (".getEntity('product').")";
@@ -499,11 +752,11 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 			while ($obj = $db->fetch_object($resql)) {
 				$products[] = array('id' => $obj->rowid, 'commercial_category' => $obj->code_commercial_category);
 			}
-		}
+	}
 	
 		foreach ($products as $prod) {
 		$prodid = is_array($prod) ? $prod['id'] : $prod;
-		$commercialCategoryId = is_array($prod) ? ((int) $prod['commercial_category']) : dynamicsprices_get_product_commercial_category($db, $prodid);
+		$commercialCategoryId = is_array($prod) ? (string) $prod['commercial_category'] : dynamicsprices_get_product_commercial_category($db, $prodid);
 		$product = new Product($db);
 		$product->fetch($prodid);
 		if (!in_array((int) $product->type, array(Product::TYPE_PRODUCT, Product::TYPE_SERVICE), true)) {
@@ -523,7 +776,13 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 	
 		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId);
 		$costPrice = $avgPrice * (1 + ($marginPercent / 100));
-		dynamicsprices_save_cost_price($db, $prodid, $costPrice);
+		dynamicsprices_save_cost_price($db, $prodid, $costPrice, array(
+			'entity' => $entity,
+			'source_type' => 'supplier_average',
+			'source_value' => $avgPrice,
+			'rule_code' => (string) $commercialCategoryId,
+			'coefficient' => 1 + (((float) $marginPercent) / 100),
+		));
 
 		$rules = dynamicsprices_get_price_rules($db, $commercialCategoryId);
 		$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $avgPrice, $rules, $tva_tx, $entity);
@@ -578,11 +837,10 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 			}
 			$products[] = $productid;
 		} else {
-			$sql = "SELECT p.rowid, p.cost_price, cc.code as code_commercial_category";
+			$sql = "SELECT p.rowid, p.cost_price, ".dynamicsprices_get_commercial_category_code_sql($db, 'ef.lmdb_commercial_category', 'p.entity')." as code_commercial_category";
 			$sql .= " FROM ".MAIN_DB_PREFIX."product";
 			$sql .= " as p";
 			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
-			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON (cc.rowid = ef.lmdb_commercial_category OR BINARY cc.code = BINARY ef.lmdb_commercial_category)";
 			$sql .= " WHERE p.tosell = 1";
 			$sql .= " AND p.fk_product_type IN (0,1)";
 			$sql .= " AND p.entity IN (".getEntity('product').")";
@@ -596,11 +854,11 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 			while ($obj = $db->fetch_object($resql)) {
 				$products[] = array('id' => $obj->rowid, 'commercial_category' => $obj->code_commercial_category, 'cost_price' => $obj->cost_price);
 			}
-		}
+	}
 	
 		foreach ($products as $prod) {
 		$prodid = is_array($prod) ? $prod['id'] : $prod;
-		$commercialCategoryId = is_array($prod) ? ((int) $prod['commercial_category']) : dynamicsprices_get_product_commercial_category($db, $prodid);
+		$commercialCategoryId = is_array($prod) ? (string) $prod['commercial_category'] : dynamicsprices_get_product_commercial_category($db, $prodid);
 		$currentCost = is_array($prod) ? $prod['cost_price'] : 0;
 		$product = new Product($db);
 		$product->fetch($prodid);
@@ -618,7 +876,21 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		if ($avgPrice !== null) {
 		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId);
 		$currentCost = $avgPrice * (1 + ($marginPercent / 100));
-		dynamicsprices_save_cost_price($db, $prodid, $currentCost);
+		dynamicsprices_save_cost_price($db, $prodid, $currentCost, array(
+			'entity' => $entity,
+			'source_type' => 'supplier_average',
+			'source_value' => $avgPrice,
+			'rule_code' => (string) $commercialCategoryId,
+			'coefficient' => 1 + (((float) $marginPercent) / 100),
+		));
+		} else {
+		dynamicsprices_save_cost_price($db, $prodid, $currentCost, array(
+			'entity' => $entity,
+			'source_type' => 'cost_price',
+			'source_value' => $currentCost,
+			'rule_code' => (string) $commercialCategoryId,
+			'coefficient' => 1,
+		));
 		}
 
 		$rules = dynamicsprices_get_price_rules($db, $commercialCategoryId);

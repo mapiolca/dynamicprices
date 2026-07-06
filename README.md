@@ -1,89 +1,81 @@
 # DynamicsPrices
 
-## Présentation (FR)
+## Présentation
 
-Module Dolibarr pour la mise à jour dynamique des prix de vente à partir des coûts d'achat et des coefficients configurables.
+DynamicsPrices est un module externe Dolibarr qui calcule et exploite des prix dynamiques à partir des coûts, prix fournisseurs et coefficients métier.
 
-### Aperçu
+Depuis la version 3.0, le module dispose d'un prix de revient propre par produit et par entité Multicompany. Ce prix est stocké dans les tables du module, historisé, exposé en API/export et peut être utilisé pour alimenter les coûts de lignes commerciales sans écraser le champ natif Dolibarr `llx_product.cost_price`.
 
-DynamicsPrices automatise le recalcul des prix des produits en s'appuyant sur les prix d'achat moyens, les coefficients de marge et les relations entre produits (composants, kits). Les déclencheurs du module s'occupent d'appliquer les nouveaux prix de vente au bon moment, tout en respectant les spécificités des produits et services Dolibarr.
+## Fonctionnalités
 
-### Fonctionnalités clés
-
+- Calcul des prix de revient DynamicPrices par couple `entity + product`.
+- Historique des recalculs et des valeurs appliquées.
+- Calcul métier basé sur la moyenne des prix d'achat unitaires fournisseurs multipliée par le coefficient de prix de revient de la catégorie commerciale.
+- Fallback configurable lorsque le coût DynamicPrices est absent.
+- Recalcul unitaire depuis l'onglet **Prix d'achat** du produit.
+- Prévisualisation sans écriture.
+- Recalcul de masse avec simulation, confirmation et export CSV.
+- Migration non destructive depuis l'ancien comportement.
+- Option d'application aux lignes de devis, commandes et factures via `pa_ht`, désactivée par défaut.
+- Snapshots des coûts appliqués aux lignes commerciales.
+- API REST pour lecture, historique, recalcul et override manuel.
+- Export Dolibarr natif des coûts DynamicPrices.
+- Traductions `fr_FR`, `en_US`, `es_ES`, `de_DE` et `it_IT`.
 - Mise à jour automatique des prix de vente en fonction du prix d'achat moyen et d'un dictionnaire de coefficients dédié.
 - Recalcul des kits après leurs composants pour éviter les doublons de prix de vente et refléter le coût cumulé des sous-produits et services.
 - Plus grand nombre de triggers pour couvrir les actions courantes (création, modification, réception d'achat, etc.).
 - Calcul automatique des prix de revient à partir des nouveaux dictionnaires et de la moyenne des prix d'achat.
 - Alerte sur les prix des kits : si aucune valeur n'est disponible (ni prix fournisseur, ni prix de revient, ni PMP), la procédure est interrompue avec message d'erreur.
 
-### Compatibilité
+## Compatibilité
 
-- Dolibarr ≥ 19.0 (minimum recommandé).
-- Module externe installable dans `htdocs/custom/dynamicsprices`.
+- Dolibarr v20 ou supérieur.
+- PHP 8.0 ou supérieur.
+- MySQL/MariaDB via l'abstraction Dolibarr.
+- Module externe à installer dans `htdocs/custom/dynamicsprices`.
 
-### Installation
+## Installation
 
-#### Depuis une archive ZIP
+### Depuis une archive ZIP
 
-1. Télécharger l'archive `module_dynamicsprices-x.y.z.zip`.
-2. Déployer l'archive via le menu **Accueil > Configuration > Modules > Déployer un module externe**.
+1. Télécharger l'archive du module.
+2. Déployer l'archive via **Accueil > Configuration > Modules > Déployer un module externe**.
 3. Activer le module **DynamicsPrices** dans **Configuration > Modules/Applications**.
 
-#### Depuis un dépôt Git
+### Depuis un dépôt Git
 
 ```bash
 cd htdocs/custom
 git clone git@github.com:gitlogin/dynamicsprices.git dynamicsprices
 ```
 
-Puis activer le module dans Dolibarr comme décrit ci-dessus.
+Puis activer le module depuis l'administration Dolibarr.
 
-### Mise à jour
+## Configuration
 
-1. Sauvegarder la base de données et le répertoire du module.
-2. Installer la nouvelle version (ZIP ou Git) dans `htdocs/custom/dynamicsprices`.
-3. Lancer les scripts de migration proposés par Dolibarr si nécessaire.
+Les réglages se trouvent dans `admin/setup.php`, seul point d'entrée déclaré dans le descripteur du module.
 
-### Configuration
+Les onglets internes disponibles sont :
 
-- **Dictionnaire des coefficients** : définir les coefficients de marge dans **Dictionnaires > Coefficients DynamicsPrices**.
-- **Triggers** : les déclencheurs DynamicsPrices mettent à jour les prix lors des actions standards (création de produit, réception fournisseur, modification de prix, etc.).
-- **Kits** : le prix de vente d'un kit est recalculé uniquement après mise à jour des prix de ses composants pour éviter toute duplication.
+- réglages ;
+- compatibilité ;
+- migration des coûts ;
+- à propos.
 
-### Utilisation
+Réglages principaux du prix de revient DynamicPrices :
 
-- Créer ou mettre à jour un produit avec un prix d'achat renseigné.
-- Les triggers calculent automatiquement le prix de revient et le prix de vente suivant le coefficient applicable.
-- Les services et produits non physiques (`fk_product_type != 0`) sont ignorés par les mises à jour automatiques.
+- `DYNAMICPRICES_COST_ENABLE` : active la lecture et le calcul du coût DynamicPrices.
+- `DYNAMICPRICES_COST_USE_FOR_SALES` : autorise l'application aux lignes commerciales. Désactivé par défaut.
+- `DYNAMICPRICES_COST_LINE_STRATEGY` : stratégie d'application aux lignes.
+- `DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY` : ordre automatique des sources à appliquer à la création des lignes commerciales (`dynamicprices`, valeur par défaut Dolibarr, PMP, coût Dolibarr).
+- `DYNAMICPRICES_COST_FALLBACK` : comportement si aucun coût DynamicPrices n'est disponible.
+- Formule de calcul : moyenne des prix d'achat unitaires fournisseurs x coefficient de prix de revient de la catégorie commerciale.
+- `DYNAMICPRICES_COST_INCLUDE_SERVICES` : inclut les services dans le calcul.
+- `DYNAMICPRICES_COST_LOG_MODE` : historisation des changements uniquement ou de tous les recalculs.
+- `DYNAMICPRICES_COST_ALLOW_MANUAL_OVERRIDE` : autorise l'override manuel via API.
+- `DYNAMICPRICES_COST_ALLOW_NATIVE_WRITE` : option legacy pour écrire aussi dans `llx_product.cost_price`. Elle est désactivée par défaut.
 
-### Permissions et sécurité
-
-- Les actions de mise à jour sont soumises aux permissions Dolibarr standard sur les produits et dictionnaires.
-- Les écrans du module masquent automatiquement les actions non autorisées.
-
-### Traductions
-
-Les fichiers de langue sont disponibles dans `langs/`. Complétez ou ajustez les traductions en `en_US` et `fr_FR` pour tout nouveau libellé.
-
-### Support
-
-- Documentation et support Dolibarr : [https://wiki.dolibarr.org](https://wiki.dolibarr.org)
-- Autres modules externes : [Dolistore.com](https://www.dolistore.com)
-
-### Licence
-
-- Code : GPLv3 ou ultérieure (voir `COPYING`).
-- Documentation : GFDL (voir la licence correspondante).
-
----
-
-## Overview (EN)
-
-Dolibarr module for dynamically updating selling prices based on purchase costs and configurable margins.
-
-### Summary
-
-DynamicsPrices automates price recalculations using average purchase prices, margin coefficients, and relationships between products (components, kits). Module triggers apply new selling prices at the right time while respecting Dolibarr product and service specifics.
+## Migration
 
 ### Key features
 
@@ -112,42 +104,46 @@ DynamicsPrices automates price recalculations using average purchase prices, mar
 cd htdocs/custom
 git clone git@github.com:gitlogin/dynamicsprices.git dynamicsprices
 ```
+L'assistant `admin/migrate_dynamic_cost.php` initialise les coûts DynamicPrices sans modifier le coût natif Dolibarr.
 
-Then enable the module in Dolibarr as described above.
+Modes disponibles :
 
-### Upgrade
+- depuis le coût Dolibarr ;
+- depuis le calcul moteur DynamicPrices ;
+- mixte ;
+- aucun, pour simulation ou contrôle.
 
-1. Back up the database and the module directory.
-2. Install the new version (ZIP or Git) in `htdocs/custom/dynamicsprices`.
-3. Run any migration scripts proposed by Dolibarr if needed.
+La migration est filtrée par entité courante, protégée par token CSRF et rejouable grâce à la clé unique `(entity, fk_product)`.
 
-### Configuration
+## Utilisation
 
-- **Coefficient dictionary**: define margin coefficients in **Dictionaries > DynamicsPrices Coefficients**.
-- **Triggers**: DynamicsPrices triggers update prices during standard actions (product creation, supplier receipt, price edits, etc.).
-- **Kits**: a kit's selling price is recalculated only after updating its component prices to prevent duplication.
+Sur l'onglet **Prix d'achat** du produit, le module affiche le coût DynamicPrices courant, la source, la règle, le dernier calcul et l'accès à l'historique lorsque l'utilisateur dispose des droits.
 
-### Usage
+Le recalcul de masse est disponible via `cost_mass_update.php`. Il permet de filtrer les produits, prévisualiser les résultats, exporter la simulation en CSV, puis confirmer l'écriture.
 
-- Create or update a product with a purchase price filled in.
-- Triggers automatically compute cost price and selling price using the applicable coefficient.
-- Services and non-physical products (`fk_product_type != 0`) are ignored by automated updates.
+Les coûts appliqués aux lignes commerciales sont activables explicitement. Tant que `DYNAMICPRICES_COST_USE_FOR_SALES` reste désactivé, les devis, commandes et factures conservent le comportement Dolibarr standard.
 
-### Permissions and security
+## API et export
 
-- Update actions follow Dolibarr standard permissions for products and dictionaries.
-- Module screens automatically hide actions that the user is not allowed to perform.
+Le module expose une API REST dédiée aux coûts DynamicPrices :
 
-### Translations
+- `GET /costs/{product_id}` ;
+- `GET /costs/{product_id}/history` ;
+- `POST /costs/{product_id}/recalculate` ;
+- `POST /costs/recalculate` ;
+- `POST /costs/{product_id}/manual` ;
+- `DELETE /costs/{product_id}/manual`.
 
-Language files live under `langs/`. Complete or adjust translations in `en_US` and `fr_FR` for any new labels.
+Un export Dolibarr natif `dynamicsprices_dynamic_cost` liste les coûts DynamicPrices produits de l'entité courante.
 
-### Support
+## Documentation technique
 
-- Dolibarr documentation and support: [https://wiki.dolibarr.org](https://wiki.dolibarr.org)
-- Other external modules: [Dolistore.com](https://www.dolistore.com)
+- `docs/technical-audit-dynamic-cost.md` : audit initial.
+- `docs/ARCHITECTURE_DYNAMIC_COST.md` : architecture du prix de revient DynamicPrices.
+- `docs/MIGRATION_DYNAMIC_COST.md` : procédure de migration.
+- `docs/TEST_PLAN_DYNAMIC_COST.md` : plan de test fonctionnel et technique.
+- `docs/DEVELOPMENT_RULES_DOLIBARR.md` : règles locales de développement Dolibarr.
 
-### License
+## Licence
 
-- Code: GPLv3 or later (see `COPYING`).
-- Documentation: GFDL (see the corresponding license).
+Code sous GPLv3 ou ultérieure.
