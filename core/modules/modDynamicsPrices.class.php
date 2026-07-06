@@ -272,6 +272,8 @@ class modDynamicsPrices extends DolibarrModules
 		$marginOnCostDictionaryKey = 1;
 		$commercialCategoryDictionaryKey = 2;
 		$commercialCategoryHasEntity = $this->columnExists(MAIN_DB_PREFIX."c_commercial_category", 'entity');
+		$coefPriceEntityList = getEntity('c_coefprice');
+		$marginOnCostEntityList = getEntity('c_margin_on_cost');
 		$commercialCategoryEntityList = getEntity('product');
 		$commercialCategorySelectSql = $commercialCategoryHasEntity
 			? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity IN ('.$commercialCategoryEntityList.')'
@@ -294,8 +296,8 @@ class modDynamicsPrices extends DolibarrModules
 				$commercialCategoryDictionaryKey => "LMDB_commercialcategories",
 			),
 			'tabsql' => array(
-				$coefPriceDictionaryKey => 'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, '.$commercialCategoryLabelSql.' as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
-				$marginOnCostDictionaryKey => 'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, '.$commercialCategoryLabelSql.' as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t WHERE t.entity = '.((int) $conf->entity),
+				$coefPriceDictionaryKey => 'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, '.$commercialCategoryLabelSql.' as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity IN ('.$coefPriceEntityList.')',
+				$marginOnCostDictionaryKey => 'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, '.$commercialCategoryLabelSql.' as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t WHERE t.entity IN ('.$marginOnCostEntityList.')',
 				$commercialCategoryDictionaryKey => $commercialCategorySelectSql,
 			),
 			'tabsqlsort' => array(

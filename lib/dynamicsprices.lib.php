@@ -250,7 +250,7 @@ function dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId)
 	$sql = "SELECT margin_on_cost_percent";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_margin_on_cost";
 	$sql .= " WHERE ".$categoryColumn." = '".$db->escape((string) $commercialCategoryId)."'";
-	$sql .= " AND entity IN (".getEntity('entity').")";
+	$sql .= " AND entity IN (".getEntity('c_margin_on_cost').")";
 	$sql .= " AND active = 1";
 	$sql .= " ORDER BY rowid DESC";
 	$sql .= " LIMIT 1";
@@ -273,7 +273,7 @@ function dynamicsprices_get_price_rules($db, $commercialCategoryId)
 	$sql = "SELECT pricelevel, minrate, targetrate";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_coefprice";
 	$sql .= " WHERE ".$categoryColumn." = '".$db->escape((string) $commercialCategoryId)."'";
-	$sql .= " AND entity IN (".getEntity('entity').")";
+	$sql .= " AND entity IN (".getEntity('c_coefprice').")";
 	$sql .= " AND active = 1";
 
 	$resql = $db->query($sql);
