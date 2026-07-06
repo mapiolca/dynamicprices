@@ -116,7 +116,7 @@ class modDynamicsPrices extends DolibarrModules
 			),
 			// Set this to relative path of js file if module must load a js on all pages
 			'js' => array(
-				//   '/dynamicsprices/js/dynamicsprices.js.php',
+				'/dynamicsprices/js/dynamicsprices_commercial_line_cost.js.php',
 			),
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */

@@ -148,6 +148,7 @@ DynamicPricesCostLineStrategyOnCreateAndUpdate = On create and update
 DynamicPricesCostLineStrategyManualButton = Manual button
 DynamicPricesCostLineStrategyPreserveOrigin = Preserve source document cost
 DynamicPricesCostLineStrategyNever = Never
+DynamicPricesCostCommercialLineOption = DynamicPrices cost price: %s
 DynamicPricesCostFallbackKeepDolibarr = Keep Dolibarr value
 DynamicPricesCostFallbackNativeCostPrice = Use Dolibarr cost price
 DynamicPricesCostFallbackPmp = Use weighted average price

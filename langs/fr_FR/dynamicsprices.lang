@@ -150,6 +150,7 @@ DynamicPricesCostLineStrategyOnCreateAndUpdate = À la création et à la modifi
 DynamicPricesCostLineStrategyManualButton = Bouton manuel
 DynamicPricesCostLineStrategyPreserveOrigin = Préserver le coût du document source
 DynamicPricesCostLineStrategyNever = Jamais
+DynamicPricesCostCommercialLineOption = Prix de revient DynamicPrices : %s
 DynamicPricesCostFallbackKeepDolibarr = Ne rien modifier
 DynamicPricesCostFallbackNativeCostPrice = Utiliser le prix de revient Dolibarr
 DynamicPricesCostFallbackPmp = Utiliser le PMP
