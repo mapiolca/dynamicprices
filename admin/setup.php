@@ -159,6 +159,9 @@ function dynamicspricesGetCommercialCategoryOptions($db)
 	$sql = "SELECT rowid, code, label";
 	$sql .= " FROM ".MAIN_DB_PREFIX."c_commercial_category";
 	$sql .= " WHERE active = 1";
+	if (function_exists('dynamicsprices_table_column_exists') && dynamicsprices_table_column_exists($db, MAIN_DB_PREFIX."c_commercial_category", 'entity')) {
+		$sql .= " AND entity IN (".getEntity('product').")";
+	}
 	$sql .= " ORDER BY label ASC, code ASC";
 
 	$resql = $db->query($sql);

@@ -95,6 +95,52 @@ function dynamicspricesAdminPrepareHead()
 	return $head;
 }
 
+/**
+ * Check if a column exists on a table.
+ *
+ * @param DoliDB $db Database handler
+ * @param string $tableName Table name
+ * @param string $columnName Column name
+ * @return bool
+ */
+function dynamicsprices_table_column_exists($db, $tableName, $columnName)
+{
+	$sql = "SHOW COLUMNS FROM ".$tableName." LIKE '".$db->escape($columnName)."'";
+	$resql = $db->query($sql);
+
+	return ($resql && $db->num_rows($resql) > 0);
+}
+
+/**
+ * Build a scalar SQL expression resolving the commercial category code for a product.
+ *
+ * The commercial category dictionary follows product Multicompany sharing because the
+ * category is carried by the product extrafield and must remain usable with shared products.
+ *
+ * @param DoliDB $db Database handler
+ * @param string $rawCategoryExpression SQL expression containing the extrafield value
+ * @param string $preferredEntityExpression SQL expression containing the product entity
+ * @return string
+ */
+function dynamicsprices_get_commercial_category_code_sql($db, $rawCategoryExpression, $preferredEntityExpression = '')
+{
+	$hasEntity = dynamicsprices_table_column_exists($db, MAIN_DB_PREFIX."c_commercial_category", 'entity');
+	$sql = "(SELECT cc.code";
+	$sql .= " FROM ".MAIN_DB_PREFIX."c_commercial_category AS cc";
+	$sql .= " WHERE (cc.rowid = ".$rawCategoryExpression." OR BINARY cc.code = BINARY ".$rawCategoryExpression.")";
+	if ($hasEntity) {
+		$sql .= " AND cc.entity IN (".getEntity('product').")";
+	}
+	$sql .= " ORDER BY ";
+	if ($preferredEntityExpression !== '' && $hasEntity) {
+		$sql .= "CASE WHEN cc.entity = ".$preferredEntityExpression." THEN 0 ELSE 1 END, ";
+	}
+	$sql .= "cc.rowid ASC";
+	$sql .= " LIMIT 1)";
+
+	return $sql;
+}
+
 // Check if a product is a Kit using product associations
 function dynamicsprices_is_kit($db, $productId)
 {
@@ -314,6 +360,10 @@ function dynamicsprices_get_product_commercial_category($db, $productId)
 		return $rawValue;
 	}
 	$sql = "SELECT code FROM ".MAIN_DB_PREFIX."c_commercial_category WHERE rowid = ".((int) $rawValue);
+	if (dynamicsprices_table_column_exists($db, MAIN_DB_PREFIX."c_commercial_category", 'entity')) {
+		$sql .= " AND entity IN (".getEntity('product').")";
+	}
+	$sql .= " LIMIT 1";
 	$resql = $db->query($sql);
 	if ($resql === false) {
 		return '';
@@ -514,11 +564,10 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 			}
 			$products[] = $productid;
 		} else {
-			$sql = "SELECT p.rowid, cc.code as code_commercial_category";
+			$sql = "SELECT p.rowid, ".dynamicsprices_get_commercial_category_code_sql($db, 'ef.lmdb_commercial_category', 'p.entity')." as code_commercial_category";
 			$sql .= " FROM ".MAIN_DB_PREFIX."product";
 			$sql .= " as p";
 			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
-			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON (cc.rowid = ef.lmdb_commercial_category OR BINARY cc.code = BINARY ef.lmdb_commercial_category)";
 			$sql .= " WHERE p.tosell = 1";
 			$sql .= " AND p.fk_product_type IN (0,1)";
 			$sql .= " AND p.entity IN (".getEntity('product').")";
@@ -614,11 +663,10 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 			}
 			$products[] = $productid;
 		} else {
-			$sql = "SELECT p.rowid, p.cost_price, cc.code as code_commercial_category";
+			$sql = "SELECT p.rowid, p.cost_price, ".dynamicsprices_get_commercial_category_code_sql($db, 'ef.lmdb_commercial_category', 'p.entity')." as code_commercial_category";
 			$sql .= " FROM ".MAIN_DB_PREFIX."product";
 			$sql .= " as p";
 			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product_extrafields as ef ON ef.fk_object = p.rowid";
-			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_commercial_category as cc ON (cc.rowid = ef.lmdb_commercial_category OR BINARY cc.code = BINARY ef.lmdb_commercial_category)";
 			$sql .= " WHERE p.tosell = 1";
 			$sql .= " AND p.fk_product_type IN (0,1)";
 			$sql .= " AND p.entity IN (".getEntity('product').")";

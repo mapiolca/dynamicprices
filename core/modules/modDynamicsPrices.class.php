@@ -269,18 +269,22 @@ class modDynamicsPrices extends DolibarrModules
 		 */
 /* BEGIN MODULEBUILDER DICTIONARIES */
 		$commercialCategoryHasEntity = $this->columnExists(MAIN_DB_PREFIX."c_commercial_category", 'entity');
+		$commercialCategoryEntityList = getEntity('product');
 		$commercialCategorySelectSql = $commercialCategoryHasEntity
-			? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity = '.((int) $conf->entity)
+			? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity IN ('.$commercialCategoryEntityList.')'
 			: 'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t';
 		$commercialCategoryFieldValue = $commercialCategoryHasEntity ? "code,entity,label" : "code,label";
+		$commercialCategoryLabelSql = $commercialCategoryHasEntity
+			? '(SELECT cc.label FROM '.MAIN_DB_PREFIX.'c_commercial_category AS cc WHERE cc.code = t.code_commercial_category AND cc.entity IN ('.$commercialCategoryEntityList.') ORDER BY CASE WHEN cc.entity = t.entity THEN 0 WHEN cc.entity = '.((int) $conf->entity).' THEN 1 ELSE 2 END, cc.rowid ASC LIMIT 1)'
+			: '(SELECT cc.label FROM '.MAIN_DB_PREFIX.'c_commercial_category AS cc WHERE cc.code = t.code_commercial_category ORDER BY cc.rowid ASC LIMIT 1)';
 
 		$this->dictionaries = array(
 			'langs' => 'dynamicsprices@dynamicsprices',
 			'tabname' => array(MAIN_DB_PREFIX."c_coefprice", MAIN_DB_PREFIX."c_margin_on_cost", MAIN_DB_PREFIX."c_commercial_category"),
 			'tablib' => array("LMDB_coefprice", "LMDB_marginoncost", "LMDB_commercialcategories"),
 			'tabsql' => array(
-				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, cc.label as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.code = t.code_commercial_category WHERE t.entity = '.((int) $conf->entity),
-				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, cc.label as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category as cc ON cc.code = t.code_commercial_category WHERE t.entity = '.((int) $conf->entity),
+				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, '.$commercialCategoryLabelSql.' as commercial_category_label, t.pricelevel, t.minrate, t.targetrate, t.active FROM '.MAIN_DB_PREFIX.'c_coefprice AS t WHERE t.entity = '.((int) $conf->entity),
+				'SELECT t.rowid as rowid, t.entity, t.code, t.code_commercial_category, '.$commercialCategoryLabelSql.' as commercial_category_label, t.margin_on_cost_percent, t.active FROM '.MAIN_DB_PREFIX.'c_margin_on_cost AS t WHERE t.entity = '.((int) $conf->entity),
 				$commercialCategorySelectSql,
 			),
 			'tabsqlsort' => array(
