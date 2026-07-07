@@ -374,8 +374,9 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		}
 
 		return false;
-  }
-  
+	}
+
+	/**
 	 * Apply DynamicPrices cost to supported commercial line triggers.
 	 *
 	 * @param DoliDB $db Database handler
