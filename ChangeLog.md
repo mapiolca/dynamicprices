@@ -4,6 +4,7 @@
 
 ### Prix fournisseurs
 - Correction de l'actualisation des prix d'achat depuis une commande fournisseur afin de conserver les quantités minimum et conditionnements édités dans la modale.
+- Création d'une nouvelle ligne de prix fournisseur lorsque la quantité minimum ou le conditionnement saisi impose une ligne distincte, avec refus contrôlé lorsque la clé unique native Dolibarr empêche un doublon.
 - Encodage sécurisé du payload de la modale pour rester compatible avec la protection SQL/script injection de Dolibarr.
 
 ### Prix de revient DynamicPrices
