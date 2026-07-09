@@ -1,5 +1,7 @@
 # DynamicsPrices
 
+Version courante : 3.0.1.
+
 ## Présentation
 
 DynamicsPrices est un module externe Dolibarr qui calcule et exploite des prix dynamiques à partir des coûts, prix fournisseurs et coefficients métier.
@@ -26,6 +28,7 @@ Depuis la version 3.0, le module dispose d'un prix de revient propre par produit
 - Plus grand nombre de triggers pour couvrir les actions courantes (création, modification, réception d'achat, etc.).
 - Calcul automatique des prix de revient à partir des nouveaux dictionnaires et de la moyenne des prix d'achat.
 - Alerte sur les prix des kits : si aucune valeur n'est disponible (ni prix fournisseur, ni prix de revient, ni PMP), la procédure est interrompue avec message d'erreur.
+- Actualisation contrôlée des prix d'achat fournisseur depuis les commandes fournisseurs, avec prise en compte des quantités minimum et conditionnements saisis dans la modale.
 
 ## Compatibilité
 
@@ -87,14 +90,14 @@ Réglages principaux du prix de revient DynamicPrices :
 
 ### Compatibility
 
-- Dolibarr ≥ 19.0 (recommended minimum).
+- Dolibarr ≥ 20.0.
 - External module installable in `htdocs/custom/dynamicsprices`.
 
 ### Installation
 
 #### From a ZIP archive
 
-1. Download the `module_dynamicsprices-x.y.z.zip` archive.
+1. Download the `module_dynamicsprices-3.0.1.zip` archive.
 2. Deploy it via **Home > Setup > Modules > Deploy an external module**.
 3. Enable the **DynamicsPrices** module in **Setup > Modules/Applications**.
 

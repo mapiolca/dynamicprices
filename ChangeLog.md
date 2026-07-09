@@ -1,12 +1,14 @@
 # ChangeLog DynamicsPrices
 
-## 3.0
+## 3.0.1
 
 ### Prix fournisseurs
 - Correction de l'actualisation des prix d'achat depuis une commande fournisseur afin de conserver les quantités minimum et conditionnements édités dans la modale.
 - Création d'une nouvelle ligne de prix fournisseur lorsque la quantité minimum ou le conditionnement saisi impose une ligne distincte, avec refus contrôlé lorsque la clé unique native Dolibarr empêche un doublon.
 - Suppression du doublon de notification généré par la propagation automatique des erreurs de hook Dolibarr lors du refus contrôlé d'une ligne de prix fournisseur.
 - Encodage sécurisé du payload de la modale pour rester compatible avec la protection SQL/script injection de Dolibarr.
+
+## 3.0
 
 ### Prix de revient DynamicPrices
 - Ajout d'un prix de revient DynamicPrices par produit et par entité Multicompany, stocké dans les tables du module et historisé sans écriture automatique dans `llx_product.cost_price`.
