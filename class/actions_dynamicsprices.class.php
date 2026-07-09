@@ -155,7 +155,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$res = $this->upsertSupplierPriceFromDiff($preparedDiff);
 			if ($res < 0) {
 				dol_syslog(__METHOD__.' - Error while upserting supplier price for line '.$lineId.': '.$this->error, LOG_ERR);
-				setEventMessages($this->error, $this->errors, 'errors');
+				setEventMessages('', $this->getUniqueSupplierPriceErrors(), 'errors');
 				return -1;
 			}
 
@@ -1346,6 +1346,36 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$this->error = $translationKey;
 		}
 		$this->errors[] = $this->error;
+	}
+
+	/**
+	 * Return supplier price errors without duplicated messages.
+	 *
+	 * @return array<int,string>
+	 */
+	private function getUniqueSupplierPriceErrors()
+	{
+		$messages = array();
+		$candidates = array();
+		if (!empty($this->errors) && is_array($this->errors)) {
+			$candidates = $this->errors;
+		}
+		if (!empty($this->error)) {
+			$candidates[] = $this->error;
+		}
+
+		foreach ($candidates as $message) {
+			if (!is_scalar($message)) {
+				continue;
+			}
+			$message = trim((string) $message);
+			if ($message === '' || in_array($message, $messages, true)) {
+				continue;
+			}
+			$messages[] = $message;
+		}
+
+		return $messages;
 	}
 
 	/**
