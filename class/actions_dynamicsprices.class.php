@@ -154,8 +154,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 			dol_syslog(__METHOD__.' - Upsert supplier price for line '.$lineId.' (product '.$preparedDiff['fk_product'].')', LOG_DEBUG);
 			$res = $this->upsertSupplierPriceFromDiff($preparedDiff);
 			if ($res < 0) {
+				$this->normalizeSupplierPriceHookErrors();
 				dol_syslog(__METHOD__.' - Error while upserting supplier price for line '.$lineId.': '.$this->error, LOG_ERR);
-				setEventMessages('', $this->getUniqueSupplierPriceErrors(), 'errors');
 				return -1;
 			}
 
@@ -1345,7 +1345,23 @@ class ActionsDynamicsPrices extends CommonHookActions
 		} else {
 			$this->error = $translationKey;
 		}
-		$this->errors[] = $this->error;
+		$this->errors = array();
+	}
+
+	/**
+	 * Normalize supplier price hook errors for Dolibarr HookManager propagation.
+	 *
+	 * @return void
+	 */
+	private function normalizeSupplierPriceHookErrors()
+	{
+		$messages = $this->getUniqueSupplierPriceErrors();
+		if (empty($messages)) {
+			return;
+		}
+
+		$this->error = array_shift($messages);
+		$this->errors = $messages;
 	}
 
 	/**
