@@ -105,8 +105,13 @@ class ActionsDynamicsPrices extends CommonHookActions
 		if (!is_array($postedRowsData)) {
 			$postedRowsData = array();
 		}
+		$payloadRowsData = $this->getPostedRowsDataFromPayload();
+		if (!empty($payloadRowsData)) {
+			$postedRowsData = $payloadRowsData;
+			$selectedRows = $this->getSelectedRowsFromPostedData($payloadRowsData);
+		}
 		$selectedLinesCsv = GETPOST('dynamicsprices_selected_lines', 'alphanohtml');
-		if (empty($selectedRows) && !empty($selectedLinesCsv)) {
+		if (empty($selectedRows) && empty($payloadRowsData) && !empty($selectedLinesCsv)) {
 			$selectedLineIds = explode(',', $selectedLinesCsv);
 			foreach ($selectedLineIds as $selectedLineId) {
 				$selectedLineId = (int) trim($selectedLineId);
@@ -405,7 +410,6 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_availability]" value="'.((int) $diff['fk_availability']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][delivery_time_days]" value="'.dol_escape_htmltag($diff['delivery_time_days'] === null ? '' : (string) $diff['delivery_time_days']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][supplier_reputation]" value="'.dol_escape_htmltag((string) $diff['supplier_reputation']).'">';
-			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'">';
 			$html .= '</tr>';
 		}
 
@@ -418,6 +422,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_modal', 'value' => '1'),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_selected_lines', 'value' => $initialSelectedLines),
+			array('type' => 'hidden', 'name' => 'dynamicsprices_payload', 'value' => ''),
 			array('type' => 'hidden', 'name' => 'datecommande', 'value' => $datecommande),
 			array('type' => 'hidden', 'name' => 'methodecommande', 'value' => $methodecommande),
 			array('type' => 'hidden', 'name' => 'methode', 'value' => $methodecommande),
@@ -488,21 +493,40 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= '});';
 		$this->resprints .= '$("input[name=\'dynamicsprices_selected_lines\']").val(selected.join(","));';
 		$this->resprints .= '};';
+		$this->resprints .= 'var updateSupplierPricePayload=function(){';
+		$this->resprints .= 'var rows={};';
+		$this->resprints .= '$("#dynamicsprices_diff_wrapper").find("input").each(function(){';
+		$this->resprints .= 'var name=$(this).attr("name")||"";';
+		$this->resprints .= 'var match=name.match(/^dynamicsprices_data\\[(\\d+)\\]\\[([^\\]]+)\\]$/);';
+		$this->resprints .= 'if(match&&match[1]&&match[2]){';
+		$this->resprints .= 'if(!rows[match[1]]) rows[match[1]]={};';
+		$this->resprints .= 'rows[match[1]][match[2]]=$(this).val();';
+		$this->resprints .= '}';
+		$this->resprints .= 'match=name.match(/^dynamicsprices_apply_line\\[(\\d+)\\]$/);';
+		$this->resprints .= 'if(match&&match[1]){';
+		$this->resprints .= 'if(!rows[match[1]]) rows[match[1]]={};';
+		$this->resprints .= 'rows[match[1]].selected=$(this).is(":checked")?"1":"0";';
+		$this->resprints .= '}';
+		$this->resprints .= '});';
+		$this->resprints .= '$("input[name=\'dynamicsprices_payload\']").val(JSON.stringify(rows));';
+		$this->resprints .= '};';
+		$this->resprints .= 'var updateModalState=function(){updateSelectedLines();updateSupplierPricePayload();};';
 
-		$this->resprints .= '$(document).on("change", "input[name^=\'dynamicsprices_apply_line\']", updateSelectedLines);';
-		$this->resprints .= '$(document).on("submit", "form", updateSelectedLines);';
+		$this->resprints .= '$(document).on("input change", "#dynamicsprices_diff_wrapper input", updateModalState);';
+		$this->resprints .= '$(document).on("submit", "form", updateModalState);';
 
 		$this->resprints .= '$(document).on("click", ".ui-dialog[aria-describedby=\'dialog-confirm\'] .ui-dialog-buttonset .ui-button", function(){';
 		$this->resprints .= 'if($.trim($(this).text())==="'.$langs->transnoentitiesnoconv('LMDB_Ignore').'"){';
 		$this->resprints .= 'window.location.href="'.$ignoreUrl.'";';
 		$this->resprints .= 'return false;';
 		$this->resprints .= '}';
-		$this->resprints .= 'updateSelectedLines();';
+		$this->resprints .= 'updateModalState();';
 		$this->resprints .= '});';
 
 		$this->resprints .= '$(document).on("click", ".ui-dialog[aria-describedby=\'dialog-confirm\'] .ui-dialog-titlebar-close", function(){';
 		$this->resprints .= 'window.location.href="'.$ignoreUrl.'";';
 		$this->resprints .= '});';
+		$this->resprints .= 'updateModalState();';
 		$this->resprints .= '});';
 		$this->resprints .= '</script>';
 
@@ -535,8 +559,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 				continue;
 			}
 
-			$qty = price2num((float) $line->qty, 'MS');
-			$unitquantity = price2num((float) (empty($line->unitquantity) ? $line->qty : $line->unitquantity), 'MS');
+			$orderQty = price2num((float) $line->qty, 'MS');
+			$orderPackaging = $this->getSupplierPackagingFromOrderLine($line);
 			$vat = price2num((float) $line->tva_tx, 'MS');
 			$discount = price2num((float) $line->remise_percent, 'MS');
 			$unitprice = $this->getLineUnitPrice($line);
@@ -548,7 +572,9 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$reputation = isset($line->supplier_reputation) ? price2num((float) $line->supplier_reputation, 'MS') : 0;
 
 			$linkedSupplierPriceId = $this->getSupplierPriceIdFromOrderLine($line, (int) $object->id);
-			$current = $this->getCurrentSupplierPrice((int) $line->fk_product, (int) $object->socid, $qty, $linkedSupplierPriceId);
+			$current = $this->getCurrentSupplierPrice((int) $line->fk_product, (int) $object->socid, $orderQty, $linkedSupplierPriceId);
+			$qty = !empty($current['quantity']) ? price2num((float) $current['quantity'], 'MS') : $orderQty;
+			$unitquantity = (isset($current['packaging']) && (float) $current['packaging'] > 0) ? price2num((float) $current['packaging'], 'MS') : $orderPackaging;
 			$currentUnitprice = !empty($current) ? price2num((float) $current['unitprice'], 'MS') : 0;
 			$newUnitprice = price2num((float) $unitprice, 'MS');
 			$priceDelta = price2num($newUnitprice - $currentUnitprice, 'MS');
@@ -632,8 +658,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 	private function getCurrentSupplierPrice($fkProduct, $fkSoc, $qty, $preferredRowid = 0)
 	{
 		global $conf;
+		$hasPackagingField = $this->hasSupplierPricePackagingField();
+		$packagingSelect = $hasPackagingField ? ', packaging' : '';
 		if (!empty($preferredRowid)) {
-			$sql = 'SELECT rowid, unitprice, tva_tx, remise_percent, fk_availability, delivery_time_days, supplier_reputation';
+			$sql = 'SELECT rowid, quantity, unitprice, tva_tx, remise_percent, fk_availability, delivery_time_days, supplier_reputation'.$packagingSelect;
 			$sql .= ' FROM '.MAIN_DB_PREFIX.'product_fournisseur_price';
 			$sql .= ' WHERE rowid = '.((int) $preferredRowid);
 			$sql .= ' AND fk_product = '.((int) $fkProduct);
@@ -647,18 +675,20 @@ class ActionsDynamicsPrices extends CommonHookActions
 				if ($obj) {
 					return array(
 						'rowid' => (int) $obj->rowid,
+						'quantity' => (float) $obj->quantity,
 						'unitprice' => (float) $obj->unitprice,
 						'tva_tx' => (float) $obj->tva_tx,
 						'remise_percent' => (float) $obj->remise_percent,
 						'fk_availability' => (int) $obj->fk_availability,
 						'delivery_time_days' => ($obj->delivery_time_days !== null ? (int) $obj->delivery_time_days : null),
 						'supplier_reputation' => (float) $obj->supplier_reputation,
+						'packaging' => ($hasPackagingField && isset($obj->packaging) ? (float) $obj->packaging : null),
 					);
 				}
 			}
 		}
 
-		$sql = 'SELECT rowid, unitprice, tva_tx, remise_percent, fk_availability, delivery_time_days, supplier_reputation';
+		$sql = 'SELECT rowid, quantity, unitprice, tva_tx, remise_percent, fk_availability, delivery_time_days, supplier_reputation'.$packagingSelect;
 		$sql .= ' FROM '.MAIN_DB_PREFIX.'product_fournisseur_price';
 		$sql .= ' WHERE fk_product = '.((int) $fkProduct);
 		$sql .= ' AND fk_soc = '.((int) $fkSoc);
@@ -678,13 +708,34 @@ class ActionsDynamicsPrices extends CommonHookActions
 
 		return array(
 			'rowid' => (int) $obj->rowid,
+			'quantity' => (float) $obj->quantity,
 			'unitprice' => (float) $obj->unitprice,
 			'tva_tx' => (float) $obj->tva_tx,
 			'remise_percent' => (float) $obj->remise_percent,
 			'fk_availability' => (int) $obj->fk_availability,
 			'delivery_time_days' => ($obj->delivery_time_days !== null ? (int) $obj->delivery_time_days : null),
 			'supplier_reputation' => (float) $obj->supplier_reputation,
+			'packaging' => ($hasPackagingField && isset($obj->packaging) ? (float) $obj->packaging : null),
 		);
+	}
+
+	/**
+	 * Check whether supplier price packaging column is available.
+	 *
+	 * @return bool
+	 */
+	private function hasSupplierPricePackagingField()
+	{
+		static $hasPackagingField = null;
+		if ($hasPackagingField !== null) {
+			return $hasPackagingField;
+		}
+
+		$sql = "SHOW COLUMNS FROM ".MAIN_DB_PREFIX."product_fournisseur_price LIKE 'packaging'";
+		$resql = $this->db->query($sql);
+		$hasPackagingField = ($resql && $this->db->num_rows($resql) > 0);
+
+		return $hasPackagingField;
 	}
 
 	/**
@@ -776,6 +827,27 @@ class ActionsDynamicsPrices extends CommonHookActions
 	}
 
 	/**
+	 * Get supplier packaging from an order line.
+	 *
+	 * @param CommonObjectLine $line Supplier order line
+	 * @return float
+	 */
+	private function getSupplierPackagingFromOrderLine($line)
+	{
+		$propertyCandidates = array('packaging', 'unitquantity', 'qty');
+		foreach ($propertyCandidates as $propertyName) {
+			if (isset($line->{$propertyName}) && $line->{$propertyName} !== '') {
+				$value = price2num((float) $line->{$propertyName}, 'MS');
+				if ($value > 0) {
+					return $value;
+				}
+			}
+		}
+
+		return 1.0;
+	}
+
+	/**
 	 * Get price direction between current supplier price and order line price.
 	 *
 	 * @param float $currentUnitprice Current supplier unit price
@@ -846,7 +918,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	private function upsertSupplierPriceFromDiff(array $diff)
 	{
-		global $user;
+		global $langs, $user;
 		$targetSupplierPriceRowId = !empty($diff['current_rowid']) ? (int) $diff['current_rowid'] : 0;
 		if (!empty($targetSupplierPriceRowId)) {
 			$targetSupplierPrice = $this->getCurrentSupplierPrice((int) $diff['fk_product'], (int) $diff['fk_soc'], (float) $diff['qty'], $targetSupplierPriceRowId);
@@ -877,8 +949,25 @@ class ActionsDynamicsPrices extends CommonHookActions
 		dol_syslog(__METHOD__.' - Upsert supplier price through ProductFournisseur::update_buyprice product='.(int) $diff['fk_product'].' supplier='.(int) $diff['fk_soc'].' target_rowid='.$targetSupplierPriceRowId, LOG_DEBUG);
 		$qtyForApi = price2num((float) $diff['qty'], 'MS');
 		$unitpriceForApi = price2num((float) $diff['unitprice'], 'MS');
+		if ($qtyForApi <= 0) {
+			if (is_object($langs)) {
+				$langs->load('errors');
+				$this->error = $langs->trans('ErrorFieldRequired', $langs->transnoentities('QtyMin'));
+			} else {
+				$this->error = 'ErrorFieldRequired';
+			}
+			$this->errors[] = $this->error;
+			dol_syslog(__METHOD__.' - Invalid supplier price quantity for product='.(int) $diff['fk_product'].' supplier='.(int) $diff['fk_soc'], LOG_ERR);
+			return -1;
+		}
+		$packagingForApi = isset($diff['unitquantity']) ? price2num((float) $diff['unitquantity'], 'MS') : 0;
+		if ($packagingForApi <= 0) {
+			$packagingForApi = 1;
+		}
+		$productFournisseur->product_fourn_packaging = $packagingForApi;
+		$productFournisseur->packaging = $packagingForApi;
 		$buypriceForApi = price2num($unitpriceForApi * $qtyForApi, 'MS');
-		dol_syslog(__METHOD__.' - update_buyprice payload qty='.$qtyForApi.' unitprice='.$unitpriceForApi.' buyprice_for_api='.$buypriceForApi.' current_rowid='.$targetSupplierPriceRowId, LOG_DEBUG);
+		dol_syslog(__METHOD__.' - update_buyprice payload qty='.$qtyForApi.' packaging='.$packagingForApi.' unitprice='.$unitpriceForApi.' buyprice_for_api='.$buypriceForApi.' current_rowid='.$targetSupplierPriceRowId, LOG_DEBUG);
 
 		$resultUpdate = $productFournisseur->update_buyprice(
 			$qtyForApi,
@@ -910,6 +999,78 @@ class ActionsDynamicsPrices extends CommonHookActions
 	}
 
 	/**
+	 * Decode edited supplier price rows from the confirmation modal payload.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function getPostedRowsDataFromPayload()
+	{
+		$payloadJson = GETPOST('dynamicsprices_payload', 'none');
+		if (!is_string($payloadJson) || trim($payloadJson) === '') {
+			return array();
+		}
+
+		$decodedPayload = json_decode($payloadJson, true);
+		if (!is_array($decodedPayload)) {
+			dol_syslog(__METHOD__.' - Invalid supplier price modal payload JSON', LOG_WARNING);
+			return array();
+		}
+
+		$rowsData = array();
+		$numericFields = array('qty', 'unitquantity', 'vat', 'unitprice', 'discount', 'supplier_reputation');
+		$integerFields = array('fk_product', 'fk_soc', 'current_rowid', 'fk_availability', 'selected');
+
+		foreach ($decodedPayload as $lineId => $rowData) {
+			$lineId = (int) $lineId;
+			if ($lineId <= 0 || !is_array($rowData)) {
+				continue;
+			}
+
+			$normalizedRow = array();
+			foreach ($numericFields as $fieldName) {
+				if (array_key_exists($fieldName, $rowData) && is_scalar($rowData[$fieldName])) {
+					$normalizedRow[$fieldName] = price2num((string) $rowData[$fieldName], 'MS');
+				}
+			}
+			foreach ($integerFields as $fieldName) {
+				if (array_key_exists($fieldName, $rowData) && is_scalar($rowData[$fieldName])) {
+					$normalizedRow[$fieldName] = (int) $rowData[$fieldName];
+				}
+			}
+			if (array_key_exists('delivery_time_days', $rowData) && is_scalar($rowData['delivery_time_days'])) {
+				$normalizedRow['delivery_time_days'] = ((string) $rowData['delivery_time_days'] !== '') ? (int) $rowData['delivery_time_days'] : null;
+			}
+			if (array_key_exists('supplier_ref', $rowData) && is_scalar($rowData['supplier_ref'])) {
+				$normalizedRow['supplier_ref'] = dol_string_nohtmltag((string) $rowData['supplier_ref'], 1);
+			}
+
+			if (!empty($normalizedRow)) {
+				$rowsData[$lineId] = $normalizedRow;
+			}
+		}
+
+		return $rowsData;
+	}
+
+	/**
+	 * Extract selected rows from normalized modal payload data.
+	 *
+	 * @param array<int,array<string,mixed>> $postedRowsData Submitted rows data
+	 * @return array<int,int>
+	 */
+	private function getSelectedRowsFromPostedData(array $postedRowsData)
+	{
+		$selectedRows = array();
+		foreach ($postedRowsData as $lineId => $rowData) {
+			if (!empty($rowData['selected'])) {
+				$selectedRows[(int) $lineId] = 1;
+			}
+		}
+
+		return $selectedRows;
+	}
+
+	/**
 	 * Merge posted form values into difference payload.
 	 *
 	 * @param int $lineId Line id
@@ -936,8 +1097,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$diff['fk_product'] = isset($rowData['fk_product']) ? (int) $rowData['fk_product'] : $diff['fk_product'];
 		$diff['fk_soc'] = isset($rowData['fk_soc']) ? (int) $rowData['fk_soc'] : $diff['fk_soc'];
 		$diff['current_rowid'] = isset($rowData['current_rowid']) ? (int) $rowData['current_rowid'] : $diff['current_rowid'];
-		$diff['supplier_ref'] = isset($rowData['supplier_ref']) ? $rowData['supplier_ref'] : $diff['supplier_ref'];
-		$diff['label'] = isset($rowData['label']) ? $rowData['label'] : $diff['label'];
+		$diff['supplier_ref'] = isset($rowData['supplier_ref']) ? dol_string_nohtmltag((string) $rowData['supplier_ref'], 1) : $diff['supplier_ref'];
+		$diff['label'] = isset($rowData['label']) ? dol_string_nohtmltag((string) $rowData['label'], 1) : $diff['label'];
 		$diff['new_unitprice'] = $diff['unitprice'];
 
 		if (isset($diff['current_unitprice'])) {

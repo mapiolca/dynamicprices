@@ -2,6 +2,9 @@
 
 ## 3.0
 
+### Prix fournisseurs
+- Correction de l'actualisation des prix d'achat depuis une commande fournisseur afin de conserver les quantités minimum et conditionnements édités dans la modale.
+
 ### Prix de revient DynamicPrices
 - Ajout d'un prix de revient DynamicPrices par produit et par entité Multicompany, stocké dans les tables du module et historisé sans écriture automatique dans `llx_product.cost_price`.
 - Centralisation du calcul, de la lecture, de la sauvegarde, de l'historisation et de l'application aux lignes commerciales dans `DynamicPricesCostService`.
