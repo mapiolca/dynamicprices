@@ -508,7 +508,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= 'rows[match[1]].selected=$(this).is(":checked")?"1":"0";';
 		$this->resprints .= '}';
 		$this->resprints .= '});';
-		$this->resprints .= '$("input[name=\'dynamicsprices_payload\']").val(JSON.stringify(rows));';
+		$this->resprints .= 'var json=JSON.stringify(rows);';
+		$this->resprints .= 'var utf8=unescape(encodeURIComponent(json));';
+		$this->resprints .= 'var encoded="";';
+		$this->resprints .= 'for(var i=0;i<utf8.length;i++){';
+		$this->resprints .= 'var h=utf8.charCodeAt(i).toString(16);';
+		$this->resprints .= 'encoded+=(h.length<2?"0":"")+h;';
+		$this->resprints .= '}';
+		$this->resprints .= '$("input[name=\'dynamicsprices_payload\']").val(encoded);';
 		$this->resprints .= '};';
 		$this->resprints .= 'var updateModalState=function(){updateSelectedLines();updateSupplierPricePayload();};';
 
@@ -1005,8 +1012,19 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	private function getPostedRowsDataFromPayload()
 	{
-		$payloadJson = GETPOST('dynamicsprices_payload', 'none');
-		if (!is_string($payloadJson) || trim($payloadJson) === '') {
+		$payloadHex = GETPOST('dynamicsprices_payload', 'aZ09');
+		if (!is_string($payloadHex) || trim($payloadHex) === '') {
+			return array();
+		}
+		$payloadHex = trim($payloadHex);
+		if ((strlen($payloadHex) % 2) !== 0 || !ctype_xdigit($payloadHex)) {
+			dol_syslog(__METHOD__.' - Invalid supplier price modal payload encoding', LOG_WARNING);
+			return array();
+		}
+
+		$payloadJson = hex2bin($payloadHex);
+		if ($payloadJson === false) {
+			dol_syslog(__METHOD__.' - Unable to decode supplier price modal payload', LOG_WARNING);
 			return array();
 		}
 
