@@ -145,7 +145,9 @@ class DynamicsPricesCostApi extends DolibarrApi
 			if ($result < 0) {
 				throw new RestException(500, $this->service->error);
 			}
-			$updated++;
+			if ($result > 0) {
+				$updated++;
+			}
 		}
 
 		return array('updated' => $updated);
@@ -232,7 +234,7 @@ class DynamicsPricesCostApi extends DolibarrApi
 			'status' => 0,
 		);
 
-		$result = $this->service->saveProductCost((int) $product_id, $calculation, $user, array('calculation_context' => 'api_manual_delete', 'allow_null_overwrite' => true));
+		$result = $this->service->saveProductCost((int) $product_id, $calculation, $user, array('calculation_context' => 'api_manual_delete'));
 		if ($result < 0) {
 			throw new RestException(500, $this->service->error);
 		}

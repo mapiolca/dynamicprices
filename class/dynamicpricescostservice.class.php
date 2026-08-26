@@ -53,6 +53,10 @@ class DynamicPricesCostService
 		if (!is_object($record) || $record->dynamic_cost_price === null) {
 			return null;
 		}
+		$requireSuccessfulCalculation = !array_key_exists('require_success', $options) || !empty($options['require_success']);
+		if ($requireSuccessfulCalculation && ((int) $record->calculation_status <= 0 || (int) $record->status <= 0)) {
+			return null;
+		}
 
 		return (float) $record->dynamic_cost_price;
 	}
@@ -199,7 +203,28 @@ class DynamicPricesCostService
 		$result['dolibarr_cost_price_snapshot'] = $productNativeValues['cost_price'];
 		$result['pmp_snapshot'] = $productNativeValues['pmp'];
 
-		$supplierAveragePrice = $this->getSupplierAveragePrice($productId);
+		$kitComponents = $this->getKitComponents($productId);
+		if ($kitComponents === null) {
+			$result['calculation_status'] = -1;
+			$result['calculation_message'] = 'DynamicPricesCostKitComponentsReadError';
+			$result['source_type'] = 'kit_components';
+			$result['calculation_hash'] = $this->buildCalculationHash($result);
+			return $result;
+		}
+		if (!empty($kitComponents)) {
+			if (!getDolGlobalInt('DYNAMICPRICES_COST_RECALC_KITS', 1)) {
+				$result['calculation_status'] = 0;
+				$result['calculation_message'] = 'DynamicPricesCostKitRecalculationDisabled';
+				$result['source_type'] = 'kit_components';
+				$result['source_details'] = $this->encodeJson(array('components' => $kitComponents));
+				$result['calculation_hash'] = $this->buildCalculationHash($result);
+				return $result;
+			}
+
+			return $this->calculateKitCost($result, $kitComponents, $entity);
+		}
+
+		$supplierAveragePrice = $this->getSupplierAveragePrice($productId, $entity);
 		$sourceDetails = array(
 			array(
 				'source_type' => 'supplier_average',
@@ -256,9 +281,6 @@ class DynamicPricesCostService
 		$entity = !empty($calculation['entity']) ? (int) $calculation['entity'] : $this->resolveEntity(!empty($context['entity']) ? (int) $context['entity'] : 0);
 		$oldRecord = $this->getDynamicCostRecord($productId, $entity);
 		$dynamicCost = array_key_exists('dynamic_cost_price', $calculation) ? $calculation['dynamic_cost_price'] : null;
-		if ($dynamicCost === null && is_object($oldRecord) && empty($context['allow_null_overwrite'])) {
-			$dynamicCost = $oldRecord->dynamic_cost_price;
-		}
 
 		$date = $this->db->idate(dol_now());
 		$sql = "INSERT INTO ".MAIN_DB_PREFIX."dynamicprices_product_cost (";
@@ -317,7 +339,7 @@ class DynamicPricesCostService
 			return -1;
 		}
 
-		if (getDolGlobalInt('DYNAMICPRICES_COST_ALLOW_NATIVE_WRITE', 0)) {
+		if (getDolGlobalInt('DYNAMICPRICES_COST_ALLOW_NATIVE_WRITE', 0) && $dynamicCost !== null && (int) ($calculation['calculation_status'] ?? 1) > 0 && (int) ($calculation['status'] ?? 1) > 0) {
 			dol_syslog(__METHOD__.' legacy native cost write enabled for product='.(int) $productId, LOG_WARNING);
 			$this->writeNativeCostPrice($productId, $dynamicCost, $entity);
 		}
@@ -331,7 +353,7 @@ class DynamicPricesCostService
 	 * @param int|string $fk_product Product id
 	 * @param User $user User
 	 * @param array<string,mixed> $context Context
-	 * @return int
+	 * @return int 1 on success, 0 when no valid cost can be calculated, -1 on persistence error
 	 */
 	public function recalculateProductCost($fk_product, User $user, array $context = array())
 	{
@@ -345,7 +367,7 @@ class DynamicPricesCostService
 		}
 
 		$this->db->commit();
-		return $result;
+		return (int) ($calculation['calculation_status'] ?? 0) > 0 && $calculation['dynamic_cost_price'] !== null ? 1 : 0;
 	}
 
 	/**
@@ -642,17 +664,31 @@ class DynamicPricesCostService
 	}
 
 	/**
-	 * Return average supplier unit price.
+	 * Return average valid supplier unit price.
 	 *
 	 * @param int $productId Product id
+	 * @param int $entity Entity id, current entity when 0
 	 * @return float|null
 	 */
-	private function getSupplierAveragePrice($productId)
+	public function getSupplierAveragePrice($productId, $entity = 0)
 	{
-		$sql = "SELECT unitprice";
-		$sql .= " FROM ".MAIN_DB_PREFIX."product_fournisseur_price";
-		$sql .= " WHERE fk_product = ".((int) $productId);
-		$sql .= " AND entity IN (".getEntity('product_fournisseur_price').")";
+		global $conf;
+
+		$productId = (int) $productId;
+		if ($productId <= 0) {
+			return null;
+		}
+
+		$entity = $this->resolveEntity($entity);
+		$entityFilter = $entity === (int) $conf->entity ? getEntity('product_fournisseur_price') : (string) $entity;
+		$sql = "SELECT p.unitprice";
+		$sql .= " FROM ".MAIN_DB_PREFIX."product_fournisseur_price AS p";
+		$sql .= " WHERE p.fk_product = ".$productId;
+		$sql .= " AND p.entity IN (".$entityFilter.")";
+		$sql .= " AND p.status = 1";
+		$sql .= " AND p.quantity > 0";
+		$sql .= " AND p.unitprice IS NOT NULL";
+		$sql .= " AND TRIM(COALESCE(p.ref_fourn, '')) <> ''";
 
 		$resql = $this->db->query($sql);
 		if (!$resql) {
@@ -667,6 +703,140 @@ class DynamicPricesCostService
 		}
 
 		return $count > 0 ? ($total / $count) : null;
+	}
+
+	/**
+	 * Count incomplete supplier price rows ignored by DynamicPrices.
+	 *
+	 * @param int $productId Product id
+	 * @param int $entity Entity id, current entity when 0
+	 * @return int
+	 */
+	public function getInvalidSupplierPriceCount($productId, $entity = 0)
+	{
+		global $conf;
+
+		$productId = (int) $productId;
+		if ($productId <= 0) {
+			return 0;
+		}
+
+		$entity = $this->resolveEntity($entity);
+		$entityFilter = $entity === (int) $conf->entity ? getEntity('product_fournisseur_price') : (string) $entity;
+		$sql = "SELECT COUNT(p.rowid) AS nb";
+		$sql .= " FROM ".MAIN_DB_PREFIX."product_fournisseur_price AS p";
+		$sql .= " WHERE p.fk_product = ".$productId;
+		$sql .= " AND p.entity IN (".$entityFilter.")";
+		$sql .= " AND p.status = 1";
+		$sql .= " AND (p.quantity <= 0 OR p.unitprice IS NULL OR TRIM(COALESCE(p.ref_fourn, '')) = '')";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			return 0;
+		}
+
+		$obj = $this->db->fetch_object($resql);
+		return is_object($obj) && isset($obj->nb) ? (int) $obj->nb : 0;
+	}
+
+	/**
+	 * Read first-level components of a kit.
+	 *
+	 * @param int $productId Parent product id
+	 * @return array<int,array{id:int,ref:string,qty:float}>|null
+	 */
+	private function getKitComponents($productId)
+	{
+		$components = array();
+		$sql = "SELECT pa.fk_product_fils, pa.qty, p.ref";
+		$sql .= " FROM ".MAIN_DB_PREFIX."product_association AS pa";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."product AS p ON p.rowid = pa.fk_product_fils";
+		$sql .= " WHERE pa.fk_product_pere = ".((int) $productId);
+		$sql .= " ORDER BY pa.rowid ASC";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			$this->errors[] = $this->error;
+			return null;
+		}
+
+		while (is_object($obj = $this->db->fetch_object($resql))) {
+			$components[] = array(
+				'id' => (int) $obj->fk_product_fils,
+				'ref' => isset($obj->ref) ? (string) $obj->ref : '',
+				'qty' => (float) price2num($obj->qty, 'MS'),
+			);
+		}
+
+		return $components;
+	}
+
+	/**
+	 * Calculate a kit from the current successful DynamicPrices costs of its components.
+	 *
+	 * @param array<string,mixed> $result Base calculation result
+	 * @param array<int,array{id:int,ref:string,qty:float}> $components Kit components
+	 * @param int $entity Entity id
+	 * @return array<string,mixed>
+	 */
+	private function calculateKitCost(array $result, array $components, $entity)
+	{
+		$componentDetails = array();
+		$missingComponents = array();
+		$totalCost = 0.0;
+
+		foreach ($components as $component) {
+			$componentId = (int) $component['id'];
+			$componentRef = (string) $component['ref'];
+			$quantity = (float) $component['qty'];
+			$record = $componentId > 0 && $componentId !== (int) $result['fk_product'] ? $this->getDynamicCostRecord($componentId, $entity) : null;
+			$componentCost = null;
+			if (is_object($record) && $record->dynamic_cost_price !== null && (int) $record->calculation_status > 0 && (int) $record->status > 0) {
+				$componentCost = (float) $record->dynamic_cost_price;
+			}
+
+			$subtotal = $componentCost !== null ? $componentCost * $quantity : null;
+			$componentDetails[] = array(
+				'fk_product' => $componentId,
+				'ref' => $componentRef,
+				'quantity' => $quantity,
+				'dynamic_cost_price' => $componentCost,
+				'subtotal' => $subtotal,
+			);
+
+			if ($componentCost === null) {
+				$missingComponents[] = array('fk_product' => $componentId, 'ref' => $componentRef);
+				continue;
+			}
+
+			if ($subtotal !== null) {
+				$totalCost += $subtotal;
+			}
+		}
+
+		$result['source_type'] = 'kit_components';
+		$result['source_details'] = $this->encodeJson(array(
+			'components' => $componentDetails,
+			'missing_components' => $missingComponents,
+		));
+		$result['coefficient'] = 1.0;
+		$result['rounding_rule'] = (string) getDolGlobalString('DYNAMICPRICES_COST_ROUNDING_MODE', 'dolibarr');
+
+		if (!empty($missingComponents)) {
+			$result['calculation_status'] = -1;
+			$result['calculation_message'] = 'DynamicPricesCostKitComponentUnavailable';
+			$result['calculation_hash'] = $this->buildCalculationHash($result);
+			return $result;
+		}
+
+		$result['source_value'] = (float) $totalCost;
+		$result['dynamic_cost_price'] = $this->roundCost($totalCost);
+		$result['calculation_status'] = 1;
+		$result['calculation_message'] = 'DynamicPricesCostKitCalculated';
+		$result['calculation_hash'] = $this->buildCalculationHash($result);
+
+		return $result;
 	}
 
 	/**
@@ -729,9 +899,12 @@ class DynamicPricesCostService
 			'dynamic_cost_price' => $calculation['dynamic_cost_price'] ?? null,
 			'source_type' => $calculation['source_type'] ?? '',
 			'source_value' => $calculation['source_value'] ?? null,
+			'source_details' => $calculation['source_details'] ?? '',
 			'rule_code' => $calculation['rule_code'] ?? '',
 			'coefficient' => $calculation['coefficient'] ?? null,
 			'rounding_rule' => $calculation['rounding_rule'] ?? '',
+			'calculation_status' => $calculation['calculation_status'] ?? 0,
+			'calculation_message' => $calculation['calculation_message'] ?? '',
 		);
 
 		return hash('sha256', $this->encodeJson($payload));

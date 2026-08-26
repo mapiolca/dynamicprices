@@ -302,29 +302,68 @@ function dynamicsprices_get_parent_kits($db, $productId)
 	return $parents;
 }
 
-// Compute average supplier price
-function dynamicsprices_get_average_supplier_price($db, $productId)
+/**
+ * Order kits so nested component kits are recalculated before their parents.
+ *
+ * Cyclic or invalid compositions are kept at the end in their original order.
+ * The central cost service will reject a parent whose component cost is invalid.
+ *
+ * @param DoliDB $db Database handler
+ * @param array<int, array<string, mixed>> $kits Kits to order
+ * @return array<int, array<string, mixed>>
+ */
+function dynamicsprices_sort_kits_for_recalculation($db, array $kits)
 {
-	$sql = "SELECT unitprice";
-	$sql .= " FROM ".MAIN_DB_PREFIX."product_fournisseur_price";
-	$sql .= " WHERE fk_product = ".((int) $productId);
-	$sql .= " AND entity IN (".getEntity('product_fournisseur_price').")";
-
-	$resql = $db->query($sql);
-	if ($resql === false) {
-		return null;
+	$remaining = array();
+	foreach ($kits as $kit) {
+		$kitId = isset($kit['id']) ? (int) $kit['id'] : 0;
+		if ($kitId > 0) {
+			$remaining[$kitId] = $kit;
+		}
 	}
 
-	$prices = array();
-	while ($obj = $db->fetch_object($resql)) {
-		$prices[] = (float) $obj->unitprice;
+	$ordered = array();
+	while (!empty($remaining)) {
+		$progress = false;
+
+		foreach ($remaining as $kitId => $kit) {
+			$components = dynamicsprices_get_kit_components($db, $kitId);
+			$hasPendingComponentKit = false;
+			foreach ($components as $component) {
+				$componentId = isset($component['id']) ? (int) $component['id'] : 0;
+				if ($componentId > 0 && isset($remaining[$componentId])) {
+					$hasPendingComponentKit = true;
+					break;
+				}
+			}
+
+			if ($hasPendingComponentKit) {
+				continue;
+			}
+
+			$ordered[] = $kit;
+			unset($remaining[$kitId]);
+			$progress = true;
+		}
+
+		if (!$progress) {
+			foreach ($remaining as $kit) {
+				$ordered[] = $kit;
+			}
+			break;
+		}
 	}
 
-	if (count($prices) === 0) {
-		return null;
-	}
+	return $ordered;
+}
 
-	return array_sum($prices) / count($prices);
+// Compute average supplier price
+function dynamicsprices_get_average_supplier_price($db, $productId, $entity = 0)
+{
+	require_once __DIR__.'/../class/dynamicpricescostservice.class.php';
+
+	$service = new DynamicPricesCostService($db);
+	return $service->getSupplierAveragePrice((int) $productId, (int) $entity);
 }
 
 // Get table column for commercial category with backward compatibility
@@ -403,6 +442,8 @@ function dynamicsprices_save_cost_price($db, $productId, $costPrice, $context = 
 	$sourceValue = array_key_exists('source_value', $context) ? $context['source_value'] : $costPrice;
 	$coefficient = array_key_exists('coefficient', $context) ? $context['coefficient'] : null;
 
+	$calculationStatus = isset($context['calculation_status']) ? (int) $context['calculation_status'] : ($costPrice === null ? -1 : 1);
+	$calculationMessage = !empty($context['calculation_message']) ? (string) $context['calculation_message'] : ($calculationStatus > 0 ? 'DynamicPricesCostCalculated' : 'DynamicPricesCostNoSource');
 	$calculation = array(
 		'entity' => $entity,
 		'fk_product' => (int) $productId,
@@ -414,17 +455,18 @@ function dynamicsprices_save_cost_price($db, $productId, $costPrice, $context = 
 		'rule_code' => !empty($context['rule_code']) ? (string) $context['rule_code'] : '',
 		'coefficient' => $coefficient === null ? null : (float) $coefficient,
 		'rounding_rule' => (string) getDolGlobalString('DYNAMICPRICES_COST_ROUNDING_MODE', 'dolibarr'),
-		'calculation_status' => 1,
-		'calculation_message' => 'DynamicPricesCostCalculated',
+		'calculation_status' => $calculationStatus,
+		'calculation_message' => $calculationMessage,
 		'status' => 1,
 	);
-	$calculation['calculation_hash'] = hash('sha256', json_encode(array(
+	$hashPayload = json_encode(array(
 		'dynamic_cost_price' => $calculation['dynamic_cost_price'],
 		'source_type' => $calculation['source_type'],
 		'source_value' => $calculation['source_value'],
 		'rule_code' => $calculation['rule_code'],
 		'coefficient' => $calculation['coefficient'],
-	)));
+	));
+	$calculation['calculation_hash'] = hash('sha256', is_string($hashPayload) ? $hashPayload : '');
 
 	$result = $service->saveProductCost((int) $productId, $calculation, $user, array(
 		'entity' => $entity,
@@ -469,36 +511,50 @@ function dynamicsprices_get_product_commercial_category($db, $productId)
 	return $obj ? $obj->code : '';
 }
 
-// Calculate and persist Kit cost price based on components
-function dynamicsprices_update_kit_cost_price($db, $productId)
+/**
+ * Calculate and persist a kit cost price from its DynamicPrices components.
+ *
+ * @param DoliDB $db Database handler
+ * @param int $productId Kit product id
+ * @param int $entity Entity id, current entity when 0
+ * @param User|null $actor User authoring the calculation
+ * @return float|false
+ */
+function dynamicsprices_update_kit_cost_price($db, $productId, $entity = 0, $actor = null)
 {
-	global $langs;
+	global $conf, $langs, $user;
 
 	$langs->load("dynamicsprices@dynamicsprices");
-	dol_include_once('/product/class/product.class.php');
-
-	$kit = new Product($db);
-	$kit->fetch((int) $productId);
-
-	$components = dynamicsprices_get_kit_components($db, $productId);
-	$totalCost = 0;
-
-	foreach ($components as $component) {
-		$componentUnitCost = dynamicsprices_get_component_unit_cost_for_kit($db, (int) $component['id'], $kit);
-		if ($componentUnitCost === null) {
-			return false;
-		}
-		$totalCost += $componentUnitCost * (float) $component['qty'];
+	require_once __DIR__.'/../class/dynamicpricescostservice.class.php';
+	if (!is_object($actor)) {
+		$actor = $user;
+	}
+	if (!is_object($actor)) {
+		dol_syslog(__METHOD__.' no user object available to recalculate kit='.(int) $productId, LOG_ERR);
+		return false;
 	}
 
-	dynamicsprices_save_cost_price($db, $productId, $totalCost, array('source_type' => 'kit_components'));
+	$entity = (int) $entity > 0 ? (int) $entity : (int) $conf->entity;
+	$service = new DynamicPricesCostService($db);
+	$calculation = $service->calculateProductCost((int) $productId, array('entity' => $entity, 'calculation_context' => 'kit_engine'));
+	$result = $service->saveProductCost((int) $productId, $calculation, $actor, array(
+		'entity' => $entity,
+		'calculation_context' => 'kit_engine',
+	));
+	if ($result < 0) {
+		dol_syslog(__METHOD__.' '.$service->error, LOG_ERR);
+		return false;
+	}
+	if ((int) $calculation['calculation_status'] <= 0 || $calculation['dynamic_cost_price'] === null) {
+		return false;
+	}
 
-	return $totalCost;
+	return (float) $calculation['dynamic_cost_price'];
 }
 
 /**
  * Resolve component unit cost used for kit cost computation.
- * Priority is: supplier average price, then cost price, then PMP.
+ * Only the successful DynamicPrices cost of the component is accepted.
  *
  * @param DoliDB $db Database handler
  * @param int    $componentId Component product id
@@ -507,33 +563,23 @@ function dynamicsprices_update_kit_cost_price($db, $productId)
  */
 function dynamicsprices_get_component_unit_cost_for_kit($db, $componentId, $kit)
 {
-	global $langs;
+	global $conf, $langs;
 
 	$langs->load("dynamicsprices@dynamicsprices");
-	dol_include_once('/product/class/product.class.php');
-
-	$avg = dynamicsprices_get_average_supplier_price($db, $componentId);
-	if ($avg !== null) {
-		return (float) $avg;
+	require_once __DIR__.'/../class/dynamicpricescostservice.class.php';
+	$service = new DynamicPricesCostService($db);
+	$entity = !empty($kit->entity) ? (int) $kit->entity : (int) $conf->entity;
+	$cost = $service->getDynamicCostPrice((int) $componentId, $entity);
+	if ($cost !== null) {
+		return (float) $cost;
 	}
 
+	dol_include_once('/product/class/product.class.php');
 	$component = new Product($db);
-	if ($component->fetch($componentId) > 0) {
+	if ($component->fetch((int) $componentId) > 0) {
 		$componentLink = dynamicsprices_get_product_ref_link($component->id, $component->ref);
 		$kitLink = dynamicsprices_get_product_ref_link($kit->id, $kit->ref);
-		$costPrice = price2num($component->cost_price, 'MU');
-		if ($costPrice > 0) {
-			setEventMessages($langs->trans('LMDB_KitCostFallbackToCostPriceWarning', $componentLink, $kitLink), null, 'warnings');
-			return (float) $costPrice;
-		}
-
-		$pmp = price2num($component->pmp, 'MU');
-		if ($pmp > 0) {
-			setEventMessages($langs->trans('LMDB_KitCostFallbackToPmpWarning', $componentLink, $kitLink), null, 'warnings');
-			return (float) $pmp;
-		}
-
-		setEventMessages($langs->trans('LMDB_KitCostMissingAllPricesError', $componentLink, $kitLink), null, 'errors');
+		setEventMessages($langs->trans('LMDB_KitDynamicCostMissingError', $componentLink, $kitLink), null, 'errors');
 	}
 
 	return null;
@@ -769,9 +815,15 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		continue;
 		}
 	
-		$avgPrice = dynamicsprices_get_average_supplier_price($db, $prodid);
+		$avgPrice = dynamicsprices_get_average_supplier_price($db, $prodid, $entity);
 		if ($avgPrice === null) {
-		continue;
+			dynamicsprices_save_cost_price($db, $prodid, null, array(
+				'entity' => $entity,
+				'source_type' => 'supplier_average',
+				'calculation_status' => -1,
+				'calculation_message' => 'DynamicPricesCostNoSource',
+			));
+			continue;
 		}
 	
 		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId);
@@ -788,6 +840,9 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $avgPrice, $rules, $tva_tx, $entity);
 		}
 
+		$kits = getDolGlobalInt('DYNAMICPRICES_COST_RECALC_KITS', 1)
+			? dynamicsprices_sort_kits_for_recalculation($db, $kits)
+			: array();
 		foreach ($kits as $kit) {
 		$prodid = $kit['id'];
 		$commercialCategoryId = $kit['commercial_category'];
@@ -795,7 +850,7 @@ function update_customer_prices_from_suppliers($db, $user, $langs, $conf, $produ
 		$product = new Product($db);
 		$product->fetch($prodid);
 
-		$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
+		$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid, $entity, $user);
 		if ($costPrice === false) {
 			return -1;
 		}
@@ -872,7 +927,7 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		continue;
 		}
 	
-		$avgPrice = dynamicsprices_get_average_supplier_price($db, $prodid);
+		$avgPrice = dynamicsprices_get_average_supplier_price($db, $prodid, $entity);
 		if ($avgPrice !== null) {
 		$marginPercent = dynamicsprices_get_margin_on_cost_percent($db, $commercialCategoryId);
 		$currentCost = $avgPrice * (1 + ($marginPercent / 100));
@@ -897,6 +952,9 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		$nb_line += dynamicsprices_update_prices_from_base($db, $user, $product, $currentCost, $rules, $tva_tx, $entity);
 		}
 
+		$kits = getDolGlobalInt('DYNAMICPRICES_COST_RECALC_KITS', 1)
+			? dynamicsprices_sort_kits_for_recalculation($db, $kits)
+			: array();
 		foreach ($kits as $kit) {
 		$prodid = $kit['id'];
 		$commercialCategoryId = $kit['commercial_category'];
@@ -904,7 +962,7 @@ function update_customer_prices_from_cost_price($db, $user, $langs, $conf, $prod
 		$product = new Product($db);
 		$product->fetch($prodid);
 
-		$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid);
+		$costPrice = dynamicsprices_update_kit_cost_price($db, $prodid, $entity, $user);
 		if ($costPrice === false) {
 			return -1;
 		}

@@ -99,14 +99,17 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 			}
 			if ($productId > 0) {
 				call_user_func($updateFunction, $db, $user, $langs, $conf, $productId);
-				$parentKits = dynamicsprices_get_parent_kits($db, $productId);
-				foreach ($parentKits as $kitId) {
-					$kitId = (int) $kitId;
+				$pendingParentKits = getDolGlobalInt('DYNAMICPRICES_COST_RECALC_KITS', 1) ? dynamicsprices_get_parent_kits($db, $productId) : array();
+				while (!empty($pendingParentKits)) {
+					$kitId = (int) array_shift($pendingParentKits);
 					if (!$this->shouldProcessProductForAction($kitId)) {
 						dol_syslog(__METHOD__." - Skip duplicated recompute for parent kit ".$kitId." after product ".$productId, LOG_DEBUG);
 						continue;
 					}
 					call_user_func($updateFunction, $db, $user, $langs, $conf, $kitId);
+					foreach (dynamicsprices_get_parent_kits($db, $kitId) as $parentKitId) {
+						$pendingParentKits[] = (int) $parentKitId;
+					}
 				}
 			}
 		}

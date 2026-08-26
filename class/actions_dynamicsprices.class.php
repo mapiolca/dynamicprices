@@ -308,6 +308,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 			setEventMessages($service->error, $service->errors, 'errors');
 			return -1;
 		}
+		if ($result === 0) {
+			$record = $service->getDynamicCostRecord($productId, $entity);
+			$message = is_object($record) && !empty($record->calculation_message) ? $langs->trans($record->calculation_message) : $langs->trans('DynamicPricesCostNoSource');
+			setEventMessages($message, null, 'warnings');
+			$url = $_SERVER['PHP_SELF'].'?id='.$productId;
+			header('Location: '.$url);
+			exit;
+		}
 		$priceUpdateResult = dynamicsprices_update_sales_prices_from_dynamic_cost($this->db, $user, $productId, $entity);
 		if ($priceUpdateResult < 0) {
 			setEventMessages($langs->trans('Error'), null, 'errors');
@@ -396,7 +404,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<tr class="oddeven">';
 			$html .= '<td><input type="checkbox" name="dynamicsprices_apply_line['.$lineId.']" value="1" checked></td>';
 			$html .= '<td>'.$this->getProductNomUrl((int) $diff['fk_product'], $diff['ref']).'</td>';
-			$html .= '<td><input class="width100 maxwidth100" type="text" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'"></td>';
+			$html .= '<td><input class="width100 maxwidth100" type="text" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'" required="required"></td>';
 			$html .= '<td class="right"><input class="center width50" type="text" name="dynamicsprices_data['.$lineId.'][qty]" value="'.dol_escape_htmltag((string) $diff['qty']).'"></td>';
 			$html .= '<td class="right"><input class="center width100" type="text" name="dynamicsprices_data['.$lineId.'][unitquantity]" value="'.dol_escape_htmltag((string) $diff['unitquantity']).'"></td>';
 			$html .= '<td class="right"><input class="center width50" type="text" name="dynamicsprices_data['.$lineId.'][vat]" value="'.dol_escape_htmltag((string) $diff['vat']).'"></td>';
@@ -967,7 +975,18 @@ class ActionsDynamicsPrices extends CommonHookActions
 			return -1;
 		}
 
-		$supplierRef = isset($diff['supplier_ref']) ? dol_string_nohtmltag((string) $diff['supplier_ref'], 1) : '';
+		$supplierRef = isset($diff['supplier_ref']) ? trim(dol_string_nohtmltag((string) $diff['supplier_ref'], 1)) : '';
+		if ($supplierRef === '') {
+			if (is_object($langs)) {
+				$langs->loadLangs(array('errors', 'dynamicsprices@dynamicsprices'));
+				$this->error = $langs->trans('ErrorFieldRequired', $langs->transnoentities('LMDB_SupplierRef'));
+			} else {
+				$this->error = 'ErrorFieldRequired';
+			}
+			$this->errors[] = $this->error;
+			dol_syslog(__METHOD__.' - Refuse empty supplier reference for product='.(int) $diff['fk_product'].' supplier='.(int) $diff['fk_soc'], LOG_ERR);
+			return -1;
+		}
 		$packagingForApi = isset($diff['unitquantity']) ? price2num((float) $diff['unitquantity'], 'MS') : 0;
 		if ($packagingForApi <= 0) {
 			$packagingForApi = 1;
@@ -1448,7 +1467,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 				$normalizedRow['delivery_time_days'] = ((string) $rowData['delivery_time_days'] !== '') ? (int) $rowData['delivery_time_days'] : null;
 			}
 			if (array_key_exists('supplier_ref', $rowData) && is_scalar($rowData['supplier_ref'])) {
-				$normalizedRow['supplier_ref'] = dol_string_nohtmltag((string) $rowData['supplier_ref'], 1);
+				$normalizedRow['supplier_ref'] = trim(dol_string_nohtmltag((string) $rowData['supplier_ref'], 1));
 			}
 
 			if (!empty($normalizedRow)) {
@@ -1498,7 +1517,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$diff['vat'] = isset($rowData['vat']) ? price2num($rowData['vat'], 'MS') : $diff['vat'];
 		$diff['unitprice'] = isset($rowData['unitprice']) ? price2num($rowData['unitprice'], 'MS') : $diff['unitprice'];
 		$diff['discount'] = isset($rowData['discount']) ? price2num($rowData['discount'], 'MS') : $diff['discount'];
-		$diff['supplier_ref'] = isset($rowData['supplier_ref']) ? dol_string_nohtmltag((string) $rowData['supplier_ref'], 1) : $diff['supplier_ref'];
+		$diff['supplier_ref'] = isset($rowData['supplier_ref']) ? trim(dol_string_nohtmltag((string) $rowData['supplier_ref'], 1)) : $diff['supplier_ref'];
 		$diff['new_unitprice'] = $diff['unitprice'];
 
 		if (isset($diff['current_unitprice'])) {
@@ -1612,12 +1631,13 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	private function renderProductCostBlock($product, $record, $asTableRow = true)
 	{
-		global $langs, $user;
+		global $conf, $langs, $user;
 
 		$productId = $this->getProductIdFromObject($product);
 		$nativeCost = isset($product->cost_price) && $product->cost_price !== null ? price($product->cost_price) : $langs->trans('NotAvailable');
 		$pmp = isset($product->pmp) && $product->pmp !== null ? price($product->pmp) : $langs->trans('NotAvailable');
-		$dynamicCost = is_object($record) && $record->dynamic_cost_price !== null ? price($record->dynamic_cost_price) : $langs->trans('NotAvailable');
+		$recordHasValidCost = is_object($record) && $record->dynamic_cost_price !== null && (int) $record->calculation_status > 0 && (int) $record->status > 0;
+		$dynamicCost = $recordHasValidCost ? price($record->dynamic_cost_price) : $langs->trans('NotAvailable');
 		$sourceType = is_object($record) && !empty($record->source_type) ? $langs->trans('DynamicPricesCostSource_'.$record->source_type) : $langs->trans('NotAvailable');
 		$coefficient = is_object($record) && $record->coefficient !== null ? price($record->coefficient) : $langs->trans('NotAvailable');
 		$ruleCode = is_object($record) && !empty($record->rule_code) ? dol_escape_htmltag($record->rule_code) : $langs->trans('NotAvailable');
@@ -1661,6 +1681,11 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$html .= '<td>'.dol_escape_htmltag($message).'</td>';
 		$html .= '</tr>';
 		$html .= '</table>';
+		$service = new DynamicPricesCostService($this->db);
+		$invalidSupplierPriceCount = $service->getInvalidSupplierPriceCount($productId, (int) $conf->entity);
+		if ($invalidSupplierPriceCount > 0) {
+			$html .= '<div class="warning">'.dol_escape_htmltag($langs->trans('DynamicPricesInvalidSupplierPricesIgnored', $invalidSupplierPriceCount)).'</div>';
+		}
 		$html .= '<div class="tabsAction right">';
 		$html .= '<a class="button button-small" href="'.$historyUrl.'">'.$langs->trans('DynamicPricesCostHistory').'</a>';
 		$html .= ' <a class="button button-small" href="'.$previewUrl.'">'.$langs->trans('DynamicPricesCostPreview').'</a>';
