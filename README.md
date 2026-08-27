@@ -1,6 +1,6 @@
 # DynamicsPrices
 
-Version courante : 3.0.2.
+Version courante : 3.0.1.
 
 ## Présentation
 
@@ -99,7 +99,7 @@ Réglages principaux du prix de revient DynamicPrices :
 
 #### From a ZIP archive
 
-1. Download the `module_dynamicsprices-3.0.2.zip` archive.
+1. Download the `module_dynamicsprices-3.0.1.zip` archive.
 2. Deploy it via **Home > Setup > Modules > Deploy an external module**.
 3. Enable the **DynamicsPrices** module in **Setup > Modules/Applications**.
 
