@@ -76,9 +76,9 @@ class modDynamicsPrices extends DolibarrModules
 		$this->editor_squarred_logo = 'logo.png@dynamicsprices';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@dynamicsprices'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '3.0.2';
+		$this->version = '3.0.1';
 		// Url to the file with your last numberversion of this module
-		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
+		$this->url_last_version = 'https://moduleversion.lesmetiersdubatiment.fr/ver.php?m=dynamicprices';
 
 		// Key used in llx_const table to save module status enabled/disabled (where DYNAMICSPRICES is value of property name of module in uppercase)
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
