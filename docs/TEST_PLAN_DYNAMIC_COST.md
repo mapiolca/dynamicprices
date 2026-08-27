@@ -22,10 +22,16 @@
 - Produit physique sans source.
 - Service ignoré par défaut.
 - Service inclus si option active.
-- Kit avec composants.
+- Kit avec composants possédant tous un prix de revient DynamicPrices valide : somme des coûts multipliés par les quantités.
+- Kit avec un composant sans coût DynamicPrices ou portant un statut de calcul en erreur : calcul refusé et montant courant nul.
+- Kit imbriqué : propagation du recalcul du composant jusqu'à tous les kits parents sans boucle.
+- Kit avec `DYNAMICPRICES_COST_RECALC_KITS` désactivé : calcul marqué indisponible.
+- Ancien coût présent puis recalcul en erreur : l'ancien montant n'est ni affiché ni retourné comme coût effectif.
+- Prix fournisseur actif et complet inclus dans la moyenne.
+- Prix fournisseur inactif, sans référence, sans quantité valide ou sans prix unitaire exclu de la moyenne.
 - Composant sans coût.
 - Coût nul volontaire.
-- Coût `NULL` qui ne doit pas écraser un coût existant hors purge volontaire.
+- Coût `NULL` issu d'un recalcul en erreur qui doit invalider l'ancien coût courant sans toucher au prix de revient natif Dolibarr.
 - Recalcul identique avec mode log `changes_only`.
 - Recalcul identique avec mode log complet.
 
@@ -43,6 +49,8 @@
 - Recalculer depuis la fiche.
 - Prévisualiser sans écriture.
 - Consulter l'historique.
+- Afficher un avertissement lorsqu'au moins un prix fournisseur incomplet est ignoré.
+- Refuser côté navigateur et côté serveur une actualisation de prix fournisseur avec une référence vide.
 - Vérifier les boutons selon les permissions.
 - Vérifier qu'aucun recalcul lourd ne se lance au simple affichage.
 

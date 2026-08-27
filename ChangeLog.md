@@ -1,5 +1,25 @@
 # ChangeLog DynamicsPrices
 
+## 3.0.2
+
+### Prix de revient et kits
+- Calcul des kits à partir des prix de revient DynamicPrices valides de leurs composants et des quantités de composition, y compris lors des recalculs manuels et de la propagation aux kits parents imbriqués.
+- Suppression de la conservation trompeuse d'un ancien montant lorsqu'un nouveau calcul échoue ; un coût en erreur n'est plus exposé comme coût effectif.
+- Prise en compte effective du réglage d'activation du recalcul des kits.
+
+### Prix fournisseurs
+- Exclusion des prix fournisseur incomplets ou inactifs de la moyenne utilisée par DynamicPrices, notamment les lignes sans référence créées par le clonage natif Dolibarr.
+- Ajout d'un avertissement sur la fiche produit lorsque des lignes fournisseur incomplètes sont ignorées.
+- Contrôle HTML et serveur empêchant l'actualisation d'un prix fournisseur avec une référence vide.
+
+## 3.0.1
+
+### Prix fournisseurs
+- Correction de l'actualisation des prix d'achat depuis une commande fournisseur afin de conserver les quantités minimum et conditionnements édités dans la modale.
+- Création d'une nouvelle ligne de prix fournisseur lorsque la quantité minimum ou le conditionnement saisi impose une ligne distincte, avec refus contrôlé lorsque la clé unique native Dolibarr empêche un doublon.
+- Suppression du doublon de notification généré par la propagation automatique des erreurs de hook Dolibarr lors du refus contrôlé d'une ligne de prix fournisseur.
+- Encodage sécurisé du payload de la modale pour rester compatible avec la protection SQL/script injection de Dolibarr.
+
 ## 3.0
 
 ### Prix de revient DynamicPrices

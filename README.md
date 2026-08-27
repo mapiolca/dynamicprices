@@ -1,5 +1,7 @@
 # DynamicsPrices
 
+Version courante : 3.0.2.
+
 ## Présentation
 
 DynamicsPrices est un module externe Dolibarr qui calcule et exploite des prix dynamiques à partir des coûts, prix fournisseurs et coefficients métier.
@@ -10,7 +12,7 @@ Depuis la version 3.0, le module dispose d'un prix de revient propre par produit
 
 - Calcul des prix de revient DynamicPrices par couple `entity + product`.
 - Historique des recalculs et des valeurs appliquées.
-- Calcul métier basé sur la moyenne des prix d'achat unitaires fournisseurs multipliée par le coefficient de prix de revient de la catégorie commerciale.
+- Calcul métier basé sur la moyenne des prix d'achat unitaires fournisseurs valides multipliée par le coefficient de prix de revient de la catégorie commerciale.
 - Fallback configurable lorsque le coût DynamicPrices est absent.
 - Recalcul unitaire depuis l'onglet **Prix d'achat** du produit.
 - Prévisualisation sans écriture.
@@ -22,10 +24,12 @@ Depuis la version 3.0, le module dispose d'un prix de revient propre par produit
 - Export Dolibarr natif des coûts DynamicPrices.
 - Traductions `fr_FR`, `en_US`, `es_ES`, `de_DE` et `it_IT`.
 - Mise à jour automatique des prix de vente en fonction du prix d'achat moyen et d'un dictionnaire de coefficients dédié.
-- Recalcul des kits après leurs composants pour éviter les doublons de prix de vente et refléter le coût cumulé des sous-produits et services.
+- Recalcul des kits à partir de la somme des prix de revient DynamicPrices valides de leurs composants, multipliés par les quantités de composition.
 - Plus grand nombre de triggers pour couvrir les actions courantes (création, modification, réception d'achat, etc.).
 - Calcul automatique des prix de revient à partir des nouveaux dictionnaires et de la moyenne des prix d'achat.
-- Alerte sur les prix des kits : si aucune valeur n'est disponible (ni prix fournisseur, ni prix de revient, ni PMP), la procédure est interrompue avec message d'erreur.
+- Alerte sur les kits : si un composant ne possède pas de prix de revient DynamicPrices valide, le calcul du kit est interrompu sans conserver un ancien montant comme s'il était courant.
+- Actualisation contrôlée des prix d'achat fournisseur depuis les commandes fournisseurs, avec prise en compte des quantités minimum et conditionnements saisis dans la modale.
+- Exclusion des prix fournisseur incomplets du calcul DynamicPrices et refus serveur de toute actualisation vidant la référence fournisseur obligatoire.
 
 ## Compatibilité
 
@@ -69,7 +73,8 @@ Réglages principaux du prix de revient DynamicPrices :
 - `DYNAMICPRICES_COST_LINE_STRATEGY` : stratégie d'application aux lignes.
 - `DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY` : ordre automatique des sources à appliquer à la création des lignes commerciales (`dynamicprices`, valeur par défaut Dolibarr, PMP, coût Dolibarr).
 - `DYNAMICPRICES_COST_FALLBACK` : comportement si aucun coût DynamicPrices n'est disponible.
-- Formule de calcul : moyenne des prix d'achat unitaires fournisseurs x coefficient de prix de revient de la catégorie commerciale.
+- Formule produit/service : moyenne des prix d'achat unitaires fournisseurs actifs, complets et accessibles x coefficient de prix de revient de la catégorie commerciale.
+- Formule kit : somme de `prix de revient DynamicPrices du composant x quantité de composition`.
 - `DYNAMICPRICES_COST_INCLUDE_SERVICES` : inclut les services dans le calcul.
 - `DYNAMICPRICES_COST_LOG_MODE` : historisation des changements uniquement ou de tous les recalculs.
 - `DYNAMICPRICES_COST_ALLOW_MANUAL_OVERRIDE` : autorise l'override manuel via API.
@@ -80,21 +85,21 @@ Réglages principaux du prix de revient DynamicPrices :
 ### Key features
 
 - Automatic selling-price updates driven by average purchase price and a dedicated coefficient dictionary.
-- Kits recalculated after their components to avoid duplicate selling prices and to reflect cumulative component and service costs.
+- Kits recalculated from the sum of the valid DynamicPrices costs of their components multiplied by composition quantities.
 - Expanded trigger coverage for common actions (creation, modification, purchase receipt, etc.).
 - Automatic cost-price computation from dedicated dictionaries and purchase-price averages.
-- Alert on kit's prices : when no value is available (no supplier price, no cost price, no PMP), the process is aborted with an error message.
+- Kit calculation is aborted when a component has no valid DynamicPrices cost; incomplete supplier prices are ignored and supplier references cannot be cleared by the module.
 
 ### Compatibility
 
-- Dolibarr ≥ 19.0 (recommended minimum).
+- Dolibarr ≥ 20.0.
 - External module installable in `htdocs/custom/dynamicsprices`.
 
 ### Installation
 
 #### From a ZIP archive
 
-1. Download the `module_dynamicsprices-x.y.z.zip` archive.
+1. Download the `module_dynamicsprices-3.0.2.zip` archive.
 2. Deploy it via **Home > Setup > Modules > Deploy an external module**.
 3. Enable the **DynamicsPrices** module in **Setup > Modules/Applications**.
 

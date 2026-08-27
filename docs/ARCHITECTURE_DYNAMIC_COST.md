@@ -72,14 +72,15 @@ Implémentation initiale : `class/dynamicpricescostservice.class.php`.
 
 1. Le service charge le produit.
 2. Il vérifie l'entité cible.
-3. Il calcule la moyenne des prix d'achat unitaires fournisseurs accessibles dans l'entité courante.
-4. Il applique le coefficient de prix de revient de la catégorie commerciale du produit.
-5. Il normalise le montant avec les helpers Dolibarr.
-6. Il sauvegarde dans `llx_dynamicprices_product_cost`.
-7. Il écrit un log selon `DYNAMICPRICES_COST_LOG_MODE`.
-8. Il laisse `llx_product.cost_price` inchangé sauf option legacy.
+3. Pour un produit ou service simple, il calcule la moyenne des prix d'achat unitaires fournisseurs actifs et complets accessibles dans l'entité courante. Une ligne sans référence fournisseur, sans quantité valide ou sans prix unitaire est exclue.
+4. Il applique le coefficient de prix de revient de la catégorie commerciale du produit ou service simple.
+5. Pour un kit, il additionne le prix de revient DynamicPrices valide de chaque composant multiplié par sa quantité de composition. Aucun fallback vers le coût natif, le PMP ou un prix fournisseur du composant n'est appliqué au niveau du kit.
+6. Il normalise le montant avec les helpers Dolibarr.
+7. Il sauvegarde dans `llx_dynamicprices_product_cost`. Un calcul en échec enregistre un montant nul et ne conserve pas silencieusement l'ancienne valeur.
+8. Il écrit un log selon `DYNAMICPRICES_COST_LOG_MODE`.
+9. Il laisse `llx_product.cost_price` inchangé sauf option legacy.
 
-La source du calcul est donc toujours `supplier_average`. Les fallbacks configurables ne servent qu'à l'exploitation d'un coût absent, pas au recalcul du prix de revient DynamicPrices.
+La source est `supplier_average` pour un produit ou service simple et `kit_components` pour un kit. Les fallbacks configurables ne servent qu'à l'exploitation d'un coût absent sur une ligne commerciale, pas au recalcul du prix de revient DynamicPrices.
 
 ## Flux d'application aux lignes commerciales
 

@@ -105,8 +105,13 @@ class ActionsDynamicsPrices extends CommonHookActions
 		if (!is_array($postedRowsData)) {
 			$postedRowsData = array();
 		}
+		$payloadRowsData = $this->getPostedRowsDataFromPayload();
+		if (!empty($payloadRowsData)) {
+			$postedRowsData = $payloadRowsData;
+			$selectedRows = $this->getSelectedRowsFromPostedData($payloadRowsData);
+		}
 		$selectedLinesCsv = GETPOST('dynamicsprices_selected_lines', 'alphanohtml');
-		if (empty($selectedRows) && !empty($selectedLinesCsv)) {
+		if (empty($selectedRows) && empty($payloadRowsData) && !empty($selectedLinesCsv)) {
 			$selectedLineIds = explode(',', $selectedLinesCsv);
 			foreach ($selectedLineIds as $selectedLineId) {
 				$selectedLineId = (int) trim($selectedLineId);
@@ -130,26 +135,27 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$updatedDown = 0;
 		$updatedSame = 0;
 		foreach ($differences as $lineId => $diff) {
-			if (!array_key_exists((int) $lineId, $selectedRows) && !array_key_exists((string) $lineId, $selectedRows)) {
-				continue;
-			}
-			if (!array_key_exists((int) $lineId, $priceDifferences) && !array_key_exists((string) $lineId, $priceDifferences)) {
-				$updatedSame++;
-			}
-		}
-		foreach ($priceDifferences as $lineId => $diff) {
-			if (!array_key_exists((int) $lineId, $selectedRows) && !array_key_exists((string) $lineId, $selectedRows)) {
-				$updatedSame++;
+			$lineIdInt = (int) $lineId;
+			if (!array_key_exists($lineIdInt, $selectedRows) && !array_key_exists((string) $lineId, $selectedRows)) {
+				if (array_key_exists($lineIdInt, $priceDifferences) || array_key_exists((string) $lineId, $priceDifferences)) {
+					$updatedSame++;
+				}
 				dol_syslog(__METHOD__.' - Skip line '.$lineId.' (unchecked)', LOG_DEBUG);
 				continue;
 			}
 
-			$preparedDiff = $this->applyPostedValuesToDiff($lineId, $diff, $postedRowsData);
+			$preparedDiff = $this->applyPostedValuesToDiff($lineIdInt, $diff, $postedRowsData);
+			if (!$this->hasSupplierPricePersistChange($preparedDiff)) {
+				$updatedSame++;
+				dol_syslog(__METHOD__.' - Skip line '.$lineId.' (no supplier price change to persist)', LOG_DEBUG);
+				continue;
+			}
+
 			dol_syslog(__METHOD__.' - Upsert supplier price for line '.$lineId.' (product '.$preparedDiff['fk_product'].')', LOG_DEBUG);
 			$res = $this->upsertSupplierPriceFromDiff($preparedDiff);
 			if ($res < 0) {
+				$this->normalizeSupplierPriceHookErrors();
 				dol_syslog(__METHOD__.' - Error while upserting supplier price for line '.$lineId.': '.$this->error, LOG_ERR);
-				setEventMessages($this->error, $this->errors, 'errors');
 				return -1;
 			}
 
@@ -302,6 +308,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 			setEventMessages($service->error, $service->errors, 'errors');
 			return -1;
 		}
+		if ($result === 0) {
+			$record = $service->getDynamicCostRecord($productId, $entity);
+			$message = is_object($record) && !empty($record->calculation_message) ? $langs->trans($record->calculation_message) : $langs->trans('DynamicPricesCostNoSource');
+			setEventMessages($message, null, 'warnings');
+			$url = $_SERVER['PHP_SELF'].'?id='.$productId;
+			header('Location: '.$url);
+			exit;
+		}
 		$priceUpdateResult = dynamicsprices_update_sales_prices_from_dynamic_cost($this->db, $user, $productId, $entity);
 		if ($priceUpdateResult < 0) {
 			setEventMessages($langs->trans('Error'), null, 'errors');
@@ -390,7 +404,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<tr class="oddeven">';
 			$html .= '<td><input type="checkbox" name="dynamicsprices_apply_line['.$lineId.']" value="1" checked></td>';
 			$html .= '<td>'.$this->getProductNomUrl((int) $diff['fk_product'], $diff['ref']).'</td>';
-			$html .= '<td><input class="width100 maxwidth100" type="text" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'"></td>';
+			$html .= '<td><input class="width100 maxwidth100" type="text" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'" required="required"></td>';
 			$html .= '<td class="right"><input class="center width50" type="text" name="dynamicsprices_data['.$lineId.'][qty]" value="'.dol_escape_htmltag((string) $diff['qty']).'"></td>';
 			$html .= '<td class="right"><input class="center width100" type="text" name="dynamicsprices_data['.$lineId.'][unitquantity]" value="'.dol_escape_htmltag((string) $diff['unitquantity']).'"></td>';
 			$html .= '<td class="right"><input class="center width50" type="text" name="dynamicsprices_data['.$lineId.'][vat]" value="'.dol_escape_htmltag((string) $diff['vat']).'"></td>';
@@ -405,7 +419,6 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_availability]" value="'.((int) $diff['fk_availability']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][delivery_time_days]" value="'.dol_escape_htmltag($diff['delivery_time_days'] === null ? '' : (string) $diff['delivery_time_days']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][supplier_reputation]" value="'.dol_escape_htmltag((string) $diff['supplier_reputation']).'">';
-			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][supplier_ref]" value="'.dol_escape_htmltag($diff['supplier_ref']).'">';
 			$html .= '</tr>';
 		}
 
@@ -418,6 +431,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_modal', 'value' => '1'),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_selected_lines', 'value' => $initialSelectedLines),
+			array('type' => 'hidden', 'name' => 'dynamicsprices_payload', 'value' => ''),
 			array('type' => 'hidden', 'name' => 'datecommande', 'value' => $datecommande),
 			array('type' => 'hidden', 'name' => 'methodecommande', 'value' => $methodecommande),
 			array('type' => 'hidden', 'name' => 'methode', 'value' => $methodecommande),
@@ -488,21 +502,47 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints .= '});';
 		$this->resprints .= '$("input[name=\'dynamicsprices_selected_lines\']").val(selected.join(","));';
 		$this->resprints .= '};';
+		$this->resprints .= 'var updateSupplierPricePayload=function(){';
+		$this->resprints .= 'var rows={};';
+		$this->resprints .= '$("#dynamicsprices_diff_wrapper").find("input").each(function(){';
+		$this->resprints .= 'var name=$(this).attr("name")||"";';
+		$this->resprints .= 'var match=name.match(/^dynamicsprices_data\\[(\\d+)\\]\\[([^\\]]+)\\]$/);';
+		$this->resprints .= 'if(match&&match[1]&&match[2]){';
+		$this->resprints .= 'if(!rows[match[1]]) rows[match[1]]={};';
+		$this->resprints .= 'rows[match[1]][match[2]]=$(this).val();';
+		$this->resprints .= '}';
+		$this->resprints .= 'match=name.match(/^dynamicsprices_apply_line\\[(\\d+)\\]$/);';
+		$this->resprints .= 'if(match&&match[1]){';
+		$this->resprints .= 'if(!rows[match[1]]) rows[match[1]]={};';
+		$this->resprints .= 'rows[match[1]].selected=$(this).is(":checked")?"1":"0";';
+		$this->resprints .= '}';
+		$this->resprints .= '});';
+		$this->resprints .= 'var json=JSON.stringify(rows);';
+		$this->resprints .= 'var utf8=unescape(encodeURIComponent(json));';
+		$this->resprints .= 'var encoded="";';
+		$this->resprints .= 'for(var i=0;i<utf8.length;i++){';
+		$this->resprints .= 'var h=utf8.charCodeAt(i).toString(16);';
+		$this->resprints .= 'encoded+=(h.length<2?"0":"")+h;';
+		$this->resprints .= '}';
+		$this->resprints .= '$("input[name=\'dynamicsprices_payload\']").val(encoded);';
+		$this->resprints .= '};';
+		$this->resprints .= 'var updateModalState=function(){updateSelectedLines();updateSupplierPricePayload();};';
 
-		$this->resprints .= '$(document).on("change", "input[name^=\'dynamicsprices_apply_line\']", updateSelectedLines);';
-		$this->resprints .= '$(document).on("submit", "form", updateSelectedLines);';
+		$this->resprints .= '$(document).on("input change", "#dynamicsprices_diff_wrapper input", updateModalState);';
+		$this->resprints .= '$(document).on("submit", "form", updateModalState);';
 
 		$this->resprints .= '$(document).on("click", ".ui-dialog[aria-describedby=\'dialog-confirm\'] .ui-dialog-buttonset .ui-button", function(){';
 		$this->resprints .= 'if($.trim($(this).text())==="'.$langs->transnoentitiesnoconv('LMDB_Ignore').'"){';
 		$this->resprints .= 'window.location.href="'.$ignoreUrl.'";';
 		$this->resprints .= 'return false;';
 		$this->resprints .= '}';
-		$this->resprints .= 'updateSelectedLines();';
+		$this->resprints .= 'updateModalState();';
 		$this->resprints .= '});';
 
 		$this->resprints .= '$(document).on("click", ".ui-dialog[aria-describedby=\'dialog-confirm\'] .ui-dialog-titlebar-close", function(){';
 		$this->resprints .= 'window.location.href="'.$ignoreUrl.'";';
 		$this->resprints .= '});';
+		$this->resprints .= 'updateModalState();';
 		$this->resprints .= '});';
 		$this->resprints .= '</script>';
 
@@ -535,8 +575,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 				continue;
 			}
 
-			$qty = price2num((float) $line->qty, 'MS');
-			$unitquantity = price2num((float) (empty($line->unitquantity) ? $line->qty : $line->unitquantity), 'MS');
+			$orderQty = price2num((float) $line->qty, 'MS');
+			$orderPackaging = $this->getSupplierPackagingFromOrderLine($line);
 			$vat = price2num((float) $line->tva_tx, 'MS');
 			$discount = price2num((float) $line->remise_percent, 'MS');
 			$unitprice = $this->getLineUnitPrice($line);
@@ -548,7 +588,11 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$reputation = isset($line->supplier_reputation) ? price2num((float) $line->supplier_reputation, 'MS') : 0;
 
 			$linkedSupplierPriceId = $this->getSupplierPriceIdFromOrderLine($line, (int) $object->id);
-			$current = $this->getCurrentSupplierPrice((int) $line->fk_product, (int) $object->socid, $qty, $linkedSupplierPriceId);
+			$current = $this->getCurrentSupplierPrice((int) $line->fk_product, (int) $object->socid, $orderQty, $linkedSupplierPriceId);
+			$supplierReference = $this->getSupplierReferenceFromLine($line, (int) $object->socid);
+			$qty = !empty($current['quantity']) ? price2num((float) $current['quantity'], 'MS') : $orderQty;
+			$unitquantity = (isset($current['packaging']) && (float) $current['packaging'] > 0) ? price2num((float) $current['packaging'], 'MS') : $orderPackaging;
+			$referenceSupplierRef = (isset($current['ref_fourn']) && (string) $current['ref_fourn'] !== '') ? (string) $current['ref_fourn'] : $supplierReference;
 			$currentUnitprice = !empty($current) ? price2num((float) $current['unitprice'], 'MS') : 0;
 			$newUnitprice = price2num((float) $unitprice, 'MS');
 			$priceDelta = price2num($newUnitprice - $currentUnitprice, 'MS');
@@ -591,8 +635,11 @@ class ActionsDynamicsPrices extends CommonHookActions
 				'delivery_time_days' => $deliveryTimeDays,
 				'supplier_reputation' => $reputation,
 				'current_rowid' => !empty($current['rowid']) ? (int) $current['rowid'] : 0,
+				'reference_qty' => $qty,
+				'reference_unitquantity' => $unitquantity,
+				'reference_supplier_ref' => $referenceSupplierRef,
 				'ref' => isset($line->ref) ? $line->ref : '',
-				'supplier_ref' => $this->getSupplierReferenceFromLine($line, (int) $object->socid),
+				'supplier_ref' => $supplierReference,
 				'label' => isset($line->product_label) ? $line->product_label : (isset($line->desc) ? $line->desc : ''),
 			);
 			dol_syslog(__METHOD__.' - Supplier price diff detected order='.(int) $object->id.' line='.(int) $line->id.' product='.(int) $line->fk_product.' supplier='.(int) $object->socid.' current='.$currentUnitprice.' proposed='.$newUnitprice.' delta='.$priceDelta.' direction='.$priceDirection.' fk_availability='.$fkAvailability.' delivery_time_days='.($deliveryTimeDays === null ? 'null' : $deliveryTimeDays), LOG_DEBUG);
@@ -632,8 +679,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 	private function getCurrentSupplierPrice($fkProduct, $fkSoc, $qty, $preferredRowid = 0)
 	{
 		global $conf;
+		$hasPackagingField = $this->hasSupplierPricePackagingField();
+		$packagingSelect = $hasPackagingField ? ', packaging' : '';
 		if (!empty($preferredRowid)) {
-			$sql = 'SELECT rowid, unitprice, tva_tx, remise_percent, fk_availability, delivery_time_days, supplier_reputation';
+			$sql = 'SELECT rowid, ref_fourn, quantity, unitprice, tva_tx, remise_percent, fk_availability, delivery_time_days, supplier_reputation'.$packagingSelect;
 			$sql .= ' FROM '.MAIN_DB_PREFIX.'product_fournisseur_price';
 			$sql .= ' WHERE rowid = '.((int) $preferredRowid);
 			$sql .= ' AND fk_product = '.((int) $fkProduct);
@@ -647,18 +696,21 @@ class ActionsDynamicsPrices extends CommonHookActions
 				if ($obj) {
 					return array(
 						'rowid' => (int) $obj->rowid,
+						'ref_fourn' => (string) $obj->ref_fourn,
+						'quantity' => (float) $obj->quantity,
 						'unitprice' => (float) $obj->unitprice,
 						'tva_tx' => (float) $obj->tva_tx,
 						'remise_percent' => (float) $obj->remise_percent,
 						'fk_availability' => (int) $obj->fk_availability,
 						'delivery_time_days' => ($obj->delivery_time_days !== null ? (int) $obj->delivery_time_days : null),
 						'supplier_reputation' => (float) $obj->supplier_reputation,
+						'packaging' => ($hasPackagingField && isset($obj->packaging) ? (float) $obj->packaging : null),
 					);
 				}
 			}
 		}
 
-		$sql = 'SELECT rowid, unitprice, tva_tx, remise_percent, fk_availability, delivery_time_days, supplier_reputation';
+		$sql = 'SELECT rowid, ref_fourn, quantity, unitprice, tva_tx, remise_percent, fk_availability, delivery_time_days, supplier_reputation'.$packagingSelect;
 		$sql .= ' FROM '.MAIN_DB_PREFIX.'product_fournisseur_price';
 		$sql .= ' WHERE fk_product = '.((int) $fkProduct);
 		$sql .= ' AND fk_soc = '.((int) $fkSoc);
@@ -678,13 +730,35 @@ class ActionsDynamicsPrices extends CommonHookActions
 
 		return array(
 			'rowid' => (int) $obj->rowid,
+			'ref_fourn' => (string) $obj->ref_fourn,
+			'quantity' => (float) $obj->quantity,
 			'unitprice' => (float) $obj->unitprice,
 			'tva_tx' => (float) $obj->tva_tx,
 			'remise_percent' => (float) $obj->remise_percent,
 			'fk_availability' => (int) $obj->fk_availability,
 			'delivery_time_days' => ($obj->delivery_time_days !== null ? (int) $obj->delivery_time_days : null),
 			'supplier_reputation' => (float) $obj->supplier_reputation,
+			'packaging' => ($hasPackagingField && isset($obj->packaging) ? (float) $obj->packaging : null),
 		);
+	}
+
+	/**
+	 * Check whether supplier price packaging column is available.
+	 *
+	 * @return bool
+	 */
+	private function hasSupplierPricePackagingField()
+	{
+		static $hasPackagingField = null;
+		if ($hasPackagingField !== null) {
+			return $hasPackagingField;
+		}
+
+		$sql = "SHOW COLUMNS FROM ".MAIN_DB_PREFIX."product_fournisseur_price LIKE 'packaging'";
+		$resql = $this->db->query($sql);
+		$hasPackagingField = ($resql && $this->db->num_rows($resql) > 0);
+
+		return $hasPackagingField;
 	}
 
 	/**
@@ -776,6 +850,27 @@ class ActionsDynamicsPrices extends CommonHookActions
 	}
 
 	/**
+	 * Get supplier packaging from an order line.
+	 *
+	 * @param CommonObjectLine $line Supplier order line
+	 * @return float
+	 */
+	private function getSupplierPackagingFromOrderLine($line)
+	{
+		$propertyCandidates = array('packaging', 'unitquantity', 'qty');
+		foreach ($propertyCandidates as $propertyName) {
+			if (isset($line->{$propertyName}) && $line->{$propertyName} !== '') {
+				$value = price2num((float) $line->{$propertyName}, 'MS');
+				if ($value > 0) {
+					return $value;
+				}
+			}
+		}
+
+		return 1.0;
+	}
+
+	/**
 	 * Get price direction between current supplier price and order line price.
 	 *
 	 * @param float $currentUnitprice Current supplier unit price
@@ -846,14 +941,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	private function upsertSupplierPriceFromDiff(array $diff)
 	{
-		global $user;
-		$targetSupplierPriceRowId = !empty($diff['current_rowid']) ? (int) $diff['current_rowid'] : 0;
-		if (!empty($targetSupplierPriceRowId)) {
-			$targetSupplierPrice = $this->getCurrentSupplierPrice((int) $diff['fk_product'], (int) $diff['fk_soc'], (float) $diff['qty'], $targetSupplierPriceRowId);
-			if (empty($targetSupplierPrice)) {
-				$targetSupplierPriceRowId = 0;
-			}
-		}
+		global $langs, $user;
 
 		$productFournisseur = new ProductFournisseur($this->db);
 		$resultFetchProduct = $productFournisseur->fetch((int) $diff['fk_product']);
@@ -873,12 +961,110 @@ class ActionsDynamicsPrices extends CommonHookActions
 			return -1;
 		}
 
-		$productFournisseur->product_fourn_price_id = $targetSupplierPriceRowId;
-		dol_syslog(__METHOD__.' - Upsert supplier price through ProductFournisseur::update_buyprice product='.(int) $diff['fk_product'].' supplier='.(int) $diff['fk_soc'].' target_rowid='.$targetSupplierPriceRowId, LOG_DEBUG);
 		$qtyForApi = price2num((float) $diff['qty'], 'MS');
 		$unitpriceForApi = price2num((float) $diff['unitprice'], 'MS');
+		if ($qtyForApi <= 0) {
+			if (is_object($langs)) {
+				$langs->load('errors');
+				$this->error = $langs->trans('ErrorFieldRequired', $langs->transnoentities('QtyMin'));
+			} else {
+				$this->error = 'ErrorFieldRequired';
+			}
+			$this->errors[] = $this->error;
+			dol_syslog(__METHOD__.' - Invalid supplier price quantity for product='.(int) $diff['fk_product'].' supplier='.(int) $diff['fk_soc'], LOG_ERR);
+			return -1;
+		}
+
+		$supplierRef = isset($diff['supplier_ref']) ? trim(dol_string_nohtmltag((string) $diff['supplier_ref'], 1)) : '';
+		if ($supplierRef === '') {
+			if (is_object($langs)) {
+				$langs->loadLangs(array('errors', 'dynamicsprices@dynamicsprices'));
+				$this->error = $langs->trans('ErrorFieldRequired', $langs->transnoentities('LMDB_SupplierRef'));
+			} else {
+				$this->error = 'ErrorFieldRequired';
+			}
+			$this->errors[] = $this->error;
+			dol_syslog(__METHOD__.' - Refuse empty supplier reference for product='.(int) $diff['fk_product'].' supplier='.(int) $diff['fk_soc'], LOG_ERR);
+			return -1;
+		}
+		$packagingForApi = isset($diff['unitquantity']) ? price2num((float) $diff['unitquantity'], 'MS') : 0;
+		if ($packagingForApi <= 0) {
+			$packagingForApi = 1;
+		}
 		$buypriceForApi = price2num($unitpriceForApi * $qtyForApi, 'MS');
-		dol_syslog(__METHOD__.' - update_buyprice payload qty='.$qtyForApi.' unitprice='.$unitpriceForApi.' buyprice_for_api='.$buypriceForApi.' current_rowid='.$targetSupplierPriceRowId, LOG_DEBUG);
+
+		$referenceRowId = !empty($diff['current_rowid']) ? (int) $diff['current_rowid'] : 0;
+		$referenceQty = isset($diff['reference_qty']) ? price2num((float) $diff['reference_qty'], 'MS') : $qtyForApi;
+		$referencePackaging = isset($diff['reference_unitquantity']) ? price2num((float) $diff['reference_unitquantity'], 'MS') : $packagingForApi;
+		$referenceSupplierRef = isset($diff['reference_supplier_ref']) ? dol_string_nohtmltag((string) $diff['reference_supplier_ref'], 1) : $supplierRef;
+		$packagingIsPersistent = $this->shouldPersistSupplierPackaging();
+		$isQuantityChangedFromReference = !$this->areDecimalValuesEqual($qtyForApi, $referenceQty);
+		$isPackagingChangedFromReference = $packagingIsPersistent && !$this->areDecimalValuesEqual($packagingForApi, $referencePackaging);
+		$isSupplierRefChangedFromReference = ((string) $supplierRef !== (string) $referenceSupplierRef);
+		$mustUseDistinctSupplierPrice = ($referenceRowId <= 0 || $isQuantityChangedFromReference || $isPackagingChangedFromReference);
+
+		$targetSupplierPriceRowId = $referenceRowId;
+		if ($mustUseDistinctSupplierPrice) {
+			$targetSupplierPrice = $this->getSupplierPriceByUniqueKey((int) $diff['fk_soc'], $supplierRef, $qtyForApi);
+			if (!empty($targetSupplierPrice)) {
+				if ((int) $targetSupplierPrice['fk_product'] !== (int) $diff['fk_product']) {
+					$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceUniqueKeyProductConflict');
+					dol_syslog(__METHOD__.' - Refuse supplier price write: native unique key already belongs to another product', LOG_ERR);
+					return -1;
+				}
+				if ($referenceRowId > 0 && (int) $targetSupplierPrice['rowid'] === $referenceRowId && $isPackagingChangedFromReference && !$isQuantityChangedFromReference && !$isSupplierRefChangedFromReference) {
+					$this->setSupplierPriceTranslatedError('LMDB_SupplierPricePackagingOnlyConflict');
+					dol_syslog(__METHOD__.' - Refuse supplier price write: packaging-only change conflicts with native supplier price unique key', LOG_ERR);
+					return -1;
+				}
+				$targetSupplierPriceRowId = (int) $targetSupplierPrice['rowid'];
+			} else {
+				if ($referenceRowId > 0 && $isPackagingChangedFromReference && !$isQuantityChangedFromReference && !$isSupplierRefChangedFromReference) {
+					$this->setSupplierPriceTranslatedError('LMDB_SupplierPricePackagingOnlyConflict');
+					dol_syslog(__METHOD__.' - Refuse supplier price create: packaging-only change cannot create a native distinct supplier price', LOG_ERR);
+					return -1;
+				}
+
+				return $this->createSupplierPriceFromDiff($productFournisseur, $diff, $qtyForApi, $unitpriceForApi, $buypriceForApi, $packagingForApi, $supplierRef);
+			}
+		} elseif ($targetSupplierPriceRowId > 0) {
+			$targetSupplierPrice = $this->getCurrentSupplierPrice((int) $diff['fk_product'], (int) $diff['fk_soc'], $referenceQty, $targetSupplierPriceRowId);
+			if (empty($targetSupplierPrice)) {
+				return $this->createSupplierPriceFromDiff($productFournisseur, $diff, $qtyForApi, $unitpriceForApi, $buypriceForApi, $packagingForApi, $supplierRef);
+			}
+		}
+
+		$resultUpdate = $this->updateSupplierPriceWithNativeApi($productFournisseur, $supplier, $diff, $targetSupplierPriceRowId, $qtyForApi, $unitpriceForApi, $buypriceForApi, $packagingForApi, $supplierRef);
+		if ($resultUpdate < 0) {
+			return -1;
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Update an existing supplier price with the Dolibarr native business API.
+	 *
+	 * @param ProductFournisseur $productFournisseur Supplier product object
+	 * @param Societe $supplier Supplier thirdparty
+	 * @param array<string,mixed> $diff Difference payload
+	 * @param int $targetSupplierPriceRowId Native supplier price rowid to update
+	 * @param float $qtyForApi Minimum quantity
+	 * @param float $unitpriceForApi Unit price
+	 * @param float $buypriceForApi Price for minimum quantity
+	 * @param float $packagingForApi Supplier packaging
+	 * @param string $supplierRef Supplier reference
+	 * @return int
+	 */
+	private function updateSupplierPriceWithNativeApi($productFournisseur, $supplier, array $diff, $targetSupplierPriceRowId, $qtyForApi, $unitpriceForApi, $buypriceForApi, $packagingForApi, $supplierRef)
+	{
+		global $user;
+
+		$productFournisseur->product_fourn_price_id = (int) $targetSupplierPriceRowId;
+		$productFournisseur->product_fourn_packaging = $packagingForApi;
+		$productFournisseur->packaging = $packagingForApi;
+
+		dol_syslog(__METHOD__.' - Update supplier price through ProductFournisseur::update_buyprice product='.(int) $diff['fk_product'].' supplier='.(int) $diff['fk_soc'].' target_rowid='.(int) $targetSupplierPriceRowId.' qty='.$qtyForApi.' packaging='.$packagingForApi.' unitprice='.$unitpriceForApi.' buyprice_for_api='.$buypriceForApi, LOG_DEBUG);
 
 		$resultUpdate = $productFournisseur->update_buyprice(
 			$qtyForApi,
@@ -887,7 +1073,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			'HT',
 			$supplier,
 			((int) $diff['fk_availability']),
-			(isset($diff['supplier_ref']) ? (string) $diff['supplier_ref'] : ''),
+			$supplierRef,
 			price2num((float) $diff['vat'], 'MS'),
 			0,
 			price2num((float) $diff['discount'], 'MS'),
@@ -904,9 +1090,410 @@ class ActionsDynamicsPrices extends CommonHookActions
 			return -1;
 		}
 
-		dol_syslog(__METHOD__.' - Business API supplier price upsert successful with rowid='.$resultUpdate, LOG_DEBUG);
+		dol_syslog(__METHOD__.' - Business API supplier price update successful with rowid='.$resultUpdate, LOG_DEBUG);
 
 		return 1;
+	}
+
+	/**
+	 * Create a supplier price without using ProductFournisseur::update_buyprice insert branch.
+	 *
+	 * The native insert branch deletes rows sharing supplier, reference, quantity and entity before inserting.
+	 * This targeted create path preserves the reference row when a distinct supplier price must be created.
+	 *
+	 * @param ProductFournisseur $productFournisseur Supplier product object
+	 * @param array<string,mixed> $diff Difference payload
+	 * @param float $qtyForApi Minimum quantity
+	 * @param float $unitpriceForApi Unit price
+	 * @param float $buypriceForApi Price for minimum quantity
+	 * @param float $packagingForApi Supplier packaging
+	 * @param string $supplierRef Supplier reference
+	 * @return int
+	 */
+	private function createSupplierPriceFromDiff($productFournisseur, array $diff, $qtyForApi, $unitpriceForApi, $buypriceForApi, $packagingForApi, $supplierRef)
+	{
+		global $conf, $user;
+
+		$deliveryTimeDays = (isset($diff['delivery_time_days']) && $diff['delivery_time_days'] !== null ? (int) $diff['delivery_time_days'] : null);
+		$supplierReputation = isset($diff['supplier_reputation']) ? (string) $diff['supplier_reputation'] : '';
+		$supplierReputationSql = (!empty($supplierReputation) && $supplierReputation !== '-1') ? "'".$this->db->escape($supplierReputation)."'" : 'NULL';
+		$now = dol_now();
+
+		$columns = array(
+			'multicurrency_price',
+			'multicurrency_unitprice',
+			'multicurrency_tx',
+			'fk_multicurrency',
+			'multicurrency_code',
+			'datec',
+			'fk_product',
+			'fk_soc',
+			'ref_fourn',
+			'desc_fourn',
+			'fk_user',
+			'price',
+			'quantity',
+			'remise_percent',
+			'remise',
+			'unitprice',
+			'tva_tx',
+			'charges',
+			'fk_availability',
+			'default_vat_code',
+			'info_bits',
+			'entity',
+			'delivery_time_days',
+			'supplier_reputation',
+			'barcode',
+			'fk_barcode_type',
+		);
+		$values = array(
+			'NULL',
+			'NULL',
+			'1',
+			'NULL',
+			'NULL',
+			"'".$this->db->idate($now)."'",
+			((string) ((int) $diff['fk_product'])),
+			((string) ((int) $diff['fk_soc'])),
+			"'".$this->db->escape($supplierRef)."'",
+			"''",
+			((string) ((int) $user->id)),
+			((string) price2num($buypriceForApi, 'MS')),
+			((string) price2num($qtyForApi, 'MS')),
+			((string) price2num((float) $diff['discount'], 'MS')),
+			'0',
+			((string) price2num($unitpriceForApi, 'MS')),
+			((string) price2num((float) $diff['vat'], 'MS')),
+			'0',
+			((string) ((int) $diff['fk_availability'])),
+			'NULL',
+			'0',
+			((string) ((int) $conf->entity)),
+			($deliveryTimeDays !== null ? (string) $deliveryTimeDays : 'NULL'),
+			$supplierReputationSql,
+			'NULL',
+			'NULL',
+		);
+
+		if ($this->shouldPersistSupplierPackaging()) {
+			$columns[] = 'packaging';
+			$values[] = ((string) price2num($packagingForApi, 'MS'));
+		}
+
+		$this->db->begin();
+		$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'product_fournisseur_price ('.implode(', ', $columns).') VALUES ('.implode(', ', $values).')';
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			$this->errors[] = $this->error;
+			$this->db->rollback();
+			dol_syslog(__METHOD__.' - SQL error while creating supplier price: '.$this->error, LOG_ERR);
+			return -1;
+		}
+
+		$newSupplierPriceRowId = (int) $this->db->last_insert_id(MAIN_DB_PREFIX.'product_fournisseur_price');
+		$productFournisseur->product_fourn_price_id = $newSupplierPriceRowId;
+		if (!getDolGlobalString('PRODUCT_PRICE_SUPPLIER_NO_LOG') && $this->insertSupplierPriceLog($newSupplierPriceRowId, $now, $buypriceForApi, $qtyForApi) < 0) {
+			$this->db->rollback();
+			return -1;
+		}
+
+		$resultFetchPrice = $productFournisseur->fetch_product_fournisseur_price($newSupplierPriceRowId);
+		if ($resultFetchPrice <= 0) {
+			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceCreatedReloadError');
+			$this->db->rollback();
+			dol_syslog(__METHOD__.' - '.$this->error, LOG_ERR);
+			return -1;
+		}
+
+		$resultTrigger = $productFournisseur->call_trigger('PRODUCT_BUYPRICE_CREATE', $user);
+		if ($resultTrigger < 0) {
+			if (!empty($productFournisseur->error)) {
+				$this->error = $productFournisseur->error;
+				$this->errors = !empty($productFournisseur->errors) ? $productFournisseur->errors : $this->errors;
+				$this->errors[] = $this->error;
+			} else {
+				$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceCreateTriggerError');
+			}
+			$this->db->rollback();
+			dol_syslog(__METHOD__.' - Trigger error while creating supplier price: '.$this->error, LOG_ERR);
+			return -1;
+		}
+
+		$this->db->commit();
+		dol_syslog(__METHOD__.' - Supplier price created with rowid='.$newSupplierPriceRowId.' product='.(int) $diff['fk_product'].' supplier='.(int) $diff['fk_soc'].' qty='.$qtyForApi.' packaging='.$packagingForApi, LOG_DEBUG);
+
+		return 1;
+	}
+
+	/**
+	 * Insert supplier price history in the native log table.
+	 *
+	 * @param int $supplierPriceRowId Supplier price rowid
+	 * @param int $dateCreation Creation timestamp
+	 * @param float $buyprice Price for minimum quantity
+	 * @param float $qty Minimum quantity
+	 * @return int
+	 */
+	private function insertSupplierPriceLog($supplierPriceRowId, $dateCreation, $buyprice, $qty)
+	{
+		global $user;
+
+		$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'product_fournisseur_price_log (datec, fk_product_fournisseur, fk_user, price, quantity)';
+		$sql .= " VALUES ('".$this->db->idate($dateCreation)."', ".((int) $supplierPriceRowId).', '.((int) $user->id).', '.price2num($buyprice, 'MS').', '.price2num($qty, 'MS').')';
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			$this->errors[] = $this->error;
+			dol_syslog(__METHOD__.' - SQL error while logging supplier price: '.$this->error, LOG_ERR);
+			return -1;
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Find a supplier price by the native unique key.
+	 *
+	 * @param int $fkSoc Supplier thirdparty id
+	 * @param string $supplierRef Supplier reference
+	 * @param float $qty Minimum quantity
+	 * @return array<string,mixed>
+	 */
+	private function getSupplierPriceByUniqueKey($fkSoc, $supplierRef, $qty)
+	{
+		global $conf;
+
+		$hasPackagingField = $this->hasSupplierPricePackagingField();
+		$packagingSelect = $hasPackagingField ? ', packaging' : '';
+		$sql = 'SELECT rowid, fk_product, ref_fourn, quantity'.$packagingSelect;
+		$sql .= ' FROM '.MAIN_DB_PREFIX.'product_fournisseur_price';
+		$sql .= ' WHERE fk_soc = '.((int) $fkSoc);
+		$sql .= " AND ref_fourn = '".$this->db->escape($supplierRef)."'";
+		$sql .= ' AND quantity = '.price2num((float) $qty, 'MS');
+		$sql .= ' AND entity = '.((int) $conf->entity);
+		$sql .= ' LIMIT 1';
+
+		$resql = $this->db->query($sql);
+		if (!$resql || !$this->db->num_rows($resql)) {
+			return array();
+		}
+
+		$obj = $this->db->fetch_object($resql);
+		if (!$obj) {
+			return array();
+		}
+
+		return array(
+			'rowid' => (int) $obj->rowid,
+			'fk_product' => (int) $obj->fk_product,
+			'ref_fourn' => (string) $obj->ref_fourn,
+			'quantity' => (float) $obj->quantity,
+			'packaging' => ($hasPackagingField && isset($obj->packaging) ? (float) $obj->packaging : null),
+		);
+	}
+
+	/**
+	 * Check whether submitted values require a supplier price write.
+	 *
+	 * @param array<string,mixed> $diff Difference payload
+	 * @return bool
+	 */
+	private function hasSupplierPricePersistChange(array $diff)
+	{
+		if (!empty($diff['is_price_different']) || !empty($diff['is_other_fields_different'])) {
+			return true;
+		}
+
+		$qty = isset($diff['qty']) ? price2num((float) $diff['qty'], 'MS') : 0;
+		$referenceQty = isset($diff['reference_qty']) ? price2num((float) $diff['reference_qty'], 'MS') : $qty;
+		if (!$this->areDecimalValuesEqual($qty, $referenceQty)) {
+			return true;
+		}
+
+		if ($this->shouldPersistSupplierPackaging()) {
+			$packaging = isset($diff['unitquantity']) ? price2num((float) $diff['unitquantity'], 'MS') : 1;
+			$referencePackaging = isset($diff['reference_unitquantity']) ? price2num((float) $diff['reference_unitquantity'], 'MS') : $packaging;
+			if (!$this->areDecimalValuesEqual($packaging, $referencePackaging)) {
+				return true;
+			}
+		}
+
+		$supplierRef = isset($diff['supplier_ref']) ? (string) $diff['supplier_ref'] : '';
+		$referenceSupplierRef = isset($diff['reference_supplier_ref']) ? (string) $diff['reference_supplier_ref'] : $supplierRef;
+
+		return $supplierRef !== $referenceSupplierRef;
+	}
+
+	/**
+	 * Check whether supplier packaging is persisted by the current Dolibarr instance.
+	 *
+	 * @return bool
+	 */
+	private function shouldPersistSupplierPackaging()
+	{
+		return getDolGlobalInt('PRODUCT_USE_SUPPLIER_PACKAGING') > 0 && $this->hasSupplierPricePackagingField();
+	}
+
+	/**
+	 * Compare normalized decimal values.
+	 *
+	 * @param float|string|int $left Left value
+	 * @param float|string|int $right Right value
+	 * @return bool
+	 */
+	private function areDecimalValuesEqual($left, $right)
+	{
+		return abs(price2num((float) $left, 'MS') - price2num((float) $right, 'MS')) < 0.000001;
+	}
+
+	/**
+	 * Set a translated supplier price error.
+	 *
+	 * @param string $translationKey Translation key
+	 * @return void
+	 */
+	private function setSupplierPriceTranslatedError($translationKey)
+	{
+		global $langs;
+
+		if (is_object($langs)) {
+			$langs->load('dynamicsprices@dynamicsprices');
+			$this->error = $langs->trans($translationKey);
+		} else {
+			$this->error = $translationKey;
+		}
+		$this->errors = array();
+	}
+
+	/**
+	 * Normalize supplier price hook errors for Dolibarr HookManager propagation.
+	 *
+	 * @return void
+	 */
+	private function normalizeSupplierPriceHookErrors()
+	{
+		$messages = $this->getUniqueSupplierPriceErrors();
+		if (empty($messages)) {
+			return;
+		}
+
+		$this->error = array_shift($messages);
+		$this->errors = $messages;
+	}
+
+	/**
+	 * Return supplier price errors without duplicated messages.
+	 *
+	 * @return array<int,string>
+	 */
+	private function getUniqueSupplierPriceErrors()
+	{
+		$messages = array();
+		$candidates = array();
+		if (!empty($this->errors) && is_array($this->errors)) {
+			$candidates = $this->errors;
+		}
+		if (!empty($this->error)) {
+			$candidates[] = $this->error;
+		}
+
+		foreach ($candidates as $message) {
+			if (!is_scalar($message)) {
+				continue;
+			}
+			$message = trim((string) $message);
+			if ($message === '' || in_array($message, $messages, true)) {
+				continue;
+			}
+			$messages[] = $message;
+		}
+
+		return $messages;
+	}
+
+	/**
+	 * Decode edited supplier price rows from the confirmation modal payload.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function getPostedRowsDataFromPayload()
+	{
+		$payloadHex = GETPOST('dynamicsprices_payload', 'aZ09');
+		if (!is_string($payloadHex) || trim($payloadHex) === '') {
+			return array();
+		}
+		$payloadHex = trim($payloadHex);
+		if ((strlen($payloadHex) % 2) !== 0 || !ctype_xdigit($payloadHex)) {
+			dol_syslog(__METHOD__.' - Invalid supplier price modal payload encoding', LOG_WARNING);
+			return array();
+		}
+
+		$payloadJson = hex2bin($payloadHex);
+		if ($payloadJson === false) {
+			dol_syslog(__METHOD__.' - Unable to decode supplier price modal payload', LOG_WARNING);
+			return array();
+		}
+
+		$decodedPayload = json_decode($payloadJson, true);
+		if (!is_array($decodedPayload)) {
+			dol_syslog(__METHOD__.' - Invalid supplier price modal payload JSON', LOG_WARNING);
+			return array();
+		}
+
+		$rowsData = array();
+		$numericFields = array('qty', 'unitquantity', 'vat', 'unitprice', 'discount', 'supplier_reputation');
+		$integerFields = array('fk_product', 'fk_soc', 'current_rowid', 'fk_availability', 'selected');
+
+		foreach ($decodedPayload as $lineId => $rowData) {
+			$lineId = (int) $lineId;
+			if ($lineId <= 0 || !is_array($rowData)) {
+				continue;
+			}
+
+			$normalizedRow = array();
+			foreach ($numericFields as $fieldName) {
+				if (array_key_exists($fieldName, $rowData) && is_scalar($rowData[$fieldName])) {
+					$normalizedRow[$fieldName] = price2num((string) $rowData[$fieldName], 'MS');
+				}
+			}
+			foreach ($integerFields as $fieldName) {
+				if (array_key_exists($fieldName, $rowData) && is_scalar($rowData[$fieldName])) {
+					$normalizedRow[$fieldName] = (int) $rowData[$fieldName];
+				}
+			}
+			if (array_key_exists('delivery_time_days', $rowData) && is_scalar($rowData['delivery_time_days'])) {
+				$normalizedRow['delivery_time_days'] = ((string) $rowData['delivery_time_days'] !== '') ? (int) $rowData['delivery_time_days'] : null;
+			}
+			if (array_key_exists('supplier_ref', $rowData) && is_scalar($rowData['supplier_ref'])) {
+				$normalizedRow['supplier_ref'] = trim(dol_string_nohtmltag((string) $rowData['supplier_ref'], 1));
+			}
+
+			if (!empty($normalizedRow)) {
+				$rowsData[$lineId] = $normalizedRow;
+			}
+		}
+
+		return $rowsData;
+	}
+
+	/**
+	 * Extract selected rows from normalized modal payload data.
+	 *
+	 * @param array<int,array<string,mixed>> $postedRowsData Submitted rows data
+	 * @return array<int,int>
+	 */
+	private function getSelectedRowsFromPostedData(array $postedRowsData)
+	{
+		$selectedRows = array();
+		foreach ($postedRowsData as $lineId => $rowData) {
+			if (!empty($rowData['selected'])) {
+				$selectedRows[(int) $lineId] = 1;
+			}
+		}
+
+		return $selectedRows;
 	}
 
 	/**
@@ -930,14 +1517,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$diff['vat'] = isset($rowData['vat']) ? price2num($rowData['vat'], 'MS') : $diff['vat'];
 		$diff['unitprice'] = isset($rowData['unitprice']) ? price2num($rowData['unitprice'], 'MS') : $diff['unitprice'];
 		$diff['discount'] = isset($rowData['discount']) ? price2num($rowData['discount'], 'MS') : $diff['discount'];
-		$diff['fk_availability'] = isset($rowData['fk_availability']) ? (int) $rowData['fk_availability'] : $diff['fk_availability'];
-		$diff['delivery_time_days'] = (isset($rowData['delivery_time_days']) && $rowData['delivery_time_days'] !== '') ? (int) $rowData['delivery_time_days'] : null;
-		$diff['supplier_reputation'] = isset($rowData['supplier_reputation']) ? price2num($rowData['supplier_reputation'], 'MS') : $diff['supplier_reputation'];
-		$diff['fk_product'] = isset($rowData['fk_product']) ? (int) $rowData['fk_product'] : $diff['fk_product'];
-		$diff['fk_soc'] = isset($rowData['fk_soc']) ? (int) $rowData['fk_soc'] : $diff['fk_soc'];
-		$diff['current_rowid'] = isset($rowData['current_rowid']) ? (int) $rowData['current_rowid'] : $diff['current_rowid'];
-		$diff['supplier_ref'] = isset($rowData['supplier_ref']) ? $rowData['supplier_ref'] : $diff['supplier_ref'];
-		$diff['label'] = isset($rowData['label']) ? $rowData['label'] : $diff['label'];
+		$diff['supplier_ref'] = isset($rowData['supplier_ref']) ? trim(dol_string_nohtmltag((string) $rowData['supplier_ref'], 1)) : $diff['supplier_ref'];
 		$diff['new_unitprice'] = $diff['unitprice'];
 
 		if (isset($diff['current_unitprice'])) {
@@ -1051,12 +1631,13 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	private function renderProductCostBlock($product, $record, $asTableRow = true)
 	{
-		global $langs, $user;
+		global $conf, $langs, $user;
 
 		$productId = $this->getProductIdFromObject($product);
 		$nativeCost = isset($product->cost_price) && $product->cost_price !== null ? price($product->cost_price) : $langs->trans('NotAvailable');
 		$pmp = isset($product->pmp) && $product->pmp !== null ? price($product->pmp) : $langs->trans('NotAvailable');
-		$dynamicCost = is_object($record) && $record->dynamic_cost_price !== null ? price($record->dynamic_cost_price) : $langs->trans('NotAvailable');
+		$recordHasValidCost = is_object($record) && $record->dynamic_cost_price !== null && (int) $record->calculation_status > 0 && (int) $record->status > 0;
+		$dynamicCost = $recordHasValidCost ? price($record->dynamic_cost_price) : $langs->trans('NotAvailable');
 		$sourceType = is_object($record) && !empty($record->source_type) ? $langs->trans('DynamicPricesCostSource_'.$record->source_type) : $langs->trans('NotAvailable');
 		$coefficient = is_object($record) && $record->coefficient !== null ? price($record->coefficient) : $langs->trans('NotAvailable');
 		$ruleCode = is_object($record) && !empty($record->rule_code) ? dol_escape_htmltag($record->rule_code) : $langs->trans('NotAvailable');
@@ -1100,6 +1681,11 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$html .= '<td>'.dol_escape_htmltag($message).'</td>';
 		$html .= '</tr>';
 		$html .= '</table>';
+		$service = new DynamicPricesCostService($this->db);
+		$invalidSupplierPriceCount = $service->getInvalidSupplierPriceCount($productId, (int) $conf->entity);
+		if ($invalidSupplierPriceCount > 0) {
+			$html .= '<div class="warning">'.dol_escape_htmltag($langs->trans('DynamicPricesInvalidSupplierPricesIgnored', $invalidSupplierPriceCount)).'</div>';
+		}
 		$html .= '<div class="tabsAction right">';
 		$html .= '<a class="button button-small" href="'.$historyUrl.'">'.$langs->trans('DynamicPricesCostHistory').'</a>';
 		$html .= ' <a class="button button-small" href="'.$previewUrl.'">'.$langs->trans('DynamicPricesCostPreview').'</a>';
