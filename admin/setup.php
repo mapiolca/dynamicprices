@@ -331,14 +331,14 @@ function dynamicspricesGetSharedSellPriceSourceEntityOptions()
  */
 function dynamicspricesGetLineSourcePriorityOptions()
 {
-	global $langs;
+	global $db, $langs;
 
-	return array(
-		'dynamicprices' => $langs->trans('DynamicPricesCostLineSourceDynamicPrices'),
-		'dolibarr_default' => $langs->trans('DynamicPricesCostLineSourceDolibarrDefault'),
-		'pmp' => $langs->trans('DynamicPricesCostLineSourcePmp'),
-		'native_cost_price' => $langs->trans('DynamicPricesCostLineSourceNativeCostPrice'),
-	);
+	$service = new DynamicPricesCostService($db);
+	$options = array();
+	foreach ($service->getCommercialLineCostSourceOptions() as $source => $label) {
+		$options[$source] = $langs->trans($label);
+	}
+	return $options;
 }
 
 /**
@@ -348,20 +348,26 @@ function dynamicspricesGetLineSourcePriorityOptions()
  */
 function dynamicspricesGetPostedLineSourcePriority()
 {
+	global $db;
+
+	$service = new DynamicPricesCostService($db);
+	$saved = $service->getCommercialLineCostSourcePriority(null, true);
 	$allowed = array_keys(dynamicspricesGetLineSourcePriorityOptions());
 	$priority = array();
-	for ($i = 1; $i <= 4; $i++) {
+	$count = max(count($allowed), count($saved));
+	for ($i = 1; $i <= $count; $i++) {
 		$source = GETPOST('DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY_'.$i, 'alphanohtml');
+		// An unavailable source already saved at this rank is retained server-side.
+		if (isset($saved[$i - 1]) && !in_array($saved[$i - 1], $allowed, true)) {
+			$priority[] = $saved[$i - 1];
+			continue;
+		}
 		if ($source !== '' && in_array($source, $allowed, true) && !in_array($source, $priority, true)) {
 			$priority[] = $source;
 		}
 	}
 
-	if (empty($priority)) {
-		$priority = array('dynamicprices', 'dolibarr_default', 'pmp', 'native_cost_price');
-	}
-
-	return implode(',', $priority);
+	return implode(',', $service->getCommercialLineCostSourcePriority(implode(',', $priority), true));
 }
 
 /**
@@ -374,8 +380,9 @@ function dynamicspricesPrintLineSourcePrioritySetting()
 	global $db, $form, $langs;
 
 	$service = new DynamicPricesCostService($db);
-	$priority = $service->getCommercialLineCostSourcePriority();
+	$priority = $service->getCommercialLineCostSourcePriority(null, true);
 	$options = array('' => $langs->trans('DynamicPricesCostLineSourceIgnore')) + dynamicspricesGetLineSourcePriorityOptions();
+	$knownOptions = $service->getCommercialLineCostSourceOptions(true);
 
 	print '<tr class="oddeven">';
 	print '<td colspan="3"><span class="opacitymedium">'.$langs->trans('DynamicPricesCostLineSourcePriorityIntro').'</span></td>';
@@ -389,12 +396,14 @@ function dynamicspricesPrintLineSourcePrioritySetting()
 	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
 	print '<input type="hidden" name="action" value="set_DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY">';
-	for ($i = 1; $i <= 4; $i++) {
+	for ($i = 1; $i <= max(count($options) - 1, count($priority)); $i++) {
 		$inputName = 'DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY_'.$i;
 		$selected = isset($priority[$i - 1]) ? $priority[$i - 1] : '';
+		$unavailable = $selected !== '' && !isset($options[$selected]);
+		$rankOptions = $unavailable ? array($selected => $langs->trans($knownOptions[$selected]).' ('.$langs->trans('NotAvailable').')') : $options;
 		print '<span class="nowrap">';
 		print $langs->trans('DynamicPricesCostLineSourcePriorityRank', $i).' ';
-		print $form->selectarray($inputName, $options, $selected, 0, 0, 0, '', 0, 0, 0, '', 'minwidth200');
+		print $form->selectarray($inputName, $rankOptions, $selected, 0, 0, 0, '', 0, 0, (int) $unavailable, '', 'minwidth200');
 		print '</span> ';
 		print ajax_combobox($inputName);
 	}

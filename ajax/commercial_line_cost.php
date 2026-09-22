@@ -58,6 +58,8 @@ if (!$res) {
 }
 
 require_once __DIR__.'/../class/dynamicpricescostservice.class.php';
+require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
 
 /**
  * Send a JSON response and stop script execution.
@@ -84,7 +86,7 @@ if (!isModEnabled('dynamicsprices')) {
 
 $userCanChooseCost = $user->hasRight('margins', 'creer');
 $userCanReadDynamicCost = $user->hasRight('dynamicsprices', 'cost', 'read');
-if (empty($user->admin) && !$userCanChooseCost && !$userCanReadDynamicCost) {
+if (!$userCanChooseCost && !$userCanReadDynamicCost) {
 	dynamicsprices_ajax_response(array('success' => false, 'error' => 'Forbidden'), 403);
 }
 
@@ -95,12 +97,14 @@ foreach ($service->getCommercialLineCostSourceOptions() as $sourceCode => $trans
 }
 $basePayload = array(
 	'success' => true,
+	'enabled' => (bool) getDolGlobalInt('DYNAMICPRICES_COST_USE_FOR_SALES', 0) && getDolGlobalString('DYNAMICPRICES_COST_LINE_STRATEGY', 'on_create_only') !== 'never',
 	'available' => false,
 	'priority' => $service->getCommercialLineCostSourcePriority(),
 	'source_labels' => $sourceLabels,
+	'pricelist' => array('available' => false, 'price' => null, 'error' => false),
 );
 
-if (!getDolGlobalInt('DYNAMICPRICES_COST_USE_FOR_SALES', 0)) {
+if (!$basePayload['enabled']) {
 	dynamicsprices_ajax_response($basePayload);
 }
 
@@ -109,15 +113,78 @@ if ($productId <= 0) {
 	dynamicsprices_ajax_response($basePayload);
 }
 
-$cost = $service->getDynamicCostPrice($productId, (int) $conf->entity);
-if ($cost === null) {
-	dynamicsprices_ajax_response($basePayload);
+$product = new Product($db);
+if ($product->fetch($productId) <= 0 || !in_array((int) $product->entity, array_map('intval', explode(',', getEntity('product'))), true)) {
+	dynamicsprices_ajax_response(array('success' => false, 'error' => 'NotFound'), 404);
+}
+$productPermission = (int) $product->type === Product::TYPE_SERVICE ? 'service' : 'produit';
+if (!$user->hasRight($productPermission, 'lire')
+	|| !checkUserAccessToObject($user, array($productPermission), $product, 'product&product', '', '')) {
+	dynamicsprices_ajax_response(array('success' => false, 'error' => 'Forbidden'), 403);
 }
 
-$costForInput = price2num($cost, 'MU');
-dynamicsprices_ajax_response(array_merge($basePayload, array(
-	'available' => true,
-	'product_id' => $productId,
-	'price' => $costForInput,
-	'label' => $langs->trans('DynamicPricesCostCommercialLineOption', price($cost)),
-)));
+$documentType = GETPOST('document_type', 'aZ09');
+$documentId = GETPOSTINT('document_id');
+$document = null;
+$entity = (int) $conf->entity;
+$types = DynamicPricesCostService::getCommercialDocumentTypes();
+if ($documentType !== '' || $documentId > 0) {
+	if (!isset($types[$documentType]) || $documentId <= 0) {
+		dynamicsprices_ajax_response(array('success' => false, 'error' => 'InvalidDocument'), 400);
+	}
+	if (!$user->hasRight($documentType, 'lire')) {
+		dynamicsprices_ajax_response(array('success' => false, 'error' => 'Forbidden'), 403);
+	}
+	$definition = $types[$documentType];
+	require_once DOL_DOCUMENT_ROOT.$definition['file'];
+	$document = new $definition['class']($db);
+	if ($document->fetch($documentId) <= 0
+		|| !in_array((int) $document->entity, array_map('intval', explode(',', getEntity($documentType))), true)
+		|| !checkUserAccessToObject($user, array($documentType), $document, $documentType, '', 'fk_soc')
+		|| $document->fetch_thirdparty() <= 0 || !is_object($document->thirdparty)
+		|| !checkUserAccessToObject($user, array('societe'), $document->thirdparty, 'societe', '', '')) {
+		dynamicsprices_ajax_response(array('success' => false, 'error' => 'Forbidden'), 403);
+	}
+	$entity = (int) $document->entity;
+}
+
+$cost = getDolGlobalInt('DYNAMICPRICES_COST_ENABLE', 1) ? $service->getDynamicCostPrice($productId, $entity) : null;
+if ($cost !== null) {
+	$basePayload['available'] = true;
+	$basePayload['product_id'] = $productId;
+	$basePayload['price'] = price2num($cost, 'MU');
+	$basePayload['label'] = $langs->trans('DynamicPricesCostCommercialLineOption', price($cost));
+}
+
+if ($document !== null && $userCanChooseCost) {
+	$quantity = price2num(GETPOST('qty', 'alphanohtml'), '', 2);
+	$currentCostInput = GETPOST('line_current_cost', 'alphanohtml');
+	$currentCost = $currentCostInput === '' ? null : price2num($currentCostInput, '', 2);
+	if (!is_numeric($quantity) || !is_finite((float) $quantity)
+		|| ($currentCost !== null && (!is_numeric($currentCost) || !is_finite((float) $currentCost)))) {
+		dynamicsprices_ajax_response(array('success' => false, 'error' => 'InvalidAmount'), 400);
+	}
+	$priceList = $service->getPriceListCost($product, $document, (float) $quantity);
+	$basePayload['pricelist'] = array(
+		'available' => $priceList['cost'] !== null && !$priceList['error'],
+		'price' => $priceList['cost'] === null ? null : price2num($priceList['cost'], 'MU'),
+		'label' => $priceList['cost'] === null ? '' : $langs->trans('DynamicPricesPriceListCommercialLineOption', price($priceList['cost'])),
+		'error' => $priceList['error'],
+	);
+	// PriceList's doActions hook supplies the incoming native cost on addline.
+	$salePrice = price2num(GETPOST('sale_price', 'alphanohtml'), '', 2);
+	$priceListWritesDefault = !getDolGlobalInt('PRICELIST_DO_NOT_OVERWRITE_PRICE_WHEN_ADDING', 0) || (int) $salePrice === 0;
+	if ($priceListWritesDefault && $priceList['cost'] !== null && !$priceList['error']) {
+		$currentCost = $priceList['cost'];
+	}
+	$resolution = $service->resolveCommercialLineCostFromPriority($productId, $product, $entity, $currentCost, array('document' => $document, 'quantity' => (float) $quantity));
+	$basePayload['resolution'] = $resolution;
+	if ($resolution['cost'] !== null) {
+		$basePayload['resolution']['label'] = $langs->trans('DynamicPricesCostResolvedOption', $langs->trans('DynamicPricesCostSource_'.$resolution['source_type']), price($resolution['cost']));
+	}
+	if ($resolution['error']) {
+		$basePayload['error_message'] = $service->error;
+	}
+}
+
+dynamicsprices_ajax_response($basePayload);

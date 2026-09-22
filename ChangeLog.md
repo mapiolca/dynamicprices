@@ -1,5 +1,13 @@
 # ChangeLog DynamicsPrices
 
+## 3.0.2
+
+- Ajout du prix de revient **Tarifs Dégréssifs** aux priorités des lignes commerciales lorsque PriceList est actif et compatible, avec conservation de l'ordre existant et du rang enregistré en cas de désactivation.
+- Résolution du coût à la création des lignes de devis, commandes et factures selon la quantité réelle, le document et le tiers, via les règles de PriceList ; préservation des choix manuels autorisés et identification de la source dans les snapshots.
+- Prise en compte d'un coût explicitement égal à zéro, passage à la source suivante lorsqu'un coût est absent et interruption de l'enregistrement en cas d'erreur PriceList.
+- Actualisation de l'aperçu au changement de produit ou de quantité, rejet des réponses obsolètes et contrôle des droits et des entités avant restitution des coûts.
+- Disponibilité affichée dans l'onglet Compatibilité et traductions françaises/anglaises. Aucune migration SQL ; pour utiliser cette source, ajouter explicitement PriceList à l'ordre configuré. Les lignes existantes et le coût natif des produits ne sont pas recalculés par cette intégration.
+
 ## 3.0.1
 
 ### Prix de revient et kits
