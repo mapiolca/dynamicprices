@@ -390,13 +390,17 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 	 */
 	private function applyDynamicCostToCommercialLine($db, $action, $object, User $user)
 	{
+		global $langs;
+
+		// Editing an existing line never applies the automatic source priority.
+		if (!getDolGlobalInt('DYNAMICPRICES_COST_USE_FOR_SALES', 0)
+			|| getDolGlobalString('DYNAMICPRICES_COST_LINE_STRATEGY', 'on_create_only') === 'never') {
+			return 0;
+		}
 		$mapping = array(
-			'LINEPROPAL_INSERT' => array('table' => 'propaldet', 'parent_table' => 'propal', 'parent_field' => 'fk_propal', 'element_type' => 'propaldet', 'line_action' => 'create'),
-			'LINEPROPAL_MODIFY' => array('table' => 'propaldet', 'parent_table' => 'propal', 'parent_field' => 'fk_propal', 'element_type' => 'propaldet', 'line_action' => 'update'),
-			'LINEORDER_INSERT' => array('table' => 'commandedet', 'parent_table' => 'commande', 'parent_field' => 'fk_commande', 'element_type' => 'commandedet', 'line_action' => 'create'),
-			'LINEORDER_MODIFY' => array('table' => 'commandedet', 'parent_table' => 'commande', 'parent_field' => 'fk_commande', 'element_type' => 'commandedet', 'line_action' => 'update'),
-			'LINEBILL_INSERT' => array('table' => 'facturedet', 'parent_table' => 'facture', 'parent_field' => 'fk_facture', 'element_type' => 'facturedet', 'line_action' => 'create'),
-			'LINEBILL_MODIFY' => array('table' => 'facturedet', 'parent_table' => 'facture', 'parent_field' => 'fk_facture', 'element_type' => 'facturedet', 'line_action' => 'update'),
+			'LINEPROPAL_INSERT' => 'propal',
+			'LINEORDER_INSERT' => 'commande',
+			'LINEBILL_INSERT' => 'facture',
 		);
 		if (empty($mapping[$action])) {
 			return 0;
@@ -407,18 +411,25 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 			return 0;
 		}
 
-		$conf = $mapping[$action];
+		$documentType = $mapping[$action];
+		$definition = DynamicPricesCostService::getCommercialDocumentTypes()[$documentType];
+		$langs->load('dynamicsprices@dynamicsprices');
+		if (!$user->hasRight($documentType, 'creer')) {
+			$object->error = $langs->trans('DynamicPricesCostAccessDenied');
+			return -1;
+		}
 		$service = new DynamicPricesCostService($db);
-		$costColumn = $service->resolveCommercialLineCostColumn((string) $conf['table']);
+		$costColumn = $service->resolveCommercialLineCostColumn($definition['line_table']);
 		if ($costColumn === '') {
-			dol_syslog(__METHOD__.' no purchase cost column found for table '.MAIN_DB_PREFIX.$conf['table'], LOG_WARNING);
+			dol_syslog(__METHOD__.' no purchase cost column found for table '.MAIN_DB_PREFIX.$definition['line_table'], LOG_WARNING);
 			return 0;
 		}
 
-		$sql = "SELECT l.rowid, l.fk_product, l.".$costColumn." AS pa_ht, l.".$conf['parent_field']." as fk_parent, p.entity";
-		$sql .= " FROM ".MAIN_DB_PREFIX.$conf['table']." AS l";
-		$sql .= " INNER JOIN ".MAIN_DB_PREFIX.$conf['parent_table']." AS p ON p.rowid = l.".$conf['parent_field'];
+		$sql = "SELECT l.rowid, l.fk_product, l.qty, l.".$costColumn." AS pa_ht, l.".$definition['parent_field']." as fk_parent, p.entity";
+		$sql .= " FROM ".MAIN_DB_PREFIX.$definition['line_table']." AS l";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX.$documentType." AS p ON p.rowid = l.".$definition['parent_field'];
 		$sql .= " WHERE l.rowid = ".$lineId;
+		$sql .= " AND p.entity IN (".$db->sanitize(getEntity($documentType)).")";
 		$sql .= " LIMIT 1";
 
 		$resql = $db->query($sql);
@@ -428,8 +439,23 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		}
 
 		$obj = $db->fetch_object($resql);
-		if (!is_object($obj) || empty($obj->fk_product)) {
+		if (!is_object($obj)) {
+			$object->error = $langs->trans('DynamicPricesCostAccessDenied');
+			return -1;
+		}
+		if (empty($obj->fk_product)) {
 			return 0;
+		}
+		require_once DOL_DOCUMENT_ROOT.$definition['file'];
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
+		$parent = new $definition['class']($db);
+		if ($parent->fetch((int) $obj->fk_parent) <= 0
+			|| (int) $parent->entity !== (int) $obj->entity
+			|| !checkUserAccessToObject($user, array($documentType), $parent, $documentType, '', 'fk_soc')
+			|| $parent->fetch_thirdparty() <= 0 || !is_object($parent->thirdparty)
+			|| !checkUserAccessToObject($user, array('societe'), $parent->thirdparty, 'societe', '', '')) {
+			$object->error = $langs->trans('DynamicPricesCostAccessDenied');
+			return -1;
 		}
 
 		$line = new stdClass();
@@ -437,22 +463,25 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		$line->rowid = (int) $obj->rowid;
 		$line->fk_product = (int) $obj->fk_product;
 		$line->pa_ht = $obj->pa_ht !== null ? (float) $obj->pa_ht : null;
+		$line->qty = (float) $obj->qty;
 
-		$parent = new stdClass();
-		$parent->id = (int) $obj->fk_parent;
-		$parent->entity = (int) $obj->entity;
-
-		$result = $service->applyCostToCommercialLine((string) $conf['element_type'], $line, $parent, $user, array(
+		$result = $service->applyCostToCommercialLine($definition['line_table'], $line, $parent, $user, array(
 			'entity' => (int) $obj->entity,
-			'line_action' => (string) $conf['line_action'],
-			'line_table' => (string) $conf['table'],
+			'line_action' => 'create',
+			'line_table' => $definition['line_table'],
 			'calculation_context' => 'commercial_line_trigger',
 			'cost_source_mode' => GETPOST('dynamicsprices_cost_source_mode', 'alpha'),
 			'cost_source' => GETPOST('dynamicsprices_cost_source', 'alphanohtml'),
+			'manual_cost' => GETPOST('dynamicsprices_manual_cost', 'alphanohtml'),
+			'from_source_document' => !empty($object->origin_id),
 		));
 		if ($result < 0) {
+			$object->error = $service->error;
 			dol_syslog(__METHOD__.' '.$service->error, LOG_ERR);
 			return -1;
+		}
+		if ($result > 0) {
+			$object->pa_ht = $line->pa_ht;
 		}
 
 		return $result;

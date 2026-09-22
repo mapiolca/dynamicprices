@@ -115,36 +115,121 @@ class DynamicPricesCostService
 
 		$entity = !empty($context['entity']) ? (int) $context['entity'] : 0;
 		$lineCurrentCost = array_key_exists('line_current_cost', $context) ? $context['line_current_cost'] : null;
-		$resolution = $this->resolveCommercialLineCostFromPriority($productId, $product, $entity, $lineCurrentCost);
-		if ($resolution['cost'] !== null) {
-			return $resolution['cost'];
+		$resolution = $this->resolveCommercialLineCostFromPriority($productId, $product, $entity, $lineCurrentCost, $context);
+		if ($resolution['error']) {
+			return null;
 		}
-
-		return $this->getFallbackCostPrice($productId, $product, (string) getDolGlobalString('DYNAMICPRICES_COST_FALLBACK', 'keep_dolibarr'), $entity);
+		return $resolution['cost'];
 	}
 
 	/**
 	 * Return available commercial line cost source codes and translation keys.
 	 *
+	 * @param bool $includeUnavailable Include known sources for saved configuration
 	 * @return array<string,string>
 	 */
-	public function getCommercialLineCostSourceOptions()
+	public function getCommercialLineCostSourceOptions($includeUnavailable = false)
 	{
-		return array(
+		$options = array(
 			'dynamicprices' => 'DynamicPricesCostLineSourceDynamicPrices',
 			'dolibarr_default' => 'DynamicPricesCostLineSourceDolibarrDefault',
 			'pmp' => 'DynamicPricesCostLineSourcePmp',
 			'native_cost_price' => 'DynamicPricesCostLineSourceNativeCostPrice',
 		);
+		if ($includeUnavailable || $this->getPriceListAvailability()['available']) {
+			$options['pricelist'] = 'DynamicPricesCostLineSourcePriceList';
+		}
+		return $options;
+	}
+
+	/**
+	 * Check the optional PriceList contract without activating the module.
+	 *
+	 * @return array{available:bool,reason:string}
+	 */
+	public function getPriceListAvailability()
+	{
+		if (!isModEnabled('pricelist')) {
+			return array('available' => false, 'reason' => 'DynamicPricesPriceListDisabled');
+		}
+		if (!defined('DOL_VERSION') || version_compare(DOL_VERSION, '20.0.0', '<') || version_compare(PHP_VERSION, '8.0.0', '<')) {
+			return array('available' => false, 'reason' => 'DynamicPricesPriceListIncompatible');
+		}
+		dol_include_once('/pricelist/class/pricelist.class.php');
+		if (!class_exists('PriceList') || !method_exists('PriceList', 'get_price') || !method_exists('PriceList', 'getEffectiveCostPriceForRow')) {
+			return array('available' => false, 'reason' => 'DynamicPricesPriceListIncompatible');
+		}
+		$method = new ReflectionMethod('PriceList', 'get_price');
+		$costMethod = new ReflectionMethod('PriceList', 'getEffectiveCostPriceForRow');
+		if (!$method->isPublic() || $method->getNumberOfParameters() < 4 || $method->getNumberOfRequiredParameters() > 4
+			|| !$costMethod->isPublic() || $costMethod->getNumberOfParameters() < 1 || $costMethod->getNumberOfRequiredParameters() > 1) {
+			return array('available' => false, 'reason' => 'DynamicPricesPriceListIncompatible');
+		}
+		return array('available' => true, 'reason' => 'DynamicPricesPriceListAvailable');
+	}
+
+	/**
+	 * Native sales documents supported by the AJAX endpoint and line triggers.
+	 *
+	 * @return array<string,array{class:string,file:string,line_table:string,parent_field:string}>
+	 */
+	public static function getCommercialDocumentTypes()
+	{
+		return array(
+			'propal' => array('class' => 'Propal', 'file' => '/comm/propal/class/propal.class.php', 'line_table' => 'propaldet', 'parent_field' => 'fk_propal'),
+			'commande' => array('class' => 'Commande', 'file' => '/commande/class/commande.class.php', 'line_table' => 'commandedet', 'parent_field' => 'fk_commande'),
+			'facture' => array('class' => 'Facture', 'file' => '/compta/facture/class/facture.class.php', 'line_table' => 'facturedet', 'parent_field' => 'fk_facture'),
+		);
+	}
+
+	/**
+	 * Resolve the cost of the applicable PriceList row using its own business rules.
+	 * Callers must authorize the loaded document, thirdparty and product first.
+	 *
+	 * @param Product|stdClass $product Authorized product
+	 * @param CommonObject|stdClass|null $document Authorized native document with thirdparty loaded
+	 * @param int|float|string|null $quantity Line quantity
+	 * @return array{cost:float|null,error:bool}
+	 */
+	public function getPriceListCost($product, $document, $quantity)
+	{
+		$result = array('cost' => null, 'error' => false);
+		if (!$this->getPriceListAvailability()['available']) {
+			return $result;
+		}
+		if (!is_object($document) || empty($document->id) || empty($document->entity)
+			|| !isset(self::getCommercialDocumentTypes()[$document->element ?? ''])
+			|| !is_object($document->thirdparty ?? null) || empty($document->thirdparty->id)
+			|| !is_object($product) || empty($product->id) || !is_numeric($quantity) || !is_finite((float) $quantity)) {
+			$this->error = $this->trans('DynamicPricesCostInvalidLine');
+			return array('cost' => null, 'error' => true);
+		}
+		$pricelist = new PriceList($this->db);
+		$row = $pricelist->get_price((int) $product->id, $document->thirdparty, (float) $quantity, $document);
+		if ($row === 0) {
+			return $result;
+		}
+		if (!is_object($row)) {
+			$this->error = $this->trans('DynamicPricesPriceListError');
+			return array('cost' => null, 'error' => true);
+		}
+		$cost = $pricelist->getEffectiveCostPriceForRow($row);
+		if ($cost !== null && (!is_numeric($cost) || !is_finite((float) $cost))) {
+			$this->error = $this->trans('DynamicPricesPriceListError');
+			return array('cost' => null, 'error' => true);
+		}
+		$result['cost'] = $cost === null ? null : (float) price2num($cost, 'MU');
+		return $result;
 	}
 
 	/**
 	 * Return configured priority for commercial line cost sources.
 	 *
 	 * @param string|null $configured Configured comma-separated value
+	 * @param bool $includeUnavailable Preserve configured ranks even when PriceList is disabled
 	 * @return array<int,string>
 	 */
-	public function getCommercialLineCostSourcePriority($configured = null)
+	public function getCommercialLineCostSourcePriority($configured = null, $includeUnavailable = false)
 	{
 		$defaultPriority = array('dynamicprices', 'dolibarr_default', 'pmp', 'native_cost_price');
 		$configuredValue = $configured !== null ? (string) $configured : (string) getDolGlobalString('DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY', implode(',', $defaultPriority));
@@ -152,7 +237,7 @@ class DynamicPricesCostService
 			return $defaultPriority;
 		}
 
-		$allowed = array_keys($this->getCommercialLineCostSourceOptions());
+		$allowed = array_keys($this->getCommercialLineCostSourceOptions(true));
 		$priority = array();
 		foreach (explode(',', $configuredValue) as $source) {
 			$source = trim((string) $source);
@@ -161,7 +246,13 @@ class DynamicPricesCostService
 			}
 		}
 
-		return !empty($priority) ? $priority : $defaultPriority;
+		if (empty($priority)) {
+			$priority = $defaultPriority;
+		}
+		if (!$includeUnavailable) {
+			$priority = array_values(array_intersect($priority, array_keys($this->getCommercialLineCostSourceOptions())));
+		}
+		return $priority;
 	}
 
 	/**
@@ -435,7 +526,7 @@ class DynamicPricesCostService
 	}
 
 	/**
-	 * Apply DynamicPrices cost to a commercial line object before persistence.
+	 * Apply the configured cost to a commercial line within its native transaction.
 	 *
 	 * @param string $element_type Line element type
 	 * @param CommonObjectLine|stdClass $line Line object
@@ -469,7 +560,9 @@ class DynamicPricesCostService
 			return 0;
 		}
 
-		dol_include_once('/product/class/product.class.php');
+		if (!class_exists('Product')) {
+			require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+		}
 		$product = new Product($this->db);
 		if ($product->fetch($productId) <= 0) {
 			$this->error = $this->trans('DynamicPricesCostProductNotFound');
@@ -478,18 +571,44 @@ class DynamicPricesCostService
 		}
 
 		$entity = $this->getObjectIntProperty($object, array('entity'));
+		if (empty($product->entity) || !in_array((int) $product->entity, array_map('intval', explode(',', getEntity('product'))), true)) {
+			$this->error = $this->trans('DynamicPricesCostProductNotFound');
+			return -1;
+		}
 		$before = $this->getObjectFloatProperty($line, array('pa_ht'));
+		$cost = null;
+		$sourceType = '';
 		if (!empty($context['cost_source_mode']) && (string) $context['cost_source_mode'] === 'manual' && $user->hasRight('margins', 'creer')) {
-			return 0;
+			if (($context['cost_source'] ?? '') === 'dynamicsprices_pricelist_cost') {
+				$priceListResult = $this->getPriceListCost($product, $object, $line->qty ?? null);
+				if ($priceListResult['error'] || $priceListResult['cost'] === null) {
+					$this->error = $this->trans('DynamicPricesPriceListError');
+					return -1;
+				}
+				$context['manual_cost'] = $priceListResult['cost'];
+				$sourceType = 'pricelist';
+			}
+			if (!isset($context['manual_cost']) || $context['manual_cost'] === '') {
+				return 0;
+			}
+			$manualCost = price2num($context['manual_cost'], '', is_int($context['manual_cost']) || is_float($context['manual_cost']) ? 1 : 2);
+			if (!is_numeric($manualCost) || !is_finite((float) $manualCost)) {
+				$this->error = $this->trans('DynamicPricesCostInvalidLine');
+				return -1;
+			}
+			$cost = (float) $manualCost;
+			$sourceType = $sourceType === 'pricelist' ? 'pricelist' : 'manual';
 		}
 
-		$resolution = $this->resolveCommercialLineCostFromPriority($productId, $product, $entity, $before);
-		$cost = $resolution['cost'];
-		$sourceType = $resolution['source_type'];
-		if ($cost === null) {
-			$fallback = (string) getDolGlobalString('DYNAMICPRICES_COST_FALLBACK', 'keep_dolibarr');
-			$cost = $this->getFallbackCostPrice($productId, $product, $fallback, $entity);
-			$sourceType = $cost !== null ? 'fallback_'.$fallback : '';
+		if ($sourceType === '') {
+			$context['document'] = $object;
+			$context['quantity'] = isset($line->qty) ? $line->qty : null;
+			$resolution = $this->resolveCommercialLineCostFromPriority($productId, $product, $entity, $before, $context);
+			if ($resolution['error']) {
+				return -1;
+			}
+			$cost = $resolution['cost'];
+			$sourceType = $resolution['source_type'];
 		}
 		if ($cost === null) {
 			return 0;
@@ -499,7 +618,7 @@ class DynamicPricesCostService
 		$line->pa_ht = price2num($cost, 'MU');
 
 		if ($lineId > 0 && !empty($context['line_table'])) {
-			$updateResult = $this->updateCommercialLinePaHt((string) $context['line_table'], $lineId, $cost);
+			$updateResult = $this->updateCommercialLinePaHt((string) $context['line_table'], $lineId, $cost, $this->getObjectIntProperty($object, array('id', 'rowid')), $entity);
 			if ($updateResult < 0) {
 				return -1;
 			}
@@ -516,7 +635,9 @@ class DynamicPricesCostService
 				'source_type' => $sourceType,
 				'status' => 1,
 			);
-			$this->createLineCostSnapshot($element_type, $lineId, $snapshotData, $user);
+			if ($this->createLineCostSnapshot($element_type, $lineId, $snapshotData, $user) < 0) {
+				return -1;
+			}
 		}
 
 		return 1;
@@ -951,14 +1072,21 @@ class DynamicPricesCostService
 	 * @param Product|stdClass $product Product object
 	 * @param int $entity Entity
 	 * @param mixed $lineCurrentCost Current native line cost
-	 * @return array{cost:float|null,source_type:string}
+	 * @param array{document?:CommonObject|stdClass,quantity?:int|float|string|null} $context Authorized document context
+	 * @return array{cost:float|null,source_type:string,error:bool}
 	 */
-	private function resolveCommercialLineCostFromPriority($productId, $product, $entity, $lineCurrentCost = null)
+	public function resolveCommercialLineCostFromPriority($productId, $product, $entity, $lineCurrentCost = null, array $context = array())
 	{
 		$nativeValues = null;
 		foreach ($this->getCommercialLineCostSourcePriority() as $source) {
 			$cost = null;
-			if ($source === 'dynamicprices') {
+			if ($source === 'pricelist') {
+				$priceListResult = $this->getPriceListCost($product, $context['document'] ?? null, $context['quantity'] ?? null);
+				if ($priceListResult['error']) {
+					return array('cost' => null, 'source_type' => $source, 'error' => true);
+				}
+				$cost = $priceListResult['cost'];
+			} elseif ($source === 'dynamicprices') {
 				if (getDolGlobalInt('DYNAMICPRICES_COST_ENABLE', 1)) {
 					$cost = $this->getDynamicCostPrice($productId, $entity);
 				}
@@ -975,13 +1103,17 @@ class DynamicPricesCostService
 				return array(
 					'cost' => (float) $cost,
 					'source_type' => $source,
+					'error' => false,
 				);
 			}
 		}
 
+		$fallback = getDolGlobalString('DYNAMICPRICES_COST_FALLBACK', 'keep_dolibarr');
+		$cost = $this->getFallbackCostPrice($productId, $product, $fallback, $entity);
 		return array(
-			'cost' => null,
-			'source_type' => '',
+			'cost' => $cost,
+			'source_type' => $cost === null ? '' : 'fallback_'.$fallback,
+			'error' => $fallback === 'block',
 		);
 	}
 
@@ -1139,9 +1271,11 @@ class DynamicPricesCostService
 	 * @param string $tableElement Line table element without prefix
 	 * @param int $lineId Line id
 	 * @param float $cost Cost to write
+	 * @param int $parentId Authorized document id
+	 * @param int $entity Document entity
 	 * @return int
 	 */
-	private function updateCommercialLinePaHt($tableElement, $lineId, $cost)
+	private function updateCommercialLinePaHt($tableElement, $lineId, $cost, $parentId, $entity)
 	{
 		$allowedTables = array('propaldet', 'commandedet', 'facturedet');
 		if (!in_array($tableElement, $allowedTables, true)) {
@@ -1155,9 +1289,14 @@ class DynamicPricesCostService
 			return 0;
 		}
 
-		$sql = "UPDATE ".MAIN_DB_PREFIX.$tableElement;
-		$sql .= " SET ".$costColumn." = ".price2num($cost, 'MU');
-		$sql .= " WHERE rowid = ".((int) $lineId);
+		$parentTables = array('propaldet' => 'propal', 'commandedet' => 'commande', 'facturedet' => 'facture');
+		$parentTable = $parentTables[$tableElement];
+		$definition = self::getCommercialDocumentTypes()[$parentTable];
+		$sql = "UPDATE ".MAIN_DB_PREFIX.$tableElement." AS l";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX.$parentTable." AS p ON p.rowid = l.".$definition['parent_field'];
+		$sql .= " SET l.".$costColumn." = ".price2num($cost, 'MU');
+		$sql .= " WHERE l.rowid = ".((int) $lineId)." AND p.rowid = ".((int) $parentId);
+		$sql .= " AND p.entity = ".((int) $entity)." AND p.entity IN (".$this->db->sanitize(getEntity($parentTable)).")";
 
 		$resql = $this->db->query($sql);
 		if (!$resql) {

@@ -6,6 +6,11 @@ define('MAIN_DB_PREFIX', 'llx_');
 $conf = new stdClass();
 $conf->entity = 1;
 
+/** @var array<string,string> $testGlobalStrings */
+$testGlobalStrings = array();
+/** @var array<string,bool> $testModules */
+$testModules = array();
+
 /** @var array<string,int> $testGlobalInts */
 $testGlobalInts = array(
 	'DYNAMICPRICES_COST_INCLUDE_SERVICES' => 1,
@@ -20,7 +25,14 @@ function getDolGlobalInt($key, $default = 0)
 
 function getDolGlobalString($key, $default = '')
 {
-	return (string) $default;
+	global $testGlobalStrings;
+	return $testGlobalStrings[$key] ?? (string) $default;
+}
+
+function isModEnabled($module)
+{
+	global $testModules;
+	return !empty($testModules[$module]);
 }
 
 function getEntity($element)
@@ -30,7 +42,7 @@ function getEntity($element)
 
 function price2num($value, $type = '')
 {
-	return (float) $value;
+	return is_numeric($value) ? (float) $value : $value;
 }
 
 function dol_include_once($path)
@@ -45,6 +57,9 @@ class Product
 
 	/** @var int */
 	public $id = 0;
+
+	/** @var int */
+	public $entity = 1;
 
 	/** @var int */
 	public $type = self::TYPE_PRODUCT;
@@ -70,6 +85,7 @@ class Product
 		$this->id = (int) $id;
 		$this->type = (int) $product['type'];
 		$this->ref = (string) $product['ref'];
+		$this->entity = isset($product['entity']) ? (int) $product['entity'] : 1;
 		return 1;
 	}
 }

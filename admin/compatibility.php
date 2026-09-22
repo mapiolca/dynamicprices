@@ -45,6 +45,7 @@ if (!$res) {
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 require_once '../lib/dynamicsprices.lib.php';
 require_once '../core/modules/modDynamicsPrices.class.php';
+require_once __DIR__.'/../class/dynamicpricescostservice.class.php';
 
 /**
  * @var Conf $conf
@@ -63,8 +64,17 @@ $moduleDescriptor = new modDynamicsPrices($db);
 $dolibarrVersion = defined('DOL_VERSION') ? (string) DOL_VERSION : '';
 $isDolibarrSupported = $dolibarrVersion !== '' && version_compare($dolibarrVersion, '20.0.0', '>=');
 $isPhpSupported = version_compare(PHP_VERSION, '8.0.0', '>=');
+$costService = new DynamicPricesCostService($db);
+$priceListAvailability = $costService->getPriceListAvailability();
 
 $features = array(
+	array(
+		'label' => 'DynamicPricesCostLineSourcePriceList',
+		'min_dolibarr' => '20.0.0',
+		'min_php' => '8.0.0',
+		'available' => $priceListAvailability['available'],
+		'reason' => $priceListAvailability['reason'],
+	),
 	array(
 		'label' => 'DynamicPricesCompatibilityFeatureDynamicCostStorage',
 		'min_dolibarr' => '20.0.0',

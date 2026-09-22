@@ -91,12 +91,30 @@ Si `DYNAMICPRICES_COST_USE_FOR_SALES` est actif :
 1. Le hook ou trigger détecte une création de ligne ; les modifications de lignes existantes conservent le prix de revient déjà défini.
 2. Il applique la stratégie configurée : `on_create_only`, `manual_button`, `preserve_origin`.
 3. Si un utilisateur autorisé par le droit natif `margins/creer` a choisi manuellement un prix de revient, le service conserve ce choix.
-4. Sinon, à la création uniquement, le service résout la première source disponible selon `DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY` : coût DynamicPrices, valeur par défaut Dolibarr, PMP, puis coût Dolibarr par défaut.
+4. Sinon, à la création uniquement, le service résout la première source disponible selon `DYNAMICPRICES_COST_LINE_SOURCE_PRIORITY`. L'ordre initial reste : coût DynamicPrices, valeur par défaut Dolibarr, PMP, puis coût Dolibarr. La source optionnelle `pricelist` peut être ajoutée au rang choisi par l'administrateur.
 5. Il applique le fallback uniquement si aucune source prioritaire n'est disponible.
 6. Il renseigne le coût de ligne (`pa_ht`) lorsque le contexte Dolibarr le permet.
 7. Il crée un snapshot dans `llx_dynamicprices_line_cost_snapshot`.
 
 Le calcul ne doit jamais être fait pendant la génération PDF.
+
+### Intégration optionnelle PriceList
+
+Implémentation dans le code de travail, sans nouvelle version publiée ni migration SQL. `DynamicPricesCostService::getCommercialLineCostSourceOptions()` centralise les sources et leurs traductions ; `getPriceListAvailability()` contrôle l'activation de PriceList et les signatures publiques requises. Les réglages, l'Ajax et les triggers réutilisent cette disponibilité. L'ordre stocké peut contenir une source temporairement indisponible ; l'ordre exécuté l'ignore sans réécrire la constante.
+
+`getPriceListCost()` charge la classe externe avec `dol_include_once('/pricelist/class/pricelist.class.php')`, puis appelle directement `PriceList::get_price($productId, $thirdparty, $quantity, $document)` et `getEffectiveCostPriceForRow($row)`. PriceList reste la source de vérité pour les paliers, le client, les catégories, les entités et le mode utilisant le coût natif du produit. DynamicPrices ne recopie pas ces règles et ne rend pas disponibles des catégories absentes de la version Dolibarr courante.
+
+Le retour `0` de `get_price()` signifie « aucun tarif » ; un retour de coût `null` signifie « aucun coût ». Un coût égal à `0` est disponible. Une erreur de résolution empêche le passage silencieux à une source de remplacement. Les sources situées après une source déjà disponible ne sont pas interrogées par la résolution serveur.
+
+L'endpoint `ajax/commercial_line_cost.php` conserve ses champs existants et accepte `document_type` (`propal`, `commande`, `facture`), `document_id`, `qty`, `sale_price` et `line_current_cost`. Il ajoute `enabled`, `pricelist` (disponibilité, montant, libellé, erreur) et `resolution` (montant, source, erreur). Les permissions fonctionnelles sont vérifiées par `hasRight()` ; les objets et leurs entités sont vérifiés avec les contrôles natifs d'accès. Les valeurs PriceList nécessitent le droit `margins/creer`. Les appels historiques sans contexte de document restent limités au coût DynamicPrices.
+
+Le JavaScript ignore une réponse dont le produit, la quantité ou le document a changé. Les champs `dynamicsprices_cost_source_mode`, `dynamicsprices_cost_source` et `dynamicsprices_manual_cost` transportent un choix manuel indépendamment des champs que PriceList modifie dans `doActions`. Ils ne donnent aucun droit : le service vérifie directement `margins/creer`, valide le montant et résout à nouveau une sélection explicite de PriceList. Sans ce droit, la priorité automatique s'applique.
+
+Les triggers natifs `LINEPROPAL_INSERT`, `LINEORDER_INSERT` et `LINEBILL_INSERT` chargent la ligne persistée, sa quantité réelle, son parent et son tiers. Ils appliquent le coût après les hooks de création de ligne, dans la transaction native. L'écriture est limitée à la ligne, au parent et à l'entité autorisés. Un échec de coût ou de snapshot remonte au traitement appelant. Le snapshot porte `source_type = pricelist` lorsque cette source est retenue. Aucun nouveau trigger métier n'est créé.
+
+**Valeur par défaut Dolibarr** désigne toujours le coût reçu par le trigger après les traitements natifs et les autres modules. Pour l'aperçu, l'effet connu du hook PriceList sur ce coût entrant est pris en compte ; un autre module modifiant le coût uniquement à la soumission peut encore modifier cette valeur. Le serveur reste décisionnaire.
+
+Contrats examinés le 2026-09-22 : sources PriceList 2.2.0, commit `33769f4d00ecac94c0f3ab79df9ab5500eca41b9` (`class/pricelist.class.php`, méthodes ci-dessus ; `class/actions_pricelist.class.php`, traitement `addline`). Contrôle natif `checkUserAccessToObject()` et sélecteurs examinés dans Dolibarr 20.0.0 et dans le checkout local `0d20b226f5e13b848bb58528398967f52862688c` (24.0.1-1812-g0d20b226f5e). Il s'agit de lecture de sources, pas d'essais sur ces instances. Le dépôt PriceList voisin évoluant indépendamment, cette preuve reste attachée au commit indiqué.
 
 ## Migration depuis l'ancien comportement
 
