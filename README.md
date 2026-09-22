@@ -80,15 +80,15 @@ Réglages principaux du prix de revient DynamicPrices :
 - `DYNAMICPRICES_COST_ALLOW_MANUAL_OVERRIDE` : autorise l'override manuel via API.
 - `DYNAMICPRICES_COST_ALLOW_NATIVE_WRITE` : option legacy pour écrire aussi dans `llx_product.cost_price`. Elle est désactivée par défaut.
 
-### Priorités PriceList — évolution en cours
+### Priorités PriceList (3.0.2)
 
-Le code de travail ajoute **Prix de revient Tarifs Dégréssifs** lorsque PriceList est actif et compatible. Les réglages proposent alors cinq rangs, avec les sélecteurs natifs et l'option **Ignorer ce rang**. L'ordre existant est conservé : l'administrateur peut placer PriceList au rang souhaité, par exemple PriceList → DynamicPrices → prix de revient Dolibarr → PMP → valeur par défaut Dolibarr.
+La version 3.0.2 ajoute **Prix de revient Tarifs Dégréssifs** lorsque PriceList est actif et compatible. Les réglages proposent alors cinq rangs, avec les sélecteurs natifs et l'option **Ignorer ce rang**. L'ordre existant est conservé : l'administrateur peut placer PriceList au rang souhaité, par exemple PriceList → DynamicPrices → prix de revient Dolibarr → PMP → valeur par défaut Dolibarr.
 
 La première source disponible fournit le coût. Zéro est une valeur valide ; un tarif ou un coût absent laisse la place à la source suivante. Une erreur PriceList rencontrée pendant la résolution interrompt l'enregistrement de la ligne. Le rang PriceList reste enregistré par entité lorsqu'il est désactivé ou incompatible : il est affiché comme indisponible et ignoré jusqu'à sa réactivation.
 
 L'aperçu suit le produit et la quantité. Le serveur utilise le document et son tiers pour résoudre les règles PriceList à la création des lignes de devis, commandes et factures, y compris sans navigateur. Un choix manuel autorisé est conservé ; une sélection explicite de PriceList est recalculée côté serveur. Les lignes existantes ne sont pas recalculées par cette intégration. **Valeur par défaut Dolibarr** conserve le coût reçu après les traitements natifs et des autres modules.
 
-Aucune migration SQL n'est nécessaire. Cette évolution ne change ni les prix de vente ni le calcul des coûts produits. L'onglet **Compatibilité** indique la disponibilité de l'intégration. Le contrat et les limites de validation sont décrits dans [l'architecture](docs/ARCHITECTURE_DYNAMIC_COST.md#intégration-optionnelle-pricelist) et le [plan de test](docs/TEST_PLAN_DYNAMIC_COST.md#intégration-pricelist). Cette évolution n'est pas encore publiée dans une nouvelle version.
+Aucune migration SQL n'est nécessaire. Cette évolution ne change ni les prix de vente ni le calcul des coûts produits. L'onglet **Compatibilité** indique la disponibilité de l'intégration. Le contrat et les limites de validation sont décrits dans [l'architecture](docs/ARCHITECTURE_DYNAMIC_COST.md#intégration-optionnelle-pricelist) et le [plan de test](docs/TEST_PLAN_DYNAMIC_COST.md#intégration-pricelist).
 
 ## Migration
 

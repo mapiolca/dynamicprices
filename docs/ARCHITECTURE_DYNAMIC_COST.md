@@ -100,7 +100,7 @@ Le calcul ne doit jamais être fait pendant la génération PDF.
 
 ### Intégration optionnelle PriceList
 
-Implémentation dans le code de travail, sans nouvelle version publiée ni migration SQL. `DynamicPricesCostService::getCommercialLineCostSourceOptions()` centralise les sources et leurs traductions ; `getPriceListAvailability()` contrôle l'activation de PriceList et les signatures publiques requises. Les réglages, l'Ajax et les triggers réutilisent cette disponibilité. L'ordre stocké peut contenir une source temporairement indisponible ; l'ordre exécuté l'ignore sans réécrire la constante.
+Intégration préparée pour la version 3.0.2, sans migration SQL. `DynamicPricesCostService::getCommercialLineCostSourceOptions()` centralise les sources et leurs traductions ; `getPriceListAvailability()` contrôle l'activation de PriceList et les signatures publiques requises. Les réglages, l'Ajax et les triggers réutilisent cette disponibilité. L'ordre stocké peut contenir une source temporairement indisponible ; l'ordre exécuté l'ignore sans réécrire la constante.
 
 `getPriceListCost()` charge la classe externe avec `dol_include_once('/pricelist/class/pricelist.class.php')`, puis appelle directement `PriceList::get_price($productId, $thirdparty, $quantity, $document)` et `getEffectiveCostPriceForRow($row)`. PriceList reste la source de vérité pour les paliers, le client, les catégories, les entités et le mode utilisant le coût natif du produit. DynamicPrices ne recopie pas ces règles et ne rend pas disponibles des catégories absentes de la version Dolibarr courante.
 

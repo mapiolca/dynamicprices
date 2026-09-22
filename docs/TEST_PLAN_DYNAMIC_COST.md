@@ -79,7 +79,7 @@
 
 ## Intégration PriceList
 
-Contrôles automatisés du code de travail, exécutables depuis la racine du module :
+Contrôles automatisés de l'intégration préparée pour la version 3.0.2, exécutables depuis la racine du module :
 
 ```sh
 php test/dynamicpricescostservice_test.php
