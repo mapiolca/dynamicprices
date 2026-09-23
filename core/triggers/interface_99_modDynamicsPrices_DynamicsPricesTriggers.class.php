@@ -415,8 +415,10 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 		$definition = DynamicPricesCostService::getCommercialDocumentTypes()[$documentType];
 		$langs->load('dynamicsprices@dynamicsprices');
 		if (!$user->hasRight($documentType, 'creer')) {
-			$object->error = $langs->trans('DynamicPricesCostAccessDenied');
-			return -1;
+			// Native workflows may create documents without granting manual creation rights.
+			// Leave the native cost untouched and skip only this optional enrichment.
+			dol_syslog(__METHOD__.' skip automatic cost recalculation: missing create permission for '.$documentType, LOG_DEBUG);
+			return 0;
 		}
 		$service = new DynamicPricesCostService($db);
 		$costColumn = $service->resolveCommercialLineCostColumn($definition['line_table']);

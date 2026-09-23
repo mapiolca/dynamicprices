@@ -1,6 +1,6 @@
 # DynamicsPrices
 
-Version courante : 3.0.2.
+Version courante : 3.0.3.
 
 ## Présentation
 
@@ -90,6 +90,14 @@ L'aperçu suit le produit et la quantité. Le serveur utilise le document et son
 
 Aucune migration SQL n'est nécessaire. Cette évolution ne change ni les prix de vente ni le calcul des coûts produits. L'onglet **Compatibilité** indique la disponibilité de l'intégration. Le contrat et les limites de validation sont décrits dans [l'architecture](docs/ARCHITECTURE_DYNAMIC_COST.md#intégration-optionnelle-pricelist) et le [plan de test](docs/TEST_PLAN_DYNAMIC_COST.md#intégration-pricelist).
 
+### Créations automatiques par Workflow (3.0.3)
+
+Lors de l'insertion d'une ligne de devis, commande ou facture, si l'utilisateur ne possède pas le droit natif de création du document cible, DynamicPrices ignore son recalcul automatique et conserve exactement le coût reçu du traitement natif, y compris zéro ou une valeur nulle. Aucune recherche de tarif, écriture de coût ou création de snapshot DynamicPrices n'est exécutée dans ce cas ; une trace de niveau DEBUG explique le recalcul ignoré sans exposer de montant ni de donnée client.
+
+Un commercial autorisé à signer un devis peut ainsi laisser le module Workflow créer sa commande sans recevoir le droit de créer manuellement des commandes. L'autorisation de l'opération reste gérée par le parcours natif. Les contrôles de consultation Ajax, les contrôles d'entité et d'accès métier des recalculs autorisés, ainsi que les erreurs de calcul restent inchangés. Les administrateurs suivent le même résultat de `hasRight()`.
+
+Aucune migration SQL ni modification des permissions n'est nécessaire. Ce correctif ne traite pas l'erreur native Dolibarr 23.0.2 concernant `fk_user_modif`. La recette du parcours complet est décrite dans le [plan de test](docs/TEST_PLAN_DYNAMIC_COST.md#créations-automatiques-workflow-303).
+
 ## Migration
 
 ### Key features
@@ -109,7 +117,7 @@ Aucune migration SQL n'est nécessaire. Cette évolution ne change ni les prix d
 
 #### From a ZIP archive
 
-1. Download the `module_dynamicsprices-3.0.2.zip` archive.
+1. Download the `module_dynamicsprices-3.0.3.zip` archive.
 2. Deploy it via **Home > Setup > Modules > Deploy an external module**.
 3. Enable the **DynamicsPrices** module in **Setup > Modules/Applications**.
 
