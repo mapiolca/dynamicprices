@@ -1,5 +1,11 @@
 # ChangeLog DynamicsPrices
 
+## 3.0.3
+
+- Correction du blocage de la création automatique de commandes par Workflow lorsqu'un commercial signe un devis sans disposer du droit de création de commandes.
+- Pour les insertions de lignes de devis, commandes et factures sans droit de création du document cible, abandon du recalcul DynamicPrices et conservation du coût natif, sans écriture ni snapshot supplémentaire ; diagnostic au niveau DEBUG.
+- Conservation des contrôles d'accès Ajax, d'entité et de périmètre métier, sans élévation des droits administrateur. Aucune migration SQL ni attribution de droit supplémentaire ; l'anomalie native `fk_user_modif` reste distincte.
+
 ## 3.0.2
 
 - Ajout du prix de revient **Tarifs Dégréssifs** aux priorités des lignes commerciales lorsque PriceList est actif et compatible, avec conservation de l'ordre existant et du rang enregistré en cas de désactivation.

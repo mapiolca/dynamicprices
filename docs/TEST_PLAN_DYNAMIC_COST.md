@@ -121,6 +121,27 @@ Résultats au 2026-09-22 : tests PHP réussis sous PHP 8.4.22, tests Ajax/trigge
 
 Pas de migration, de nouveau cron, d'Agenda, de Notifications, de numérotation ou de génération documentaire dans ce périmètre : leurs tests spécifiques ne s'appliquent pas à cette évolution.
 
+## Créations automatiques Workflow (3.0.3)
+
+Le correctif distingue le recalcul facultatif de DynamicPrices de l'autorisation du parcours natif. L'absence de droit `creer` sur le document cible fait ignorer le recalcul, sans erreur ajoutée, recherche de tarif, écriture ni snapshot. Un utilisateur autorisé conserve les contrôles d'entité et d'accès métier existants et les erreurs de calcul restent bloquantes. L'endpoint Ajax conserve son contrôle de lecture du document et ses droits de consultation des coûts.
+
+### Vérification automatisée du correctif
+
+`php test/commercial_line_cost_endpoint_test.php` exécute 53 scénarios isolés. La matrice ajoutée couvre devis, commande et facture, utilisateur standard et administrateur, coût positif, zéro et valeur nulle. Elle vérifie le retour neutre, l'absence de requête SQL et d'appel PriceList, l'absence d'écriture et d'erreur ajoutée et le contenu limité du diagnostic DEBUG. Les refus Ajax restent vérifiés pour les trois documents et les deux profils.
+
+Le nouveau test a reproduit le refus `DynamicPricesCostAccessDenied` avant modification du trigger. Après correction, les 53 scénarios passent sous PHP 8.4.22, ainsi que `dynamicpricescostservice_test.php` et `commercial_line_cost_test.php` (modes normal, `missing` et `incompatible`). Le contrôle `php -l` réussit sur les fichiers PHP modifiés.
+
+Ces résultats du 2026-09-23 proviennent de doubles de test (avec `DOL_VERSION` simulé à 20.0.0), pas d'une instance Dolibarr : ils ne prouvent ni la signature réelle ni le commit de la commande Workflow. PHPStan est indisponible ; le checkout Dolibarr local ne contient pas de configuration `htdocs/conf/conf.php`. Aucun déploiement, envoi de notification ni test navigateur distant n'a été effectué. Le couple Dolibarr 20 / PHP 8.0 et Multicompany réel restent à valider.
+
+### Recette restant à exécuter sur Dolibarr 23.0.2
+
+1. Utiliser une instance de test servant le correctif 3.0.3 ; noter PHP, Multicompany et les réglages Workflow, Agenda et Notifications. Reproduire les droits et l'entité du commercial sans lui accorder `commande.creer`.
+2. Préparer deux devis, avec et sans batterie, avec prix de revient connus. Signer chaque devis : contrôler le statut signé, une seule commande liée, les lignes complètes et le coût issu du traitement natif sans recalcul DynamicPrices ni nouveau snapshot du module. Pour un coût nul ou zéro, comparer avec la valeur effectivement fournie par Dolibarr, qui peut appliquer ses propres règles avant le trigger.
+3. Rejouer le parcours natif après succès : vérifier l'absence de seconde commande. Tester aussi un administrateur dont `hasRight('commande', 'creer')` est faux, puis un utilisateur autorisé avec recalcul normal. Vérifier qu'une création manuelle reste refusée au commercial.
+4. Avec un utilisateur autorisé au recalcul, vérifier le refus des documents/tiers hors périmètre et d'une entité non accessible. Provoquer une erreur de calcul en environnement de test : vérifier la propagation de l'erreur et le rollback natif.
+5. Vérifier les refus Ajax sans droit de lecture ou de consultation des coûts. Relever séparément les éventuelles traces `fk_user_modif`, qui relèvent du core 23.0.2 et ne sont pas corrigées par ce patch.
+6. Comparer puis restaurer les réglages temporaires sans écraser de changements concurrents ; inventorier les données de test et effets externes éventuels. Ne pas interpréter un rollback comme l'annulation d'un email déjà envoyé.
+
 ## Migration
 
 - Simulation depuis coût Dolibarr.
