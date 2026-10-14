@@ -1,6 +1,6 @@
 # DynamicsPrices
 
-Version courante : 3.0.3.
+Version courante : 3.0.4.
 
 ## Présentation
 
@@ -117,7 +117,7 @@ Aucune migration SQL ni modification des permissions n'est nécessaire. Ce corre
 
 #### From a ZIP archive
 
-1. Download the `module_dynamicsprices-3.0.3.zip` archive.
+1. Download the `module_dynamicsprices-3.0.4.zip` archive.
 2. Deploy it via **Home > Setup > Modules > Deploy an external module**.
 3. Enable the **DynamicsPrices** module in **Setup > Modules/Applications**.
 
