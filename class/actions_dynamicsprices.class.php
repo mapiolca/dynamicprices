@@ -467,7 +467,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 		$form = new Form($this->db);
 		$formquestion = array(
-			array('type' => 'other', 'name' => 'dynamicsprices_instruction', 'label' => '', 'value' => '<p>'.dol_escape_htmltag($langs->trans('LMDB_SupplierPriceModalDescription')).'</p>'),
+			array('type' => 'other', 'name' => 'dynamicsprices_instruction', 'label' => '', 'value' => '<div class="confirmtext">'.dol_escape_htmltag($langs->trans('LMDB_SupplierPriceModalDescription')).'</div>'),
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_modal', 'value' => '1'),
 			array('type' => 'hidden', 'name' => 'datecommande', 'value' => $datecommande),
@@ -505,6 +505,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		// The dialog already carries the title; the confirmation body is neutral.
 		$this->resprints = str_replace('<div class="valid">', '<div>', $this->resprints);
 		$this->resprints = preg_replace('/<div class="validtitre">.*?<\/div>\s*/s', '', $this->resprints);
+		$this->resprints = str_replace(array('<div style="padding-top: 20px;"></div>', '<div class="inline-block"></div>', "</form>\n<br>"), array('', '', "</form>\n"), $this->resprints);
 		// Keep the native POST form intact inside the native jQuery UI dialog.
 		// Closing the dialog has no handler and never submits the order.
 		$this->resprints = '<div id="dynamicsprices_supplier_confirmation">'.$this->resprints.'</div>';
@@ -516,13 +517,13 @@ class ActionsDynamicsPrices extends CommonHookActions
 				var dialog = $("#dynamicsprices_supplier_confirmation");
 				if (typeof $.fn.dialog !== "function" || dialog.hasClass("ui-dialog-content")) { return; }
 				var form = dialog.find("form");
+				form.find("input[type=submit]").parent(".inline-block").hide();
 				dialog.dialog({modal: true, title: '.$dialogTitle.', width: Math.min(1200, $(window).width() - 32),
 					maxHeight: $(window).height() - 64, height: "auto", closeOnEscape: true,
 					buttons: [
 						{text: '.$validateLabel.', click: function () { form[0].requestSubmit(); }},
 						{text: '.$cancelLabel.', click: function () { dialog.dialog("close"); }}
 					]});
-				form.find("input[type=submit]").hide();
 				form.on("submit.dynamicsprices", function () {
 					dialog.dialog("widget").find(".ui-dialog-buttonpane button").prop("disabled", true);
 				});
