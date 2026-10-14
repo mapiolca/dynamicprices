@@ -67,6 +67,24 @@ class ActionsDynamicsPrices extends CommonHookActions
 			return 0;
 		}
 
+		global $conf, $user;
+		// Recent native cards submit directly from their order modal.
+		// Insert the optional tariff proposal before the native transaction starts.
+		if ($action === 'confirm_commande' && GETPOST('confirm', 'alpha') === 'yes'
+			&& $object instanceof CommandeFournisseur && (int) $object->entity === (int) $conf->entity
+			&& $user->hasRight('fournisseur', 'lire') && $user->hasRight('fournisseur', 'commande', 'commander')
+			&& empty($user->socid)
+			&& in_array((int) $object->status, array(CommandeFournisseur::STATUS_VALIDATED, CommandeFournisseur::STATUS_ACCEPTED), true)) {
+			try {
+				if ($this->filterPriceDifferences($this->getOrderSupplierPriceDifferences($object, true))) {
+					$action = 'commande';
+				}
+			} catch (Throwable $exception) {
+				$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceWriteFailed');
+				return -1;
+			}
+			return 0;
+		}
 		if ($action !== 'dynamicsprices_confirm_commande') {
 			dol_syslog(__METHOD__.' - Skip: action is not dynamicsprices_confirm_commande', LOG_DEBUG);
 			return 0;
@@ -76,7 +94,6 @@ class ActionsDynamicsPrices extends CommonHookActions
 			return 0;
 		}
 
-		global $conf, $user;
 		if (!isModEnabled('dynamicsprices') || !$object instanceof CommandeFournisseur
 			|| (int) $object->id <= 0 || (int) $object->entity !== (int) $conf->entity
 			|| !in_array((int) $object->status, array(CommandeFournisseur::STATUS_VALIDATED, CommandeFournisseur::STATUS_ACCEPTED), true)
@@ -396,6 +413,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 			GETPOSTINT('reday'),
 			GETPOSTINT('reyear')
 		);
+		if (GETPOSTINT('datecommande') > 0) {
+			$datecommande = GETPOSTINT('datecommande');
+		}
+		$dateParts = dol_getdate($datecommande);
 		$methodecommande = GETPOST('methodecommande', 'alpha');
 		$comment = GETPOST('comment', 'alphanohtml');
 		$csrfToken = newToken();
@@ -449,9 +470,16 @@ class ActionsDynamicsPrices extends CommonHookActions
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_modal', 'value' => '1'),
 			array('type' => 'hidden', 'name' => 'datecommande', 'value' => $datecommande),
+			array('type' => 'hidden', 'name' => 'reyear', 'value' => $dateParts['year']),
+			array('type' => 'hidden', 'name' => 'remonth', 'value' => $dateParts['mon']),
+			array('type' => 'hidden', 'name' => 'reday', 'value' => $dateParts['mday']),
+			array('type' => 'hidden', 'name' => 'rehour', 'value' => $dateParts['hours']),
+			array('type' => 'hidden', 'name' => 'remin', 'value' => $dateParts['minutes']),
+			array('type' => 'hidden', 'name' => 'resec', 'value' => $dateParts['seconds']),
 			array('type' => 'hidden', 'name' => 'methodecommande', 'value' => $methodecommande),
 			array('type' => 'hidden', 'name' => 'methode', 'value' => $methodecommande),
 			array('type' => 'hidden', 'name' => 'comment', 'value' => $comment),
+			array('type' => 'hidden', 'name' => 'manual_trigger_send', 'value' => GETPOST('manual_trigger_send', 'alpha')),
 		);
 
 		$this->resprints = $form->formconfirm(

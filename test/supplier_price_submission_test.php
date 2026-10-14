@@ -116,6 +116,7 @@ function restrictedArea(...$args) {
 function setEventMessages(...$args) {}
 function GETPOSTINT($key) { return (int) GETPOST($key, 'int'); }
 function dol_mktime(...$args) { return 1700000000; }
+function dol_getdate($timestamp) { return array('year' => 2026, 'mon' => 10, 'mday' => 14, 'hours' => 0, 'minutes' => 0, 'seconds' => 0); }
 function newToken() { return 'simulated-token'; }
 function getNonce() { return 'simulated-nonce'; }
 function dol_escape_htmltag($value) { return htmlspecialchars((string) $value, ENT_QUOTES); }
@@ -165,6 +166,8 @@ if (($argv[1] ?? '') === '--native-form') {
 	check(1, $xpath->query('//form//select[@name="dynamicsprices_update_prices"]')->length, 'Separate native selector for optional update');
 	check(1, $xpath->query('//form/input[@name="token"]')->length, 'Native CSRF field');
 	check(2, $xpath->query('//form//input[contains(@name,"[unitprice]")]')->length, 'Editable prices belong to POST form');
+	check(1, $xpath->query('//form//input[@name="reyear" and @value="2026"]')->length, 'Native date components survive the tariff proposal');
+	check(1, $xpath->query('//form//input[@name="manual_trigger_send"]')->length, 'Native manual-trigger choice survives the tariff proposal');
 	check(1, $xpath->query('//div[@id="dynamicsprices_supplier_confirmation"]/form')->length, 'Entire POST form belongs to modal container');
 	$conf->use_javascript_ajax = 1;
 	check(1, $hook->formConfirm($parameters, $order, $action, $manager), 'Modal rendering with native Ajax enabled');
@@ -186,6 +189,15 @@ function prepare($request, $expected = 0) {
 	check($expected, $hook->doActions($parameters, $order, $action, $manager), 'Preparation result');
 	return $action;
 }
+$_POST = array('confirm' => 'yes', 'token' => 'middleware-validated');
+$nativeAction = 'confirm_commande';
+check(0, $hook->doActions($parameters, $order, $nativeAction, $manager), 'Direct native modal preparation');
+check('commande', $nativeAction, 'Direct native submission opens the tariff proposal first');
+check(0, $db->writes, 'Direct native modal preparation performs no writes');
+$_POST['confirm'] = 'no';
+$nativeAction = 'confirm_commande';
+check(0, $hook->doActions($parameters, $order, $nativeAction, $manager), 'Native cancellation stays neutral');
+check('confirm_commande', $nativeAction, 'Native cancellation never opens a tariff proposal');
 check('confirm_commande', prepare($request), 'Native submission must remain active');
 check(0, $db->writes, 'Hook preparation must never write prices');
 check(10, $order->context['dynamicsprices_supplier_updates'][10]['fk_product'], 'Forged product ignored');
