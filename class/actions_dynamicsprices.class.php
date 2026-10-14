@@ -505,16 +505,30 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$this->resprints
 		);
 		$this->resprints = str_replace('</form>', '<input type="hidden" name="confirm" value="yes"></form>', $this->resprints);
+		// The dialog already carries the title; the confirmation body is neutral.
+		$this->resprints = str_replace('<div class="valid">', '<div>', $this->resprints);
+		$this->resprints = preg_replace('/<div class="validtitre">.*?<\/div>\s*/s', '', $this->resprints);
 		// Keep the native POST form intact inside the native jQuery UI dialog.
 		// Closing the dialog has no handler and never submits the order.
 		$this->resprints = '<div id="dynamicsprices_supplier_confirmation">'.$this->resprints.'</div>';
 		if (!empty($conf->use_javascript_ajax)) {
 			$dialogTitle = json_encode($langs->transnoentities('LMDB_SupplierPriceModalTitle'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+			$validateLabel = json_encode($langs->transnoentities('Validate'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+			$cancelLabel = json_encode($langs->transnoentities('Cancel'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 			$this->resprints .= '<script nonce="'.getNonce().'">jQuery(function ($) {
 				var dialog = $("#dynamicsprices_supplier_confirmation");
 				if (typeof $.fn.dialog !== "function" || dialog.hasClass("ui-dialog-content")) { return; }
+				var form = dialog.find("form");
 				dialog.dialog({modal: true, title: '.$dialogTitle.', width: Math.min(1200, $(window).width() - 32),
-					maxHeight: $(window).height() - 64, height: "auto", closeOnEscape: true});
+					maxHeight: $(window).height() - 64, height: "auto", closeOnEscape: true,
+					buttons: [
+						{text: '.$validateLabel.', click: function () { form[0].requestSubmit(); }},
+						{text: '.$cancelLabel.', click: function () { dialog.dialog("close"); }}
+					]});
+				form.find("input[type=submit]").hide();
+				form.on("submit.dynamicsprices", function () {
+					dialog.dialog("widget").find(".ui-dialog-buttonpane button").prop("disabled", true);
+				});
 			});</script>';
 		}
 

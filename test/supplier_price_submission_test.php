@@ -169,6 +169,7 @@ if (($argv[1] ?? '') === '--native-form') {
 	check(1, $xpath->query('//form//input[@name="reyear" and @value="2026"]')->length, 'Native date components survive the tariff proposal');
 	check(1, $xpath->query('//form//input[@name="manual_trigger_send"]')->length, 'Native manual-trigger choice survives the tariff proposal');
 	check(1, $xpath->query('//div[@id="dynamicsprices_supplier_confirmation"]/form')->length, 'Entire POST form belongs to modal container');
+	check(0, $xpath->query('//div[@class="valid" or @class="validtitre"]')->length, 'No warning background or repeated confirmation title');
 	$conf->use_javascript_ajax = 1;
 	check(1, $hook->formConfirm($parameters, $order, $action, $manager), 'Modal rendering with native Ajax enabled');
 	$modalDom = new DOMDocument();
