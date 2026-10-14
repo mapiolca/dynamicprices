@@ -266,3 +266,7 @@ LMDB_KitCostFallbackToCostPriceWarning = Le composant %s n'a pas de prix d'achat
 LMDB_KitCostFallbackToPmpWarning = Le composant %s n'a ni prix d'achat fournisseur ni prix de revient. Le PMP est utilisé pour calculer le coût du kit %s.
 LMDB_KitCostMissingAllPricesError = Le composant %s n'a ni prix d'achat fournisseur, ni prix de revient, ni PMP. Le calcul du coût du kit %s est abandonné.
 LMDB_KitDynamicCostMissingError = Le composant %s ne possède pas de prix de revient DynamicPrices valide. Le calcul du kit %s est abandonné.
+LMDB_SupplierPriceAccessDenied=Accès refusé à la mise à jour des prix fournisseurs.
+LMDB_SupplierPriceInvalidInput=Les valeurs du tarif fournisseur sont invalides.
+LMDB_SupplierPriceWriteFailed=La mise à jour des tarifs fournisseurs a échoué ; la commande ne peut pas être envoyée.
+LMDB_SupplierPriceConcurrentChange=Le tarif fournisseur a changé depuis la confirmation. Rechargez la commande avant de réessayer.

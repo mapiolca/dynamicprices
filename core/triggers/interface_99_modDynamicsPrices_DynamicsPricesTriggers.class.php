@@ -75,6 +75,18 @@ class InterfaceDynamicsPricesTriggers extends DolibarrTriggers
 			return 0; // If module is not enabled, we do nothing
 		}
 
+		if ($action === 'ORDER_SUPPLIER_SUBMIT' && isset($object->context['dynamicsprices_supplier_updates'])) {
+			require_once __DIR__.'/../../class/actions_dynamicsprices.class.php';
+			$priceActions = new ActionsDynamicsPrices($this->db);
+			$result = $priceActions->applySupplierPriceUpdates($object);
+			if ($result < 0) {
+				$this->error = $priceActions->error;
+				$this->errors = $priceActions->errors;
+				return -1;
+			}
+			return $result;
+		}
+
 		// Put here code you want to execute when a Dolibarr business events occurs.
 		// Data and type of action are stored into $object and $action
 
