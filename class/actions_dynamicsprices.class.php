@@ -497,14 +497,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$langs->trans('LMDB_Ignore')
 		);
 
-		// The core caches confirm before doActions. Keep confirm=yes for submission,
-		// and use a separate native yes/no selector for the optional tariff update.
-		$this->resprints = str_replace(
-			array('name="confirm"', 'id="confirm"'),
-			array('name="dynamicsprices_update_prices"', 'id="dynamicsprices_update_prices"'),
-			$this->resprints
-		);
-		$this->resprints = str_replace('</form>', '<input type="hidden" name="confirm" value="yes"></form>', $this->resprints);
+		// Checked lines are the only update choice. The core caches confirm before
+		// doActions, so preserve its confirmation separately from the line selection.
+		$this->resprints = preg_replace('/<select\b[^>]*name="confirm"[^>]*>.*?<\/select>/s', '', $this->resprints);
+		$this->resprints = str_replace('</form>', '<input type="hidden" name="confirm" value="yes"><input type="hidden" name="dynamicsprices_update_prices" value="yes"></form>', $this->resprints);
 		// The dialog already carries the title; the confirmation body is neutral.
 		$this->resprints = str_replace('<div class="valid">', '<div>', $this->resprints);
 		$this->resprints = preg_replace('/<div class="validtitre">.*?<\/div>\s*/s', '', $this->resprints);

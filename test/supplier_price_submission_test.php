@@ -163,7 +163,8 @@ if (($argv[1] ?? '') === '--native-form') {
 	$xpath = new DOMXPath($dom);
 	check(1, $xpath->query('//form[@method="POST"]')->length, 'Exactly one POST confirmation form');
 	check(1, $xpath->query('//form/input[@name="confirm" and @value="yes"]')->length, 'Core confirmation is always yes');
-	check(1, $xpath->query('//form//select[@name="dynamicsprices_update_prices"]')->length, 'Separate native selector for optional update');
+	check(0, $xpath->query('//form//select')->length, 'Checked lines replace the redundant confirmation selector');
+	check(1, $xpath->query('//form/input[@name="dynamicsprices_update_prices" and @value="yes"]')->length, 'Selected lines are processed when validating');
 	check(1, $xpath->query('//form/input[@name="token"]')->length, 'Native CSRF field');
 	check(2, $xpath->query('//form//input[contains(@name,"[unitprice]")]')->length, 'Editable prices belong to POST form');
 	check(1, $xpath->query('//form//input[@name="reyear" and @value="2026"]')->length, 'Native date components survive the tariff proposal');
