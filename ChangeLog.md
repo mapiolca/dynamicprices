@@ -1,5 +1,13 @@
 # ChangeLog DynamicsPrices
 
+## Correctifs en attente de publication — prix fournisseurs (PR #34)
+
+- Actualisation des tarifs dans la transaction native de passage de commande : une erreur de prix empêche la validation de la commande, avec contrôle des droits, de l'entité, des données et des confirmations devenues obsolètes.
+- Création d'un nouveau palier lors d'un changement de quantité minimale, conservation de l'ancien tarif et réutilisation du palier correspondant sans doublon ; conservation des prix zéro, des précisions natives, de la TVA, des remises et des conditionnements valides.
+- Rétablissement de la modale avec formulaire POST et token CSRF : fond neutre, titre unique, consigne au-dessus du tableau et boutons Valider/Annuler dans le pied de la modale. Seules les lignes cochées sont actualisées ; une sélection vide passe la commande sans changer les prix. Annuler, fermer ou appuyer sur Échap ne soumet pas la commande.
+- Prise en charge des deux parcours natifs de confirmation, y compris l'envoi direct depuis la nouvelle modale Dolibarr, avec conservation de la date, de la méthode et du commentaire de commande.
+- Correction des contrôles natifs d'accès aux produits et fournisseurs et du retour d'erreur de confirmation. Aucune migration SQL, attribution de droit, modification du core ni écriture automatique dans le prix de revient natif du produit ; version publiée inchangée.
+
 ## 3.0.3
 
 - Correction du blocage de la création automatique de commandes par Workflow lorsqu'un commercial signe un devis sans disposer du droit de création de commandes.
