@@ -52,7 +52,6 @@ class ActionsDynamicsPrices extends CommonHookActions
 	public function doActions($parameters, &$object, &$action, $hookmanager)
 	{
 		dol_syslog(__METHOD__.' - Start doActions with action='.$action, LOG_DEBUG);
-		dol_syslog(__METHOD__.' - WARNING trace: entering doActions', LOG_WARNING);
 
 		if ($this->isProductCostContext($parameters)) {
 			return $this->doProductCostActions($parameters, $object, $action, $hookmanager);
@@ -77,23 +76,28 @@ class ActionsDynamicsPrices extends CommonHookActions
 			return 0;
 		}
 
-		$confirm = GETPOST('confirm', 'alpha');
-		if ($confirm !== 'yes') {
-			dol_syslog(__METHOD__.' - Ignore flow detected from modal, continue supplier order submission without upsert', LOG_DEBUG);
-			$_POST['dynamicsprices_skip_update'] = '1';
-			$_REQUEST['dynamicsprices_skip_update'] = '1';
+		global $conf, $user;
+		if (!isModEnabled('dynamicsprices') || !$object instanceof CommandeFournisseur
+			|| (int) $object->id <= 0 || (int) $object->entity !== (int) $conf->entity
+			|| !in_array((int) $object->status, array(CommandeFournisseur::STATUS_VALIDATED, CommandeFournisseur::STATUS_ACCEPTED), true)
+			|| !$user->hasRight('fournisseur', 'commande', 'commander') || !empty($user->socid)) {
+			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceAccessDenied');
+			return -1;
 		}
-
-		if ($action !== 'confirm_commande') {
-			$_POST['action'] = 'confirm_commande';
-			$_REQUEST['action'] = 'confirm_commande';
+		// main.inc.php validates the token before hooks run; refuse missing tokens as well.
+		if (GETPOST('token', 'alphanohtml') === '') {
+			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceAccessDenied');
+			return -1;
+		}
+		$confirm = GETPOST('dynamicsprices_update_prices', 'alpha');
+		if (!in_array($confirm, array('yes', 'no'), true)) {
+			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceInvalidInput');
+			return -1;
+		}
+		if ($confirm === 'no' || GETPOST('dynamicsprices_skip_update', 'alpha') === '1') {
+			$action = 'confirm_commande';
 			$_POST['confirm'] = 'yes';
 			$_REQUEST['confirm'] = 'yes';
-			$action = 'confirm_commande';
-		}
-
-		if (GETPOST('dynamicsprices_skip_update', 'alpha') === '1') {
-			dol_syslog(__METHOD__.' - Skip update requested, continue supplier order submission', LOG_DEBUG);
 			return 0;
 		}
 
@@ -105,80 +109,83 @@ class ActionsDynamicsPrices extends CommonHookActions
 		if (!is_array($postedRowsData)) {
 			$postedRowsData = array();
 		}
-		$payloadRowsData = $this->getPostedRowsDataFromPayload();
-		if (!empty($payloadRowsData)) {
-			$postedRowsData = $payloadRowsData;
-			$selectedRows = $this->getSelectedRowsFromPostedData($payloadRowsData);
-		}
-		$selectedLinesCsv = GETPOST('dynamicsprices_selected_lines', 'alphanohtml');
-		if (empty($selectedRows) && empty($payloadRowsData) && !empty($selectedLinesCsv)) {
-			$selectedLineIds = explode(',', $selectedLinesCsv);
-			foreach ($selectedLineIds as $selectedLineId) {
-				$selectedLineId = (int) trim($selectedLineId);
-				if ($selectedLineId > 0) {
-					$selectedRows[$selectedLineId] = 1;
-				}
-			}
-		}
 		dol_syslog(__METHOD__.' - Selected supplier price lines='.implode(',', array_keys($selectedRows)), LOG_DEBUG);
 
-		$differences = $this->getOrderSupplierPriceDifferences($object, true);
-		$priceDifferences = $this->filterPriceDifferences($differences);
-		if (empty($priceDifferences)) {
-			dol_syslog(__METHOD__.' - No supplier unit price difference found, nothing to update', LOG_DEBUG);
-			return 0;
+		try {
+			$differences = $this->getOrderSupplierPriceDifferences($object, true);
+		} catch (Throwable $exception) {
+			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceWriteFailed');
+			return -1;
 		}
-		dol_syslog(__METHOD__.' - Found '.count($priceDifferences).' line(s) with supplier unit price differences', LOG_DEBUG);
-
-		$updatedLines = 0;
-		$updatedUp = 0;
-		$updatedDown = 0;
-		$updatedSame = 0;
+		$updates = array();
 		foreach ($differences as $lineId => $diff) {
-			$lineIdInt = (int) $lineId;
-			if (!array_key_exists($lineIdInt, $selectedRows) && !array_key_exists((string) $lineId, $selectedRows)) {
-				if (array_key_exists($lineIdInt, $priceDifferences) || array_key_exists((string) $lineId, $priceDifferences)) {
-					$updatedSame++;
-				}
-				dol_syslog(__METHOD__.' - Skip line '.$lineId.' (unchecked)', LOG_DEBUG);
+			if (!isset($selectedRows[$lineId])) {
 				continue;
 			}
-
-			$preparedDiff = $this->applyPostedValuesToDiff($lineIdInt, $diff, $postedRowsData);
-			if (!$this->hasSupplierPricePersistChange($preparedDiff)) {
-				$updatedSame++;
-				dol_syslog(__METHOD__.' - Skip line '.$lineId.' (no supplier price change to persist)', LOG_DEBUG);
-				continue;
-			}
-
-			dol_syslog(__METHOD__.' - Upsert supplier price for line '.$lineId.' (product '.$preparedDiff['fk_product'].')', LOG_DEBUG);
-			$res = $this->upsertSupplierPriceFromDiff($preparedDiff);
-			if ($res < 0) {
-				$this->normalizeSupplierPriceHookErrors();
-				dol_syslog(__METHOD__.' - Error while upserting supplier price for line '.$lineId.': '.$this->error, LOG_ERR);
+			if (!isset($postedRowsData[$lineId]) || !is_array($postedRowsData[$lineId])) {
+				$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceInvalidInput');
 				return -1;
 			}
-
-			$updatedLines++;
-			$direction = isset($preparedDiff['price_direction']) ? (string) $preparedDiff['price_direction'] : 'same';
-			if ($direction === 'up') {
-				$updatedUp++;
-			} elseif ($direction === 'down') {
-				$updatedDown++;
-			} else {
-				$updatedSame++;
+			foreach (array('qty', 'unitquantity', 'vat', 'unitprice', 'discount', 'supplier_ref') as $field) {
+				if (!isset($postedRowsData[$lineId][$field]) || !is_scalar($postedRowsData[$lineId][$field])) {
+					$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceInvalidInput');
+					return -1;
+				}
 			}
-			dol_syslog(__METHOD__.' - Applied supplier price update on order='.(int) $object->id.' line='.(int) $lineId.' product='.(int) $preparedDiff['fk_product'].' supplier='.(int) $preparedDiff['fk_soc'].' current='.(isset($preparedDiff['current_unitprice']) ? price2num((float) $preparedDiff['current_unitprice'], 'MS') : 0).' new='.price2num((float) $preparedDiff['unitprice'], 'MS').' delta='.(isset($preparedDiff['price_delta']) ? price2num((float) $preparedDiff['price_delta'], 'MS') : 0).' direction='.$direction, LOG_DEBUG);
+			if (!isset($postedRowsData[$lineId]['expected_unitprice'], $postedRowsData[$lineId]['current_rowid'])
+				|| !is_scalar($postedRowsData[$lineId]['expected_unitprice'])
+				|| !is_scalar($postedRowsData[$lineId]['current_rowid'])
+				|| (int) $postedRowsData[$lineId]['current_rowid'] !== (int) $diff['current_rowid']
+				|| !$this->areDecimalValuesEqual($postedRowsData[$lineId]['expected_unitprice'], $diff['current_unitprice'])) {
+				$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceConcurrentChange');
+				return -1;
+			}
+			$preparedDiff = $this->applyPostedValuesToDiff((int) $lineId, $diff, $postedRowsData);
+			if ($this->hasSupplierPricePersistChange($preparedDiff)) {
+				$updates[(int) $lineId] = $preparedDiff;
+			}
 		}
-
-		if ($updatedLines > 0 || $updatedSame > 0) {
-			global $langs;
-			$langs->load('dynamicsprices@dynamicsprices');
-			setEventMessages($langs->trans('LMDB_SupplierPriceUpdatedCountWithDirection', $updatedLines, $updatedUp, $updatedDown, $updatedSame), null, 'mesgs');
-		}
-		dol_syslog(__METHOD__.' - End doActions with '.$updatedLines.' line(s) updated', LOG_DEBUG);
-
+		// Only the native submission trigger writes prices, inside the order transaction.
+		$object->context['dynamicsprices_supplier_updates'] = $updates;
+		$action = 'confirm_commande';
+		dol_syslog(__METHOD__.' supplier updates prepared order='.(int) $object->id.' entity='.(int) $object->entity.' count='.count($updates), LOG_INFO);
 		return 0;
+	}
+
+	/**
+	 * Persist prepared prices in the native ORDER_SUPPLIER_SUBMIT transaction.
+	 * No request/session data is read here; the caller owns the final commit.
+	 *
+	 * @param CommandeFournisseur $object Submitted supplier order
+	 * @return int Negative on error, positive on success
+	 */
+	public function applySupplierPriceUpdates($object)
+	{
+		global $conf, $user;
+		$updates = $object->context['dynamicsprices_supplier_updates'] ?? array();
+		unset($object->context['dynamicsprices_supplier_updates']);
+		if (!is_array($updates) || (int) $object->entity !== (int) $conf->entity
+			|| !$user->hasRight('fournisseur', 'commande', 'commander') || !empty($user->socid)) {
+			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceAccessDenied');
+			return -1;
+		}
+		try {
+			foreach ($updates as $lineId => $diff) {
+				if (!is_array($diff) || (int) ($diff['fk_soc'] ?? 0) !== (int) $object->socid
+					|| $this->upsertSupplierPriceFromDiff($diff) < 0) {
+					if (!$this->error) {
+						$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceInvalidInput');
+					}
+					return -1;
+				}
+				dol_syslog(__METHOD__.' supplier update staged order='.(int) $object->id.' entity='.(int) $object->entity.' line='.(int) $lineId.' product='.(int) $diff['fk_product'].' new='.price2num($diff['unitprice'], 'MU').' awaiting native order commit', LOG_INFO);
+			}
+		} catch (Throwable $exception) {
+			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceWriteFailed');
+			dol_syslog(__METHOD__.' supplier update failed order='.(int) $object->id.' exception='.get_class($exception), LOG_ERR);
+			return -1;
+		}
+		return 1;
 	}
 
 	/**
@@ -339,11 +346,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	public function formConfirm($parameters, &$object, &$action, $hookmanager)
 	{
-		global $langs;
+		global $conf, $langs, $user;
 		dol_syslog(__METHOD__.' - Start formConfirm with action='.$action, LOG_DEBUG);
-		dol_syslog(__METHOD__.' - WARNING trace: entering formConfirm', LOG_WARNING);
 
-		if (empty($parameters['context']) || strpos($parameters['context'], 'ordersuppliercard') === false) {
+		if (!$this->isHookContext($parameters, 'ordersuppliercard')) {
 			dol_syslog(__METHOD__.' - Skip: unsupported context', LOG_DEBUG);
 			return 0;
 		}
@@ -358,13 +364,24 @@ class ActionsDynamicsPrices extends CommonHookActions
 			return 0;
 		}
 
-		$differences = $this->getOrderSupplierPriceDifferences($object);
+		if (!$object instanceof CommandeFournisseur || (int) $object->entity !== (int) $conf->entity
+			|| !$user->hasRight('fournisseur', 'lire') || !$user->hasRight('fournisseur', 'commande', 'commander')
+			|| !empty($user->socid)) {
+			return 0;
+		}
+
+		try {
+			$differences = $this->getOrderSupplierPriceDifferences($object, true);
+		} catch (Throwable $exception) {
+			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceWriteFailed');
+			return -1;
+		}
 		$priceDifferences = $this->filterPriceDifferences($differences);
 		if (empty($priceDifferences)) {
 			dol_syslog(__METHOD__.' - No supplier unit price difference found, native confirmation will be used', LOG_DEBUG);
 			return 0;
 		}
-		$displayDifferences = $this->getOrderSupplierPriceDifferences($object, true);
+		$displayDifferences = $differences;
 		dol_syslog(__METHOD__.' - Prepare modal with '.count($displayDifferences).' line(s), including unchanged lines, because at least one supplier unit price differs', LOG_DEBUG);
 
 		$langs->load('dynamicsprices@dynamicsprices');
@@ -382,9 +399,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$csrfToken = newToken();
 		$url .= '&token='.$csrfToken;
 
-		$initialSelectedLines = implode(',', array_map('intval', array_keys($displayDifferences)));
-
-		$html = '<div id="dynamicsprices_diff_wrapper" class="div-table-responsive">';
+		$html = '<div id="dynamicsprices_diff_wrapper" class="div-table-responsive-no-min">';
 		$html .= '<table class="noborder">';
 		$html .= '<tr class="liste_titre">';
 		$html .= '<td>&nbsp;</td>';
@@ -415,6 +430,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$html .= '<td class="right"><input class="center width50" type="text" name="dynamicsprices_data['.$lineId.'][discount]" value="'.dol_escape_htmltag((string) $diff['discount']).'" placeholder="%"></td>';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_product]" value="'.((int) $diff['fk_product']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_soc]" value="'.((int) $diff['fk_soc']).'">';
+			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][expected_unitprice]" value="'.dol_escape_htmltag((string) $diff['current_unitprice']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][current_rowid]" value="'.((int) $diff['current_rowid']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][fk_availability]" value="'.((int) $diff['fk_availability']).'">';
 			$html .= '<input type="hidden" name="dynamicsprices_data['.$lineId.'][delivery_time_days]" value="'.dol_escape_htmltag($diff['delivery_time_days'] === null ? '' : (string) $diff['delivery_time_days']).'">';
@@ -430,19 +446,11 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$formquestion = array(
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_modal', 'value' => '1'),
-			array('type' => 'hidden', 'name' => 'dynamicsprices_selected_lines', 'value' => $initialSelectedLines),
-			array('type' => 'hidden', 'name' => 'dynamicsprices_payload', 'value' => ''),
 			array('type' => 'hidden', 'name' => 'datecommande', 'value' => $datecommande),
 			array('type' => 'hidden', 'name' => 'methodecommande', 'value' => $methodecommande),
 			array('type' => 'hidden', 'name' => 'methode', 'value' => $methodecommande),
 			array('type' => 'hidden', 'name' => 'comment', 'value' => $comment),
 		);
-
-		$ignoreUrl = $url.'&action=dynamicsprices_confirm_commande&confirm=yes&dynamicsprices_modal=1&dynamicsprices_skip_update=1';
-		$ignoreUrl .= '&datecommande='.urlencode($datecommande);
-		$ignoreUrl .= '&methodecommande='.urlencode($methodecommande);
-		$ignoreUrl .= '&methode='.urlencode($methodecommande);
-		$ignoreUrl .= '&comment='.urlencode($comment);
 
 		$this->resprints = $form->formconfirm(
 			$url,
@@ -450,8 +458,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$langs->trans('LMDB_SupplierPriceModalDescription'),
 			'dynamicsprices_confirm_commande',
 			$formquestion,
-			1,
-			1,
+			'yes',
+			0,
 			'auto',
 			'auto',
 			0,
@@ -459,92 +467,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$langs->trans('LMDB_Ignore')
 		);
 
-		$this->resprints .= '<style nonce="'.getNonce().'">';
-		$this->resprints .= '.ui-dialog[aria-describedby="dialog-confirm"]{';
-		$this->resprints .= 'position:fixed !important;';
-		$this->resprints .= 'top:50% !important;';
-		$this->resprints .= 'left:50% !important;';
-		$this->resprints .= 'transform:translate(-50%, -50%);';
-		$this->resprints .= 'margin:0;';
-		$this->resprints .= 'width:auto !important;';
-		$this->resprints .= 'max-width:calc(100vw - 100px);';
-		$this->resprints .= 'max-height:calc(100vh - 100px);';
-		$this->resprints .= 'display:flex;';
-		$this->resprints .= 'flex-direction:column;';
-		$this->resprints .= '}';
-		$this->resprints .= '.ui-dialog[aria-describedby="dialog-confirm"] .ui-dialog-titlebar{flex:0 0 auto;}';
-		$this->resprints .= '.ui-dialog[aria-describedby="dialog-confirm"] .ui-dialog-buttonpane{flex:0 0 auto;}';
-		$this->resprints .= '#dialog-confirm{';
-		$this->resprints .= 'box-sizing:border-box;';
-		$this->resprints .= 'height:auto !important;';
-		$this->resprints .= 'max-height:none !important;';
-		$this->resprints .= 'overflow:hidden !important;';
-		$this->resprints .= 'display:flex !important;';
-		$this->resprints .= 'flex-direction:column;';
-		$this->resprints .= 'min-height:0;';
-		$this->resprints .= '}';
-		$this->resprints .= '#dialog-confirm .confirmquestions{';
-		$this->resprints .= 'flex:1 1 auto;';
-		$this->resprints .= 'min-height:0;';
-		$this->resprints .= 'overflow-y:auto;';
-		$this->resprints .= '}';
-		$this->resprints .= '#dialog-confirm .confirmmessage{flex:0 0 auto;}';
-		$this->resprints .= '#dynamicsprices_diff_wrapper{overflow-x:auto;overflow-y:visible;}';
-		$this->resprints .= '</style>';
-
-		$this->resprints .= '<script nonce="'.getNonce().'">';
-		$this->resprints .= 'jQuery(function($){';
-		$this->resprints .= 'var updateSelectedLines=function(){';
-		$this->resprints .= 'var selected=[];';
-		$this->resprints .= '$("input[name^=\'dynamicsprices_apply_line\']:checked").each(function(){';
-		$this->resprints .= 'var m=($(this).attr("name")||"").match(/\\[(\\d+)\\]/);';
-		$this->resprints .= 'if(m&&m[1]) selected.push(m[1]);';
-		$this->resprints .= '});';
-		$this->resprints .= '$("input[name=\'dynamicsprices_selected_lines\']").val(selected.join(","));';
-		$this->resprints .= '};';
-		$this->resprints .= 'var updateSupplierPricePayload=function(){';
-		$this->resprints .= 'var rows={};';
-		$this->resprints .= '$("#dynamicsprices_diff_wrapper").find("input").each(function(){';
-		$this->resprints .= 'var name=$(this).attr("name")||"";';
-		$this->resprints .= 'var match=name.match(/^dynamicsprices_data\\[(\\d+)\\]\\[([^\\]]+)\\]$/);';
-		$this->resprints .= 'if(match&&match[1]&&match[2]){';
-		$this->resprints .= 'if(!rows[match[1]]) rows[match[1]]={};';
-		$this->resprints .= 'rows[match[1]][match[2]]=$(this).val();';
-		$this->resprints .= '}';
-		$this->resprints .= 'match=name.match(/^dynamicsprices_apply_line\\[(\\d+)\\]$/);';
-		$this->resprints .= 'if(match&&match[1]){';
-		$this->resprints .= 'if(!rows[match[1]]) rows[match[1]]={};';
-		$this->resprints .= 'rows[match[1]].selected=$(this).is(":checked")?"1":"0";';
-		$this->resprints .= '}';
-		$this->resprints .= '});';
-		$this->resprints .= 'var json=JSON.stringify(rows);';
-		$this->resprints .= 'var utf8=unescape(encodeURIComponent(json));';
-		$this->resprints .= 'var encoded="";';
-		$this->resprints .= 'for(var i=0;i<utf8.length;i++){';
-		$this->resprints .= 'var h=utf8.charCodeAt(i).toString(16);';
-		$this->resprints .= 'encoded+=(h.length<2?"0":"")+h;';
-		$this->resprints .= '}';
-		$this->resprints .= '$("input[name=\'dynamicsprices_payload\']").val(encoded);';
-		$this->resprints .= '};';
-		$this->resprints .= 'var updateModalState=function(){updateSelectedLines();updateSupplierPricePayload();};';
-
-		$this->resprints .= '$(document).on("input change", "#dynamicsprices_diff_wrapper input", updateModalState);';
-		$this->resprints .= '$(document).on("submit", "form", updateModalState);';
-
-		$this->resprints .= '$(document).on("click", ".ui-dialog[aria-describedby=\'dialog-confirm\'] .ui-dialog-buttonset .ui-button", function(){';
-		$this->resprints .= 'if($.trim($(this).text())==="'.$langs->transnoentitiesnoconv('LMDB_Ignore').'"){';
-		$this->resprints .= 'window.location.href="'.$ignoreUrl.'";';
-		$this->resprints .= 'return false;';
-		$this->resprints .= '}';
-		$this->resprints .= 'updateModalState();';
-		$this->resprints .= '});';
-
-		$this->resprints .= '$(document).on("click", ".ui-dialog[aria-describedby=\'dialog-confirm\'] .ui-dialog-titlebar-close", function(){';
-		$this->resprints .= 'window.location.href="'.$ignoreUrl.'";';
-		$this->resprints .= '});';
-		$this->resprints .= 'updateModalState();';
-		$this->resprints .= '});';
-		$this->resprints .= '</script>';
+		// The core caches confirm before doActions. Keep confirm=yes for submission,
+		// and use a separate native yes/no selector for the optional tariff update.
+		$this->resprints = str_replace(
+			array('name="confirm"', 'id="confirm"'),
+			array('name="dynamicsprices_update_prices"', 'id="dynamicsprices_update_prices"'),
+			$this->resprints
+		);
+		$this->resprints = str_replace('</form>', '<input type="hidden" name="confirm" value="yes"></form>', $this->resprints);
 
 		dol_syslog(__METHOD__.' - Custom confirmation modal rendered', LOG_DEBUG);
 		return 1;
@@ -559,6 +489,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	private function getOrderSupplierPriceDifferences($object, $includeUnchanged = false)
 	{
+		global $user;
 		$differences = array();
 		if (empty($object->id) || empty($object->socid)) {
 			dol_syslog(__METHOD__.' - Skip comparison: missing order id or supplier id', LOG_DEBUG);
@@ -573,6 +504,14 @@ class ActionsDynamicsPrices extends CommonHookActions
 			if (empty($line->fk_product)) {
 				dol_syslog(__METHOD__.' - Skip line without product id', LOG_DEBUG);
 				continue;
+			}
+
+			$product = new ProductFournisseur($this->db);
+			if ($product->fetch((int) $line->fk_product) <= 0
+				|| !$user->hasRight('fournisseur', 'lire')
+				|| !in_array((int) $product->entity, array_map('intval', explode(',', getEntity('product'))), true)
+				|| restrictedArea($user, 'produit|service', $product, 'product&product', '', '', '', 0, 1) <= 0) {
+				throw new RuntimeException('Supplier price product access denied');
 			}
 
 			$orderQty = price2num((float) $line->qty, 'MS');
@@ -674,9 +613,10 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 * @param int $fkSoc Supplier thirdparty id
 	 * @param float $qty Minimum quantity
 	 * @param int $preferredRowid Preferred supplier price rowid linked to the order line
+	 * @param bool $lock Lock the preferred row within the submission transaction
 	 * @return array<string,mixed>
 	 */
-	private function getCurrentSupplierPrice($fkProduct, $fkSoc, $qty, $preferredRowid = 0)
+	private function getCurrentSupplierPrice($fkProduct, $fkSoc, $qty, $preferredRowid = 0, $lock = false)
 	{
 		global $conf;
 		$hasPackagingField = $this->hasSupplierPricePackagingField();
@@ -688,9 +628,12 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$sql .= ' AND fk_product = '.((int) $fkProduct);
 			$sql .= ' AND fk_soc = '.((int) $fkSoc);
 			$sql .= ' AND entity = '.((int) $conf->entity);
-			$sql .= ' LIMIT 1';
+			$sql .= ' LIMIT 1'.($lock ? ' FOR UPDATE' : '');
 
 			$resql = $this->db->query($sql);
+			if (!$resql) {
+				throw new RuntimeException('Supplier price lookup failed');
+			}
 			if ($resql && $this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
 				if ($obj) {
@@ -719,6 +662,9 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$sql .= ' ORDER BY rowid DESC';
 
 		$resql = $this->db->query($sql);
+		if (!$resql) {
+			throw new RuntimeException('Supplier price lookup failed');
+		}
 		if (!$resql || !$this->db->num_rows($resql)) {
 			return array();
 		}
@@ -941,7 +887,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	private function upsertSupplierPriceFromDiff(array $diff)
 	{
-		global $langs, $user;
+		global $conf, $langs, $user;
 
 		$productFournisseur = new ProductFournisseur($this->db);
 		$resultFetchProduct = $productFournisseur->fetch((int) $diff['fk_product']);
@@ -961,8 +907,44 @@ class ActionsDynamicsPrices extends CommonHookActions
 			return -1;
 		}
 
+		$canWritePrice = (int) $productFournisseur->type === 0
+			? $user->hasRight('produit', 'creer') : $user->hasRight('service', 'creer');
+		if (version_compare(DOL_VERSION, '23.0.0', '>=') && getDolGlobalInt('MAIN_USE_ADVANCED_PERMS')) {
+			$canWritePrice = $user->hasRight('product', 'product_advance', 'write_supplier_prices');
+		}
+		if (!$canWritePrice || !$user->hasRight('fournisseur', 'lire')
+			|| !in_array((int) $productFournisseur->entity, array_map('intval', explode(',', getEntity('product'))), true)
+			|| !in_array((int) $supplier->entity, array_map('intval', explode(',', getEntity('societe'))), true)
+			|| restrictedArea($user, 'produit|service', $productFournisseur, 'product&product', '', '', '', 0, 1) <= 0
+			|| restrictedArea($user, 'societe', $supplier, 'societe', '', '', '', 0, 1) <= 0) {
+			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceAccessDenied');
+			return -1;
+		}
+		foreach (array('qty', 'unitquantity', 'vat', 'unitprice', 'discount') as $field) {
+			if (!isset($diff[$field]) || !is_scalar($diff[$field]) || !is_numeric($diff[$field])
+				|| !is_finite((float) $diff[$field]) || (float) $diff[$field] < 0) {
+				$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceInvalidInput');
+				return -1;
+			}
+		}
+		if ((float) $diff['discount'] > 100 || (float) $diff['unitquantity'] <= 0) {
+			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceInvalidInput');
+			return -1;
+		}
+
+		if ((int) $diff['current_rowid'] > 0) {
+			$current = $this->getCurrentSupplierPrice((int) $diff['fk_product'], (int) $diff['fk_soc'], $diff['reference_qty'], (int) $diff['current_rowid'], true);
+			if (empty($current) || (int) $current['rowid'] !== (int) $diff['current_rowid']
+				|| !$this->areDecimalValuesEqual($current['unitprice'], $diff['current_unitprice'])
+				|| !$this->areDecimalValuesEqual($current['quantity'], $diff['reference_qty'])
+				|| (string) $current['ref_fourn'] !== (string) $diff['reference_supplier_ref']) {
+				$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceConcurrentChange');
+				return -1;
+			}
+		}
+
 		$qtyForApi = price2num((float) $diff['qty'], 'MS');
-		$unitpriceForApi = price2num((float) $diff['unitprice'], 'MS');
+		$unitpriceForApi = price2num((float) $diff['unitprice'], 'MU');
 		if ($qtyForApi <= 0) {
 			if (is_object($langs)) {
 				$langs->load('errors');
@@ -991,7 +973,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 		if ($packagingForApi <= 0) {
 			$packagingForApi = 1;
 		}
-		$buypriceForApi = price2num($unitpriceForApi * $qtyForApi, 'MS');
+		// Native supplier price is a tariff for the minimum quantity (MU), not a commercial total.
+		$buypriceForApi = price2num($unitpriceForApi * $qtyForApi, 'MU');
 
 		$referenceRowId = !empty($diff['current_rowid']) ? (int) $diff['current_rowid'] : 0;
 		$referenceQty = isset($diff['reference_qty']) ? price2num((float) $diff['reference_qty'], 'MS') : $qtyForApi;
@@ -1159,11 +1142,11 @@ class ActionsDynamicsPrices extends CommonHookActions
 			"'".$this->db->escape($supplierRef)."'",
 			"''",
 			((string) ((int) $user->id)),
-			((string) price2num($buypriceForApi, 'MS')),
+			((string) price2num($buypriceForApi, 'MU')),
 			((string) price2num($qtyForApi, 'MS')),
 			((string) price2num((float) $diff['discount'], 'MS')),
 			'0',
-			((string) price2num($unitpriceForApi, 'MS')),
+			((string) price2num($unitpriceForApi, 'MU')),
 			((string) price2num((float) $diff['vat'], 'MS')),
 			'0',
 			((string) ((int) $diff['fk_availability'])),
@@ -1181,50 +1164,63 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$values[] = ((string) price2num($packagingForApi, 'MS'));
 		}
 
-		$this->db->begin();
-		$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'product_fournisseur_price ('.implode(', ', $columns).') VALUES ('.implode(', ', $values).')';
-		$resql = $this->db->query($sql);
-		if (!$resql) {
-			$this->error = $this->db->lasterror();
-			$this->errors[] = $this->error;
-			$this->db->rollback();
-			dol_syslog(__METHOD__.' - SQL error while creating supplier price: '.$this->error, LOG_ERR);
+		if (!$this->db->begin()) {
+			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceWriteFailed');
 			return -1;
 		}
-
-		$newSupplierPriceRowId = (int) $this->db->last_insert_id(MAIN_DB_PREFIX.'product_fournisseur_price');
-		$productFournisseur->product_fourn_price_id = $newSupplierPriceRowId;
-		if (!getDolGlobalString('PRODUCT_PRICE_SUPPLIER_NO_LOG') && $this->insertSupplierPriceLog($newSupplierPriceRowId, $now, $buypriceForApi, $qtyForApi) < 0) {
-			$this->db->rollback();
-			return -1;
-		}
-
-		$resultFetchPrice = $productFournisseur->fetch_product_fournisseur_price($newSupplierPriceRowId);
-		if ($resultFetchPrice <= 0) {
-			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceCreatedReloadError');
-			$this->db->rollback();
-			dol_syslog(__METHOD__.' - '.$this->error, LOG_ERR);
-			return -1;
-		}
-
-		$resultTrigger = $productFournisseur->call_trigger('PRODUCT_BUYPRICE_CREATE', $user);
-		if ($resultTrigger < 0) {
-			if (!empty($productFournisseur->error)) {
-				$this->error = $productFournisseur->error;
-				$this->errors = !empty($productFournisseur->errors) ? $productFournisseur->errors : $this->errors;
+		try {
+			$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'product_fournisseur_price ('.implode(', ', $columns).') VALUES ('.implode(', ', $values).')';
+			$resql = $this->db->query($sql);
+			if (!$resql) {
+				$this->error = $this->db->lasterror();
 				$this->errors[] = $this->error;
-			} else {
-				$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceCreateTriggerError');
+				$this->db->rollback();
+				dol_syslog(__METHOD__.' - SQL error while creating supplier price: '.$this->error, LOG_ERR);
+				return -1;
 			}
+
+			$newSupplierPriceRowId = (int) $this->db->last_insert_id(MAIN_DB_PREFIX.'product_fournisseur_price');
+			$productFournisseur->product_fourn_price_id = $newSupplierPriceRowId;
+			if (!getDolGlobalString('PRODUCT_PRICE_SUPPLIER_NO_LOG') && $this->insertSupplierPriceLog($newSupplierPriceRowId, $now, $buypriceForApi, $qtyForApi) < 0) {
+				$this->db->rollback();
+				return -1;
+			}
+
+			$resultFetchPrice = $productFournisseur->fetch_product_fournisseur_price($newSupplierPriceRowId);
+			if ($resultFetchPrice <= 0) {
+				$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceCreatedReloadError');
+				$this->db->rollback();
+				dol_syslog(__METHOD__.' - '.$this->error, LOG_ERR);
+				return -1;
+			}
+
+			$resultTrigger = $productFournisseur->call_trigger('PRODUCT_BUYPRICE_CREATE', $user);
+			if ($resultTrigger < 0) {
+				if (!empty($productFournisseur->error)) {
+					$this->error = $productFournisseur->error;
+					$this->errors = !empty($productFournisseur->errors) ? $productFournisseur->errors : $this->errors;
+					$this->errors[] = $this->error;
+				} else {
+					$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceCreateTriggerError');
+				}
+				$this->db->rollback();
+				dol_syslog(__METHOD__.' - Trigger error while creating supplier price: '.$this->error, LOG_ERR);
+				return -1;
+			}
+
+			if (!$this->db->commit()) {
+				$this->db->rollback();
+				$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceWriteFailed');
+				return -1;
+			}
+			dol_syslog(__METHOD__.' - Supplier price created with rowid='.$newSupplierPriceRowId.' product='.(int) $diff['fk_product'].' supplier='.(int) $diff['fk_soc'].' qty='.$qtyForApi.' packaging='.$packagingForApi, LOG_DEBUG);
+
+			return 1;
+		} catch (Throwable $exception) {
 			$this->db->rollback();
-			dol_syslog(__METHOD__.' - Trigger error while creating supplier price: '.$this->error, LOG_ERR);
+			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceWriteFailed');
 			return -1;
 		}
-
-		$this->db->commit();
-		dol_syslog(__METHOD__.' - Supplier price created with rowid='.$newSupplierPriceRowId.' product='.(int) $diff['fk_product'].' supplier='.(int) $diff['fk_soc'].' qty='.$qtyForApi.' packaging='.$packagingForApi, LOG_DEBUG);
-
-		return 1;
 	}
 
 	/**
@@ -1241,7 +1237,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		global $user;
 
 		$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'product_fournisseur_price_log (datec, fk_product_fournisseur, fk_user, price, quantity)';
-		$sql .= " VALUES ('".$this->db->idate($dateCreation)."', ".((int) $supplierPriceRowId).', '.((int) $user->id).', '.price2num($buyprice, 'MS').', '.price2num($qty, 'MS').')';
+		$sql .= " VALUES ('".$this->db->idate($dateCreation)."', ".((int) $supplierPriceRowId).', '.((int) $user->id).', '.price2num($buyprice, 'MU').', '.price2num($qty, 'MS').')';
 		$resql = $this->db->query($sql);
 		if (!$resql) {
 			$this->error = $this->db->lasterror();
@@ -1276,6 +1272,9 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$sql .= ' LIMIT 1';
 
 		$resql = $this->db->query($sql);
+		if (!$resql) {
+			throw new RuntimeException('Supplier price lookup failed');
+		}
 		if (!$resql || !$this->db->num_rows($resql)) {
 			return array();
 		}
@@ -1345,7 +1344,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	private function areDecimalValuesEqual($left, $right)
 	{
-		return abs(price2num((float) $left, 'MS') - price2num((float) $right, 'MS')) < 0.000001;
+		return (string) price2num($left, 'MS') === (string) price2num($right, 'MS');
 	}
 
 	/**
@@ -1414,89 +1413,6 @@ class ActionsDynamicsPrices extends CommonHookActions
 	}
 
 	/**
-	 * Decode edited supplier price rows from the confirmation modal payload.
-	 *
-	 * @return array<int,array<string,mixed>>
-	 */
-	private function getPostedRowsDataFromPayload()
-	{
-		$payloadHex = GETPOST('dynamicsprices_payload', 'aZ09');
-		if (!is_string($payloadHex) || trim($payloadHex) === '') {
-			return array();
-		}
-		$payloadHex = trim($payloadHex);
-		if ((strlen($payloadHex) % 2) !== 0 || !ctype_xdigit($payloadHex)) {
-			dol_syslog(__METHOD__.' - Invalid supplier price modal payload encoding', LOG_WARNING);
-			return array();
-		}
-
-		$payloadJson = hex2bin($payloadHex);
-		if ($payloadJson === false) {
-			dol_syslog(__METHOD__.' - Unable to decode supplier price modal payload', LOG_WARNING);
-			return array();
-		}
-
-		$decodedPayload = json_decode($payloadJson, true);
-		if (!is_array($decodedPayload)) {
-			dol_syslog(__METHOD__.' - Invalid supplier price modal payload JSON', LOG_WARNING);
-			return array();
-		}
-
-		$rowsData = array();
-		$numericFields = array('qty', 'unitquantity', 'vat', 'unitprice', 'discount', 'supplier_reputation');
-		$integerFields = array('fk_product', 'fk_soc', 'current_rowid', 'fk_availability', 'selected');
-
-		foreach ($decodedPayload as $lineId => $rowData) {
-			$lineId = (int) $lineId;
-			if ($lineId <= 0 || !is_array($rowData)) {
-				continue;
-			}
-
-			$normalizedRow = array();
-			foreach ($numericFields as $fieldName) {
-				if (array_key_exists($fieldName, $rowData) && is_scalar($rowData[$fieldName])) {
-					$normalizedRow[$fieldName] = price2num((string) $rowData[$fieldName], 'MS');
-				}
-			}
-			foreach ($integerFields as $fieldName) {
-				if (array_key_exists($fieldName, $rowData) && is_scalar($rowData[$fieldName])) {
-					$normalizedRow[$fieldName] = (int) $rowData[$fieldName];
-				}
-			}
-			if (array_key_exists('delivery_time_days', $rowData) && is_scalar($rowData['delivery_time_days'])) {
-				$normalizedRow['delivery_time_days'] = ((string) $rowData['delivery_time_days'] !== '') ? (int) $rowData['delivery_time_days'] : null;
-			}
-			if (array_key_exists('supplier_ref', $rowData) && is_scalar($rowData['supplier_ref'])) {
-				$normalizedRow['supplier_ref'] = trim(dol_string_nohtmltag((string) $rowData['supplier_ref'], 1));
-			}
-
-			if (!empty($normalizedRow)) {
-				$rowsData[$lineId] = $normalizedRow;
-			}
-		}
-
-		return $rowsData;
-	}
-
-	/**
-	 * Extract selected rows from normalized modal payload data.
-	 *
-	 * @param array<int,array<string,mixed>> $postedRowsData Submitted rows data
-	 * @return array<int,int>
-	 */
-	private function getSelectedRowsFromPostedData(array $postedRowsData)
-	{
-		$selectedRows = array();
-		foreach ($postedRowsData as $lineId => $rowData) {
-			if (!empty($rowData['selected'])) {
-				$selectedRows[(int) $lineId] = 1;
-			}
-		}
-
-		return $selectedRows;
-	}
-
-	/**
 	 * Merge posted form values into difference payload.
 	 *
 	 * @param int $lineId Line id
@@ -1511,6 +1427,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		}
 
 		$rowData = $postedRowsData[$lineId];
+		$originalDiff = $diff;
 
 		$diff['qty'] = isset($rowData['qty']) ? price2num($rowData['qty'], 'MS') : $diff['qty'];
 		$diff['unitquantity'] = isset($rowData['unitquantity']) ? price2num($rowData['unitquantity'], 'MS') : $diff['unitquantity'];
@@ -1518,6 +1435,12 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$diff['unitprice'] = isset($rowData['unitprice']) ? price2num($rowData['unitprice'], 'MS') : $diff['unitprice'];
 		$diff['discount'] = isset($rowData['discount']) ? price2num($rowData['discount'], 'MS') : $diff['discount'];
 		$diff['supplier_ref'] = isset($rowData['supplier_ref']) ? trim(dol_string_nohtmltag((string) $rowData['supplier_ref'], 1)) : $diff['supplier_ref'];
+		$diff['is_price_different'] = !empty($diff['is_price_different']) || !$this->areDecimalValuesEqual($diff['unitprice'], $diff['new_unitprice']);
+		foreach (array('vat', 'discount') as $field) {
+			if (!$this->areDecimalValuesEqual($diff[$field], $originalDiff[$field])) {
+				$diff['is_other_fields_different'] = true;
+			}
+		}
 		$diff['new_unitprice'] = $diff['unitprice'];
 
 		if (isset($diff['current_unitprice'])) {
@@ -1731,6 +1654,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 	 */
 	private function getSupplierReferenceFromLine($line, $socid)
 	{
+		global $conf;
 		if (!empty($line->ref_fourn)) {
 			return (string) $line->ref_fourn;
 		}
@@ -1745,9 +1669,13 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$sql .= ' WHERE fk_product = '.((int) $line->fk_product);
 		$sql .= ' AND fk_soc = '.((int) $socid);
 		$sql .= ' AND ref_fourn IS NOT NULL AND ref_fourn <> \'\'';
+		$sql .= ' AND entity = '.((int) $conf->entity);
 		$sql .= ' ORDER BY rowid DESC';
 		$sql .= ' LIMIT 1';
 		$resql = $this->db->query($sql);
+		if (!$resql) {
+			throw new RuntimeException('Supplier price lookup failed');
+		}
 		if ($resql && $this->db->num_rows($resql) > 0) {
 			$obj = $this->db->fetch_object($resql);
 			if ($obj && isset($obj->ref_fourn)) {
