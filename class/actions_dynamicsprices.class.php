@@ -467,6 +467,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 		$form = new Form($this->db);
 		$formquestion = array(
+			array('type' => 'other', 'name' => 'dynamicsprices_instruction', 'label' => '', 'value' => '<p>'.dol_escape_htmltag($langs->trans('LMDB_SupplierPriceModalDescription')).'</p>'),
 			array('type' => 'other', 'name' => 'dynamicsprices_diff_table', 'label' => '', 'value' => $html),
 			array('type' => 'hidden', 'name' => 'dynamicsprices_modal', 'value' => '1'),
 			array('type' => 'hidden', 'name' => 'datecommande', 'value' => $datecommande),
@@ -485,7 +486,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 		$this->resprints = $form->formconfirm(
 			$url,
 			$langs->trans('LMDB_SupplierPriceModalTitle'),
-			$langs->trans('LMDB_SupplierPriceModalDescription'),
+			'',
 			'dynamicsprices_confirm_commande',
 			$formquestion,
 			'yes',
