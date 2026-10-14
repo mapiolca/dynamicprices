@@ -374,7 +374,9 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$differences = $this->getOrderSupplierPriceDifferences($object, true);
 		} catch (Throwable $exception) {
 			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceWriteFailed');
-			return -1;
+			// The native card ignores negative formConfirm returns and opens its own dialog.
+			$this->resprints = '<div class="error">'.dol_escape_htmltag($this->error).'</div>';
+			return 1;
 		}
 		$priceDifferences = $this->filterPriceDifferences($differences);
 		if (empty($priceDifferences)) {
@@ -510,7 +512,7 @@ class ActionsDynamicsPrices extends CommonHookActions
 			if ($product->fetch((int) $line->fk_product) <= 0
 				|| !$user->hasRight('fournisseur', 'lire')
 				|| !in_array((int) $product->entity, array_map('intval', explode(',', getEntity('product'))), true)
-				|| restrictedArea($user, 'produit|service', $product, 'product&product', '', '', '', 0, 1) <= 0) {
+				|| restrictedArea($user, 'produit|service', $product, 'product&product', '', '', 'rowid', 0, 1) <= 0) {
 				throw new RuntimeException('Supplier price product access denied');
 			}
 
@@ -915,8 +917,8 @@ class ActionsDynamicsPrices extends CommonHookActions
 		if (!$canWritePrice || !$user->hasRight('fournisseur', 'lire')
 			|| !in_array((int) $productFournisseur->entity, array_map('intval', explode(',', getEntity('product'))), true)
 			|| !in_array((int) $supplier->entity, array_map('intval', explode(',', getEntity('societe'))), true)
-			|| restrictedArea($user, 'produit|service', $productFournisseur, 'product&product', '', '', '', 0, 1) <= 0
-			|| restrictedArea($user, 'societe', $supplier, 'societe', '', '', '', 0, 1) <= 0) {
+			|| restrictedArea($user, 'produit|service', $productFournisseur, 'product&product', '', '', 'rowid', 0, 1) <= 0
+			|| restrictedArea($user, 'societe', $supplier, '&societe', '', 'fk_soc', 'rowid', 0, 1) <= 0) {
 			$this->setSupplierPriceTranslatedError('LMDB_SupplierPriceAccessDenied');
 			return -1;
 		}

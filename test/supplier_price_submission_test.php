@@ -107,7 +107,11 @@ function price2num($value, $mode = '') {
 function dol_syslog(...$args) {}
 function dol_string_nohtmltag($value, $mode) { return strip_tags($value); }
 function getEntity($element) { return '2'; }
-function restrictedArea(...$args) { return 1; }
+function restrictedArea(...$args) {
+	if (($args[6] ?? 'rowid') !== 'rowid') { throw new RuntimeException('Native access check requires its rowid SELECT column'); }
+	if ($args[1] === 'societe' && $args[3] !== '&societe') { throw new RuntimeException('Native third-party sharing contract must be preserved'); }
+	return 1;
+}
 function setEventMessages(...$args) {}
 function GETPOSTINT($key) { return (int) GETPOST($key, 'int'); }
 function dol_mktime(...$args) { return 1700000000; }
@@ -159,6 +163,10 @@ if (($argv[1] ?? '') === '--native-form') {
 	check(1, $xpath->query('//form//select[@name="dynamicsprices_update_prices"]')->length, 'Separate native selector for optional update');
 	check(1, $xpath->query('//form/input[@name="token"]')->length, 'Native CSRF field');
 	check(2, $xpath->query('//form//input[contains(@name,"[unitprice]")]')->length, 'Editable prices belong to POST form');
+	$db->failRead = true;
+	check(1, $hook->formConfirm($parameters, $order, $action, $manager), 'Lookup failure replaces native confirmation');
+	check(false, strpos($hook->resprints, '<form') !== false, 'Lookup failure never opens a submission form');
+	$db->failRead = false;
 	echo "Native Form::formconfirm DOM test passed (simulated environment).\n";
 }
 function prepare($request, $expected = 0) {
