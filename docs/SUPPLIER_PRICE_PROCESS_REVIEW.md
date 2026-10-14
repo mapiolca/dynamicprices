@@ -14,7 +14,7 @@ Revue du 14 octobre 2026. Branche `fix/supplier-price-confirmation`, base `b9399
 
 ## Parcours corrigé
 
-1. L'action native `commande` affiche une confirmation `Form::formconfirm` en POST si un prix diffère. Les lignes non cochées restent inchangées.
+1. L'action native `commande` affiche une confirmation `Form::formconfirm` en POST si un prix diffère. Le formulaire entier est placé dans le dialogue jQuery UI natif lorsque JavaScript/Ajax est actif ; son rendu intégré sert de repli sans JavaScript. Les lignes non cochées restent inchangées.
 2. Un choix distinct permet de mettre à jour les tarifs ou de les ignorer. Le paramètre natif `confirm=yes` reste réservé à l'envoi de commande : le core le lit avant `doActions`. Le choix « Ignorer » continue explicitement l'envoi sans écrire de tarif.
 3. `main.inc.php` conserve son contrôle CSRF. Le module refuse également une requête sans token, une commande déjà envoyée, un utilisateur externe, un acteur sans droit d'envoi ou une commande d'une autre entité. Les valeurs techniques du produit et du fournisseur sont reconstruites depuis les lignes serveur.
 4. Le hook prépare les seules lignes sélectionnées dans le contexte transitoire `dynamicsprices_supplier_updates`. Il n'écrit aucun tarif.
@@ -59,7 +59,7 @@ La suite vérifie préparation sans écriture, succès, échec de la deuxième l
 
 - Le développement sert le correctif `34979425a25c81621b7c95d6e06de3261d44b1e4`, récupéré via GitControl cPanel directement dans le répertoire du module. Pas de tâche Deploy HEAD : le dépôt ne contient pas de `.cpanel.yml`. La commande 1233 et INT300 n'ont pas été modifiés ; le journal initial ne permet toujours pas d'attester leur tarif final.
 - Faire la recette sur une instance de test : produit et service, droits simples/avancés, administrateur sans droit, deux entités et produit partagé, création d'un nouveau tarif et conservation du tarif de référence, conflit de clé unique, échec d'historique/trigger et commit final sur l'abstraction SQL réelle.
-- Tester POST avec/sans token et token invalide, choix « Ignorer », aucune ligne sélectionnée, fonctionnement sans JavaScript, téléphone, tablette et bureau. La confirmation est désormais intégrée à la page ; aucune fermeture de dialogue ne lance une commande.
+- Tester POST avec/sans token et token invalide, choix « Ignorer », aucune ligne sélectionnée, fonctionnement sans JavaScript, téléphone, tablette et bureau. Aucune fermeture de dialogue ne lance une commande.
 - Vérifier les notifications et déclencheurs manuels propres à l'instance. La transaction SQL ne peut pas annuler un email ou un appel externe déjà émis par un autre trigger.
 - Le verrou contrôle le prix, la quantité et la référence au moment d'écrire ; il ne constitue pas un contrôle de version complet de tous les attributs d'un tarif. La prévention du rejeu dépend du statut de la commande relu par la page ; un double envoi strictement simultané doit être testé sur la base réelle.
 - Les traces INFO `supplier update staged` indiquent une écriture dans la transaction, pas un succès final. Pour confirmer le résultat, corréler le `COMMIT`/`ROLLBACK` natif au niveau DEBUG et contrôler le tarif et son historique en base.
@@ -79,3 +79,29 @@ Instance `develop.lesmetiersdubatiment.fr`, Dolibarr 25.0.0-alpha avec Multicomp
 - Journal corrélé : 10:39:33 UTC / 12:39:33 Paris, requête 1050210, préparation sans écriture, mise à jour native du tarif 83, insertion de son historique à 12, trigger natif d'envoi, puis `COMMIT Transaction`. Aucun rollback ou échec SQL dans ce parcours.
 
 Les enregistrements de recette sont conservés pour inspection. Cette recette valide le parcours nominal produit, pas les échecs réels de transaction, les services, les accès interentités, les soumissions concurrentes ni la matrice complète v20–v25. Les autres scénarios restent couverts seulement par simulation ou à exécuter manuellement.
+
+## Variantes réelles sur le formulaire intégré
+
+Recette du 14 octobre 2026, code servi `f0912d6`, même instance, acteur et entité. Clones fictifs de la commande 24, sans emails, appels ou réceptions. Les notes privées copiées identifient les objets de recette. Les configurations sont conservées.
+
+| Cas | Objet | Résultat observé |
+|---|---|---|
+| Quantité minimale 0 | Commande 25 / PO2610-0013 | Refus explicite, commande approuvée, aucun nouveau tarif |
+| Remise 101 % | Commande 25 | Refus des valeurs invalides, commande approuvée |
+| Conditionnement 2, référence/quantité minimale 1 inchangées | Commande 25 | Conflit de clé native expliqué, envoi refusé |
+| Nouveau minimum 10, conditionnement 5, TVA 5,5 %, remise 10 %, prix unitaire 12 € | Commande 25 | Nouveau tarif 84 ; tarif 83 à minimum 1 conservé ; commande passée |
+| Ignorer | Commande 26 / PO2610-0014 | Commande passée ; tarifs 83 et 84 inchangés |
+| Aucune ligne sélectionnée | Commande 27 / PO2610-0015 | Commande passée ; tarifs inchangés |
+| Minimum 10 déjà existant, prix 12,12345 €, TVA 10 %, remise 5 % | Commande 28 / PO2610-0016 | Tarif 84 actualisé, historique 121,2345 € pour 10 unités, aucun doublon ; tarif 83 conservé |
+| Tarif de référence changé après affichage, 12 → 12,50 € | Commande 29 / PO2610-0017 | Confirmation obsolète refusée avant envoi ; référence restaurée explicitement à 12 € depuis la page native |
+| Minimum 20, conditionnement 10, prix volontairement 0 € | Commande 29 puis 30 / PO2610-0018 | Tarif 85 créé puis réutilisé, prix et historique à zéro, commandes passées |
+
+Le journal téléchargé par le lien natif de `admin/syslog.php` confirme notamment la création du tarif 85 et son historique, puis le commit à 12:13:29 UTC / 14:13:29 Paris (requête 1172390), et sa réutilisation suivie du commit à 12:15:26 UTC (requête 1176108). Une relecture initiale de l'onglet conservait une vue ancienne ; une nouvelle requête native de tri affiche les trois paliers et confirme le zéro. Les historiques 83/84 ont aussi été inspectés dans les infobulles natives.
+
+Les modifications temporaires pour le conflit ont été restaurées, avec leur historique conservé. Les produits/tarifs/commandes fictifs et leurs PDF/événements restent disponibles ; aucune suppression ni purge. Cette recette ne vaut pas contrôle de droits par comptes distincts, essai de deux entités, test de plusieurs produits dans une même commande ou exécution simultanée.
+
+## Retour à la modale
+
+Demandé après cette première série : conserver le formulaire POST natif et son token à l'intérieur du dialogue jQuery UI déjà fourni par Dolibarr. Initialisation limitée au conteneur du module, idempotente, nonce natif `getNonce()`, fermeture/Escape sans soumission ni requête métier. Aucune charge tarifaire JSON dans l'URL, aucun gestionnaire global ou nouvel endpoint.
+
+Les tests locaux du vrai `Form::formconfirm` vérifient le DOM avec et sans Ajax : un seul formulaire POST, token, champs et choix d'actualisation à l'intérieur du conteneur. Le test du zéro explicite sur tarif existant passe en simulation. Déploiement et seconde recette de la modale encore à réaliser au moment de cette entrée ; ne pas confondre cette préparation avec une validation réelle du dialogue.

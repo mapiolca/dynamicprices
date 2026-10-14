@@ -477,6 +477,18 @@ class ActionsDynamicsPrices extends CommonHookActions
 			$this->resprints
 		);
 		$this->resprints = str_replace('</form>', '<input type="hidden" name="confirm" value="yes"></form>', $this->resprints);
+		// Keep the native POST form intact inside the native jQuery UI dialog.
+		// Closing the dialog has no handler and never submits the order.
+		$this->resprints = '<div id="dynamicsprices_supplier_confirmation">'.$this->resprints.'</div>';
+		if (!empty($conf->use_javascript_ajax)) {
+			$dialogTitle = json_encode($langs->transnoentities('LMDB_SupplierPriceModalTitle'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+			$this->resprints .= '<script nonce="'.getNonce().'">jQuery(function ($) {
+				var dialog = $("#dynamicsprices_supplier_confirmation");
+				if (typeof $.fn.dialog !== "function" || dialog.hasClass("ui-dialog-content")) { return; }
+				dialog.dialog({modal: true, title: '.$dialogTitle.', width: Math.min(1200, $(window).width() - 32),
+					maxHeight: $(window).height() - 64, height: "auto", closeOnEscape: true});
+			});</script>';
+		}
 
 		dol_syslog(__METHOD__.' - Custom confirmation modal rendered', LOG_DEBUG);
 		return 1;

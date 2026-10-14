@@ -16,6 +16,7 @@ class User {
 class Translate {
 	public function load($name) {}
 	public function trans($key, ...$args) { return $key; }
+	public function transnoentities($key, ...$args) { return $key; }
 }
 class Conf {
 	public $entity = 2;
@@ -116,6 +117,7 @@ function setEventMessages(...$args) {}
 function GETPOSTINT($key) { return (int) GETPOST($key, 'int'); }
 function dol_mktime(...$args) { return 1700000000; }
 function newToken() { return 'simulated-token'; }
+function getNonce() { return 'simulated-nonce'; }
 function dol_escape_htmltag($value) { return htmlspecialchars((string) $value, ENT_QUOTES); }
 function dol_include_once(...$args) {}
 function img_picto(...$args) { return ''; }
@@ -163,6 +165,14 @@ if (($argv[1] ?? '') === '--native-form') {
 	check(1, $xpath->query('//form//select[@name="dynamicsprices_update_prices"]')->length, 'Separate native selector for optional update');
 	check(1, $xpath->query('//form/input[@name="token"]')->length, 'Native CSRF field');
 	check(2, $xpath->query('//form//input[contains(@name,"[unitprice]")]')->length, 'Editable prices belong to POST form');
+	check(1, $xpath->query('//div[@id="dynamicsprices_supplier_confirmation"]/form')->length, 'Entire POST form belongs to modal container');
+	$conf->use_javascript_ajax = 1;
+	check(1, $hook->formConfirm($parameters, $order, $action, $manager), 'Modal rendering with native Ajax enabled');
+	$modalDom = new DOMDocument();
+	@$modalDom->loadHTML($hook->resprints);
+	$modalXpath = new DOMXPath($modalDom);
+	check(1, $modalXpath->query('//div[@id="dynamicsprices_supplier_confirmation"]/form[@method="POST"]')->length, 'Modal retains native POST and CSRF flow');
+	$conf->use_javascript_ajax = 0;
 	$db->failRead = true;
 	check(1, $hook->formConfirm($parameters, $order, $action, $manager), 'Lookup failure replaces native confirmation');
 	check(false, strpos($hook->resprints, '<form') !== false, 'Lookup failure never opens a submission form');
@@ -205,6 +215,12 @@ $db->begin();
 check(1, $trigger->runTrigger('ORDER_SUPPLIER_SUBMIT', $order, $user, $langs, $conf), 'Successful price staging');
 $db->rollback();
 check(10, $db->prices[10]['unitprice'], 'Later order failure rolls prices back');
+$zero = $request; $zero['dynamicsprices_data'][10]['unitprice'] = '0';
+prepare($zero);
+$db->begin();
+check(1, $trigger->runTrigger('ORDER_SUPPLIER_SUBMIT', $order, $user, $langs, $conf), 'Explicit zero tariff accepted');
+check(0.0, $db->prices[10]['unitprice'], 'Explicit zero is persisted instead of being ignored');
+$db->rollback();
 // Missing functional rights, including an administrator, never grant writes.
 foreach (array(false, true) as $admin) {
 	$user->admin = $admin;
